@@ -56,14 +56,38 @@
   (validate [this x] (check (instance? this x) "Wanted instance of %s, got %s" this (class x)))
 
   ;; prevent coersion
+  clojure.core$float
+  (validate [this x]
+    (check (instance? Float x) "Wanted float, got %s" (class x)))
+  
   clojure.core$double
   (validate [this x]
     (check (instance? Double x) "Wanted double, got %s" (class x)))
   
+  clojure.core$boolean
+  (validate [this x]
+    (check (instance? Boolean x) "Wanted boolean, got %s" (class x)))
+  
+  clojure.core$byte
+  (validate [this x]
+    (check (instance? Byte x) "Wanted byte, got %s" (class x)))
+  
+  clojure.core$char
+  (validate [this x]
+    (check (instance? Character x) "Wanted char, got %s" (class x)))
+  
+  clojure.core$short
+  (validate [this x]
+    (check (instance? Short x) "Wanted short, got %s" (class x)))
+  
+  clojure.core$int
+  (validate [this x]
+    (check (instance? Integer x) "Wanted int, got %s" (class x)))
+  
   clojure.core$long
   (validate [this x]
     (check (instance? Long x) "Wanted long, got %s" (class x)))
-  
+
   clojure.lang.AFn 
   (validate [this x] 
     (check (this x) "Value did not satisfy %s" this)))
@@ -208,7 +232,9 @@
   Schema
   (validate [this r]
     (check (instance? klass r) "Expected record %s, got class %s" klass (class r))
-    (validate schema (into {} r))))
+    (validate schema (into {} r))
+    (when-let [f (:extra-validator-fn this)]
+      (check (f r) "Record %s did not satisfy extra validation fn." klass))))
 
 (defn record 
   "A schema for record with class klass and map schema schema"
@@ -217,6 +243,30 @@
   (assert (map? schema))
   (Record. klass schema))
 
+(defn extract-record-fields [schema]
+  (assert (map? schema))
+  (vec
+   (for [[k v-schema] schema
+         :when (keyword? k)]
+     (with-meta (symbol (name k))
+       (cond (or (class? v-schema) 
+                 ('#{float double boolean byte char short int long} v-schema))
+             {:tag v-schema}
+             
+             (instance? Record v-schema)
+             {:tag (.klass ^Record v-schema)}
+             
+             :else {})))))
+
+(defmacro defrecord-schema 
+  "Define a defrecord 'name' with an accompanying schema 'schema-name'.
+   field-schema provides the record schema as a map, where non-optional or
+   repeated keys are made into record fields and primitive schemas generate
+   primitive hinted fields.  An optional extra-validator-fn can be given
+   which will provide extra validation for the schema."
+  [name [schema-name field-schema & [extra-validator-fn]] & opts+specs]
+  `(do (defrecord ~name ~(extract-record-fields field-schema) ~@opts+specs)
+       (def ~schema-name (assoc-when (record ~name ~field-schema) :extra-validator-fn ~extra-validator-fn))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

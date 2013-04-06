@@ -4,6 +4,28 @@
 (defmacro valid! [s x] `(is (do (validate ~s ~x) true)))
 (defmacro invalid! [s x] `(is (~'thrown? Exception (validate ~s ~x))))
 
+(deftest class-test
+  (valid! String "foo")
+  (invalid! String :foo))
+
+(deftest fn-test
+  (valid! odd? 1)
+  (invalid! odd? 2)
+  (invalid! odd? :foo))
+
+(deftest primitive-test
+  (valid! float (float 1.0))
+  (invalid! float 1.0)
+  (valid! double 1.0)
+  (invalid! double (float 1.0))
+  (valid! boolean true)
+  (invalid! boolean 1)
+  (doseq [f [byte char short int]]
+    (valid! f (f 1))
+    (invalid! f 1))
+  (valid! long 1)
+  (invalid! long (byte 1)))
+
 (deftest simple-map-schema-test
  (let [schema {:foo long
                :bar double}]
@@ -87,6 +109,20 @@
     (valid! schema  (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
+
+
+(defrecord-schema Bar [+bar-schema+ {:foo long :bar String (optional-key :baz) clojure.lang.Keyword}])
+
+(deftest defrecord-schema-test
+  (is (= +bar-schema+ (record Bar {:foo long :bar String (optional-key :baz) clojure.lang.Keyword})))
+  (is (Bar. 1 :foo))
+  (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
+  (is (thrown? Exception (map->Bar {})))
+  (valid! +bar-schema+ (Bar. 1 "test"))
+  (invalid! +bar-schema+ (Bar. 1 :foo))
+  (valid! +bar-schema+ (assoc (Bar. 1 "test") :baz :foo))
+  (invalid! +bar-schema+ (assoc (Bar. 1 "test") :baaaz :foo))
+  (invalid! +bar-schema+ (assoc (Bar. 1 "test") :baz "foo")))
 
 
 
