@@ -72,3 +72,18 @@
  (let [schema [(single (named "topic" String)) (single (named "score" double))]]
    (valid! schema ["foo" 1.0])
    (invalid! schema [1 2])))
+
+
+(defrecord Foo [x ^long y])
+
+(deftest record-test
+  (let [schema (record Foo {:x +anything+ :y long})]
+    (valid! schema (Foo. :foo 1))
+    (invalid! schema {:x :foo :y 1})
+    (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
+
+(deftest record-with-extra-keys test
+  (let [schema (record Foo {:x +anything+ :y long (key-schema clojure.lang.Keyword) +anything+})]
+    (valid! schema  (Foo. :foo 1))
+    (valid! schema (assoc (Foo. :foo 1) :bar 2))
+    (invalid! schema {:x :foo :y 1})))

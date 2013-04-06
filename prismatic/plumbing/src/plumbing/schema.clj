@@ -200,6 +200,23 @@
               (recur (inc i) (next singles) (next x))))))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Record schemata
+
+(defrecord Record [klass schema]
+  Schema
+  (validate [this r]
+    (check (instance? klass r) "Expected record %s, got class %s" klass (class r))
+    (validate schema (into {} r))))
+
+(defn record 
+  "A schema for record with class klass and map schema schema"
+  [klass schema]
+  (assert (class? klass))
+  (assert (map? schema))
+  (Record. klass schema))
+
+
 ;; TODO: custom array types
 ;; TODO: disjunctions?
 ;; TODO: records.
