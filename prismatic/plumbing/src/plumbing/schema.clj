@@ -249,8 +249,8 @@
    (for [[k v-schema] schema
          :when (keyword? k)]
      (with-meta (symbol (name k))
-       (cond (or (class? v-schema) 
-                 ('#{float double boolean byte char short int long} v-schema))
+       (cond (or (symbol? v-schema) 
+                 (#{float double boolean byte char short int long} v-schema))
              {:tag v-schema}
              
              (instance? Record v-schema)
