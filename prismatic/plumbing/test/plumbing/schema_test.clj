@@ -87,3 +87,24 @@
     (valid! schema  (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
+
+
+
+(defmacro valid-call! [o c] `(is (= ~o (validated-call ~@c))))
+(defmacro invalid-call! [c] `(is (~'thrown? Exception (validated-call ~@c))))
+
+(deftest validated-call-test
+  (let [f (with-meta 
+            (fn schematized-fn [l m] 
+              (if (= l 100)
+                {:baz l}
+                {:bar (when (= l 1) (+ l (:foo m)))}))
+            {:input-schema [(single long) (single {:foo double})]
+             :output-schema {:bar (nillable double)}})]
+    (valid-call! {:bar nil} (f 2 {:foo 1.0}))
+    (valid-call! {:bar 4.0} (f 1 {:foo 3.0}))
+    (invalid-call! (f 3.0 {:foo 1.0}))
+    (invalid-call! (f 3 {:foo 1}))
+    (invalid-call! (f 100 {:foo 1.0}))))
+
+

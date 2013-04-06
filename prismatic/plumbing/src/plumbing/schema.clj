@@ -4,8 +4,9 @@
   (:require 
    [clojure.string :as str]))
 
-;; have to make our own defrecord, which builds mapping from record to schema.
-;; or have a declare-schema for classes...
+;; TODO: custom array types
+;; TODO: disjunctions?
+;; TODO: our own defschematizedrecord?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -217,7 +218,13 @@
   (Record. klass schema))
 
 
-;; TODO: custom array types
-;; TODO: disjunctions?
-;; TODO: records.
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schematized functions
+
+(defn validated-call [f & args]
+  (letk [[input-schema output-schema] (meta f)]
+    (validate input-schema args)
+    (let [o (apply f args)]
+      (validate output-schema o)
+      o)))
