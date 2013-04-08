@@ -1,23 +1,41 @@
 (ns plumbing.schema
-  "A library for data structure schemata and validation."
+  "A library for data structure schema definition and validation.
+
+   For example, 
+
+   (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0]})
+
+   returns true but 
+
+   (validate {:foo long :bar [double]} {:bar [1.0 2.0 3.0]})
+   (validate {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
+   (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
+
+   all throw exceptions."
+  (:refer-clojure :exclude [defrecord])
   (:use plumbing.core)
   (:require 
    [clojure.string :as str]))
 
 ;; TODO: custom array types
-;; TODO: disjunctions?
-;; TODO: our own defschematizedrecord?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
-(def ^:dynamic *validation-context* [])
+(def ^:dynamic *validation-context*  
+  "A path through the current data structure being validated, used to generate
+   a helpful error message about the context of a validation fail." 
+  [])
 
-(defmacro with-context [context & body]
+(defmacro with-context 
+  "Execute 'body' in with 'context' pushed onto the end of the validation context stack"
+  [context & body]
   `(binding [*validation-context* (conj *validation-context* ~context)]
      ~@body))
 
-(defn context-str []
+(defn context-str
+  "Produce a human-readable representation of the current validation context"
+  []
   (str/join   
    ","
    (for [c *validation-context*]
@@ -26,14 +44,20 @@
          s
          (subs s 0 20))))))
 
-(defn check-throw [& format-args]
+(defn check-throw 
+  "Throw an exception for a failed validation"
+  [& format-args]
   (throw (ex-info 
           (str (when (seq *validation-context*)
                  (format "In context %s: " (context-str)))
                (apply format format-args))
           {:type ::schema-mismatch})))
 
-(defmacro check [condition & format-args]
+(defmacro check 
+  "Check that condition is true; if not (or it thows an exception), throw an
+   exception describing the failure (via format-args) as well as the current 
+   validation context."
+  [condition & format-args]
   `(try (when-not ~condition
           (check-throw ~@format-args))
         (catch Throwable t#
@@ -42,7 +66,6 @@
            (check-throw "Condition %s threw exception %s" '~condition t#)))))
 
 (defprotocol Schema
-  "A schema"
   (validate [this x]    
     "Validate that x satisfies this schema by calling 'check', using 'with-context'
      to provide context about the path taken through the object"))
@@ -55,7 +78,7 @@
   Class
   (validate [this x] (check (instance? this x) "Wanted instance of %s, got %s" this (class x)))
 
-  ;; prevent coersion
+  ;; prevent coersion, so you have to be exactly the given type.
   clojure.core$float
   (validate [this x]
     (check (instance? Float x) "Wanted float, got %s" (class x)))
@@ -98,19 +121,43 @@
 (def +anything+
   (reify Schema (validate [this x])))
 
-(defrecord Nillable [schema]
+(clojure.core/defrecord Either [schemas]
+  Schema
+  (validate [this x]
+    (let [fails (map #(try (validate % x) nil (catch Exception e e)) schemas)]
+      (check (some not fails) "Did not match any schema: %s" (vec fails)))))
+
+(defn either
+  "The disjunction of multiple schemas."
+  [& schemas]
+  (Either. schemas))
+
+(clojure.core/defrecord Both [schemas]
+  Schema
+  (validate [this x]
+    (doseq [schema schemas]
+      (validate schema x))))
+
+(defn both
+  "The intersection of multiple schemas.  Useful, e.g., to combine a special-
+   purpose function validator with a normal map schema."
+  [& schemas]
+  (Both. schemas))
+
+
+(clojure.core/defrecord Maybe [schema]
   Schema
   (validate [this x]
     (when-not (nil? x)
       (validate schema x))))
 
-(defn nillable
+(defn maybe
   "Value can be nil or must satisfy schema"
   [schema]
-  (Nillable. schema))
+  (Maybe. schema))
 
 
-(defrecord NamedSchema [name schema]
+(clojure.core/defrecord NamedSchema [name schema]
   Schema
   (validate [this x]
     (with-context (format "<%s>" name)
@@ -122,44 +169,31 @@
   (NamedSchema. name schema))
 
 
-(defrecord MultiValidator [schemas]
-  Schema
-  (validate [this x]
-    (doseq [schema schemas]
-      (validate schema x))))
-
-(defn multi-validator 
-  "The intersection of multiple schemas.  Useful for instance to combine a special-
-   purpose function validator with a normal map schema."
-  [& schemas]
-  (MultiValidator. schemas))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
 
 
-(defrecord KeySchema [schema])
+(clojure.core/defrecord KeySchema [schema])
 
-(defn key-schema 
+(defn more-keys 
   "A schema that allows any number of additional map entries, where keys must 
    satisfy this schema."
   [schema]
   (KeySchema. schema))
 
-(defrecord OptionalKey [k])
+(clojure.core/defrecord OptionalKey [k])
 
 (defn optional-key
   "An optional key in a map"
   [k]
   (OptionalKey. k))
 
-(defn- find-key-schema [ks]
+(defn- find-more-keys [ks]
   (when-let [key-schemata (seq (filter #(instance? KeySchema %) ks))]
     (assert (< (count key-schemata) 2))
     (first key-schemata)))
 
-(defn validate-key 
+(defn- validate-key 
   "Validate a single schema key and dissoc the value from m"
   [m [schema-k schema-v]]
   (let [optional? (instance? OptionalKey schema-k)
@@ -174,12 +208,12 @@
   clojure.lang.APersistentMap
   (validate [this x]
     (check (instance? clojure.lang.APersistentMap x) "Expected a map, got a %s" (class x))
-    (let [key-schema (find-key-schema (keys this))]
-      (let [remaining (reduce validate-key x (dissoc this key-schema))]
-        (if key-schema
-          (let [value-schema (safe-get this key-schema)]
+    (let [more-keys (find-more-keys (keys this))]
+      (let [remaining (reduce validate-key x (dissoc this more-keys))]
+        (if more-keys
+          (let [value-schema (safe-get this more-keys)]
            (doseq [[k v] remaining]
-             (validate (.schema ^KeySchema key-schema) k)
+             (validate (.schema ^KeySchema more-keys) k)
              (with-context k (validate value-schema v))))
           (check (empty? remaining) "Got extra map keys %s" (vec (keys remaining))))))))
 
@@ -190,7 +224,7 @@
 ;; to do destructuring style, can use any number of 'single' elements
 ;; followed by an optional (implicit) repeated.
 
-(defrecord Single [schema])
+(clojure.core/defrecord Single [schema])
 
 (defn single
   "A single element of a sequence (not repeated, the implicit default)"
@@ -228,7 +262,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record schemata
 
-(defrecord Record [klass schema]
+(clojure.core/defrecord Record [klass schema]
   Schema
   (validate [this r]
     (check (instance? klass r) "Expected record %s, got class %s" klass (class r))
@@ -243,31 +277,69 @@
   (assert (map? schema))
   (Record. klass schema))
 
-(defn extract-record-fields [schema]
-  (assert (map? schema))
+(defn- extract-record-fields [schema]
+  (assert (vector? schema))
+  (assert (even? (count schema)))
   (vec
-   (for [[k v-schema] schema
-         :when (keyword? k)]
-     (with-meta (symbol (name k))
-       (cond (or (symbol? v-schema) 
-                 (#{float double boolean byte char short int long} v-schema))
-             {:tag v-schema}
+   (for [[k v-schema] (partition 2 schema)]
+     (do (assert (keyword? k))
+         (with-meta (symbol (name k))
+           (cond (or (symbol? v-schema) 
+                     (#{float double boolean byte char short int long} v-schema))
+                 {:tag v-schema}
              
-             (instance? Record v-schema)
-             {:tag (.klass ^Record v-schema)}
+                 (instance? Record v-schema)
+                 {:tag (.klass ^Record v-schema)}
              
-             :else {})))))
+                 :else {}))))))
 
-(defmacro defrecord-schema 
-  "Define a defrecord 'name' with an accompanying schema 'schema-name'.
-   field-schema provides the record schema as a map, where non-optional or
-   repeated keys are made into record fields and primitive schemas generate
-   primitive hinted fields.  An optional extra-validator-fn can be given
-   which will provide extra validation for the schema."
-  [name [schema-name field-schema & [extra-validator-fn]] & opts+specs]
-  `(do (defrecord ~name ~(extract-record-fields field-schema) ~@opts+specs)
-       (def ~schema-name (assoc-when (record ~name ~field-schema) :extra-validator-fn ~extra-validator-fn))))
+(def ^java.util.Map +record-schema-map+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
 
+(defn record-schema
+  "The schema for a defrecord class defined with schema/defrecord"
+  [klass]
+  (let [s (.get +record-schema-map+ klass)]
+    (when-not s
+      (throw (RuntimeException. (str "No schema known for record class " klass))))
+    s))
+
+(defmacro defrecord
+  "Define a defrecord 'name' using a modified map schema format.
+
+   field-schema is a let-binding-style vector from keys to value schemata,
+   which defines the actual base keys in the record.
+   e.g., [:foo long :bar {:a double}]
+   defines a record with two base keys foo and bar.
+
+   extra-key-schema? is an optional map schema that defines additional optional
+   keys (and/or a key-schemas) -- without it, the schema specifies that extra
+   keys are not allowed in the record.
+
+   extra-validator-fn? is an optional additional function that validates the record
+   value.
+   
+   and opts+specs is passed through to defrecord, i.e., protocol/interface
+   definitions, etc."
+  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  [name field-schema & more-args]
+  (let [[extra-key-schema? more-args] (if (map? (first more-args))
+                                        [(first more-args) (next more-args)]
+                                        [nil more-args])
+        [extra-validator-fn? more-args] (if-not (symbol? (first more-args))
+                                          [(first more-args) (next more-args)]
+                                          [nil more-args])]
+    `(do 
+       (let [extra-key-schema# (or ~extra-key-schema? {})]
+        (doseq [k# (keys extra-key-schema#)]
+          (when-not (or (instance? OptionalKey k#)
+                        (instance? KeySchema k#))
+            (throw (RuntimeException. "extra-key-schema? can only consist of optional-keys and more-keys"))))
+        (when ~extra-validator-fn? (assert (fn? ~extra-validator-fn?)))
+        (clojure.core/defrecord ~name ~(extract-record-fields field-schema) ~@more-args))
+       (.put +record-schema-map+ ~name
+             (assoc-when (record ~name (merge (for-map [[k# v#] (partition 2 ~field-schema)] k# v#)
+                                              ~extra-key-schema?)) 
+                         :extra-validator-fn ~extra-validator-fn?)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
