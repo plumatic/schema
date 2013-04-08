@@ -127,9 +127,29 @@
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
 
+(defprotocol PProtocol
+  (do-something [this]))
+
 (schema/defrecord Bar 
   [:foo long :bar String]
   {(schema/optional-key :baz) clojure.lang.Keyword})
+
+(schema/defrecord Bar2
+  [:foo long :bar String]
+  {(schema/optional-key :baz) clojure.lang.Keyword}
+  PProtocol 
+  (do-something [this] 2))
+
+(schema/defrecord Bar3
+  [:foo long :bar String]
+  PProtocol 
+  (do-something [this] 3))
+
+(schema/defrecord Bar4
+  [:foo long :bar String]
+  (fn [this] (odd? (:foo this)))
+  PProtocol 
+  (do-something [this] 4))
 
 (deftest defrecord-schema-test
   (is (= (schema/record-schema Bar) 
@@ -141,7 +161,19 @@
   (invalid! (schema/record-schema Bar) (Bar. 1 :foo))
   (valid! (schema/record-schema Bar) (assoc (Bar. 1 "test") :baz :foo))
   (invalid! (schema/record-schema Bar) (assoc (Bar. 1 "test") :baaaz :foo))
-  (invalid! (schema/record-schema Bar) (assoc (Bar. 1 "test") :baz "foo")))
+  (invalid! (schema/record-schema Bar) (assoc (Bar. 1 "test") :baz "foo"))
+  
+  (valid! (schema/record-schema Bar2) (assoc (Bar2. 1 "test") :baz :foo))
+  (invalid! (schema/record-schema Bar2) (assoc (Bar2. 1 "test") :baaaaz :foo))
+  (is (= 2 (do-something (Bar2. 1 "test"))))
+  
+  (valid! (schema/record-schema Bar3) (Bar3. 1 "test"))
+  (invalid! (schema/record-schema Bar3) (assoc (Bar3. 1 "test") :foo :bar))
+  (is (= 3 (do-something (Bar3. 1 "test"))))
+  
+  (valid! (schema/record-schema Bar4) (Bar4. 1 "test"))
+  (invalid! (schema/record-schema Bar4) (Bar4. 2 "test"))
+  (is (= 4 (do-something (Bar4. 1 "test")))))
 
 
 
