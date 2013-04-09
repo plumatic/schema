@@ -28,8 +28,8 @@
   (invalid! long (byte 1)))
 
 (deftest simple-map-schema-test
- (let [schema {:foo long
-               :bar double}]
+ (let [schema {(schema/required-key :foo) long
+               (schema/required-key :bar) double}]
    (valid! schema {:foo 1 :bar 2.0})
    (invalid! schema [[:foo 1] [:bar 2.0]])
    (invalid! schema {:foo 1 :bar 2.0 :baz 1})
@@ -37,8 +37,8 @@
    (invalid! schema {:foo 1.0 :bar 1.0})))
 
 (deftest fancier-map-schema-test
- (let [schema {:foo long
-               (schema/more-keys String) double}]
+  (let [schema {(schema/required-key :foo) long
+                String double}]
    (valid! schema {:foo 1})
    (valid! schema {:foo 1 "bar" 2.0})
    (valid! schema {:foo 1 "bar" 2.0 "baz" 10.0})  
@@ -47,9 +47,9 @@
    (invalid! schema {:foo 1 "bar" 2})))
 
 (deftest another-fancy-map-schema-test
- (let [schema {:foo (schema/maybe long)
+ (let [schema {(schema/required-key :foo) (schema/maybe long)
                (schema/optional-key :bar) double
-               :baz {:b1 odd?}}]
+               (schema/required-key :baz) {(schema/required-key :b1) odd?}}]
    (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
    (valid! schema {:foo 1 :baz {:b1 3}})
    (valid! schema {:foo nil :baz {:b1 3}})
@@ -61,8 +61,8 @@
 
 (deftest either-test
   (let [schema (schema/either
-                {:l long}
-                {:d double})]
+                {(schema/required-key :l) long}
+                {(schema/required-key :d) double})]
     (valid! schema {:l 1})
     (valid! schema {:d 1.0})
     (invalid! schema {:l 1.0})
@@ -71,7 +71,7 @@
 (deftest both-test
  (let [schema (schema/both
                (fn equal-keys? [m] (doseq [[k v] m] (schema/check (= k v) "Got non-equal key-value pair: %s %s" k v)) true)
-               {(schema/more-keys clojure.lang.Keyword) clojure.lang.Keyword})]
+               {clojure.lang.Keyword clojure.lang.Keyword})]
    (valid! schema {})
    (valid! schema {:foo :foo :bar :bar})
    (invalid! schema {"foo" "foo"})
@@ -122,14 +122,15 @@
 (defrecord Foo [x ^long y])
 
 (deftest record-test
-  (let [schema (schema/record Foo {:x schema/+anything+ :y long})]
+  (let [schema (schema/record Foo {(schema/required-key :x) schema/+anything+ (schema/optional-key :y) long})]
     (valid! schema (Foo. :foo 1))
     (invalid! schema {:x :foo :y 1})
     (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
 
 (deftest record-with-extra-keys test
-  (let [schema (schema/record Foo {:x schema/+anything+ :y long
-                                   (schema/more-keys clojure.lang.Keyword) schema/+anything+})]
+  (let [schema (schema/record Foo {(schema/required-key :x) schema/+anything+ 
+                                   (schema/required-key :y) long
+                                   clojure.lang.Keyword schema/+anything+})]
     (valid! schema  (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
@@ -160,7 +161,9 @@
 
 (deftest defrecord-schema-test
   (is (= (schema/record-schema Bar) 
-         (schema/record Bar {:foo long :bar String (schema/optional-key :baz) clojure.lang.Keyword})))
+         (schema/record Bar {(schema/required-key :foo) long 
+                             (schema/required-key :bar) String 
+                             (schema/optional-key :baz) clojure.lang.Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   (is (thrown? Exception (map->Bar {})))
@@ -193,8 +196,8 @@
               (if (= l 100)
                 {:baz l}
                 {:bar (when (= l 1) (+ l (:foo m)))}))
-            {:input-schema [(schema/single long) (schema/single {:foo double})]
-             :output-schema {:bar (schema/maybe double)}})]
+            {:input-schema [(schema/single long) (schema/single {(schema/required-key :foo) double})]
+             :output-schema {(schema/required-key :bar) (schema/maybe double)}})]
     (valid-call! {:bar nil} (f 2 {:foo 1.0}))
     (valid-call! {:bar 4.0} (f 1 {:foo 3.0}))
     (invalid-call! (f 3.0 {:foo 1.0}))

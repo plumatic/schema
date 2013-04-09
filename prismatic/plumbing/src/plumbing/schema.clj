@@ -17,6 +17,8 @@
   (:require 
    [clojure.string :as str]))
 
+;; TODO: allow bare keywords to be required-key ?
+
 ;; TODO: unify default for sequences and maps? 
 ;;  - option 1: no 'single' have 'many' instead
 ;;  - option 2: have 'exact-key' or some such -- plus sugar for defrecord.
@@ -190,14 +192,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
 
+(clojure.core/defrecord RequiredKey [k])
 
-(clojure.core/defrecord KeySchema [schema])
-
-(defn more-keys 
-  "A schema that allows any number of additional map entries, where keys must 
-   satisfy this schema."
-  [schema]
-  (KeySchema. schema))
+(defn required-key
+  "An optional key in a map"
+  [k]
+  (RequiredKey. k))
 
 (clojure.core/defrecord OptionalKey [k])
 
@@ -206,8 +206,12 @@
   [k]
   (OptionalKey. k))
 
+(defn- specific-key? [ks]
+  (or (instance? RequiredKey ks) (instance? OptionalKey ks))
+  )
+
 (defn- find-more-keys [ks]
-  (when-let [key-schemata (seq (filter #(instance? KeySchema %) ks))]
+  (let [key-schemata (remove specific-key? ks)]
     (assert (< (count key-schemata) 2))
     (first key-schemata)))
 
@@ -215,7 +219,7 @@
   "Validate a single schema key and dissoc the value from m"
   [m [schema-k schema-v]]
   (let [optional? (instance? OptionalKey schema-k)
-        k (if optional? (.k ^OptionalKey schema-k) schema-k)]
+        k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
     (when-not optional? (check (contains? m k) "Map is missing key %s" k))
     (when-not (and optional? (not (contains? m k))) 
       (with-context k
@@ -231,7 +235,7 @@
         (if more-keys
           (let [value-schema (safe-get this more-keys)]
            (doseq [[k v] remaining]
-             (validate (.schema ^KeySchema more-keys) k)
+             (validate more-keys k)
              (with-context k (validate value-schema v))))
           (check (empty? remaining) "Got extra map keys %s" (vec (keys remaining))))))))
 
@@ -348,15 +352,15 @@
                                           [(first more-args) (next more-args)]
                                           [nil more-args])]
     `(do 
-       (let [extra-key-schema# (or ~extra-key-schema? {})]
-        (doseq [k# (keys extra-key-schema#)]
-          (when-not (or (instance? OptionalKey k#)
-                        (instance? KeySchema k#))
-            (throw (RuntimeException. "extra-key-schema? can only consist of optional-keys and more-keys"))))
-        (when ~extra-validator-fn? (assert (fn? ~extra-validator-fn?)))
-        (clojure.core/defrecord ~name ~(extract-record-fields field-schema) ~@more-args))
+       (when-let [bad-keys# (seq (filter #(instance? RequiredKey %) (keys ~extra-key-schema?)))]
+         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
+       (when ~extra-validator-fn?
+         (assert (fn? ~extra-validator-fn?)))
+       (clojure.core/defrecord ~name ~(extract-record-fields field-schema) ~@more-args)
        (.put +record-schema-map+ ~name
-             (assoc-when (record ~name (merge (for-map [[k# v#] (partition 2 ~field-schema)] k# v#)
+             (assoc-when (record ~name (merge (for-map [[k# v#] (partition 2 ~field-schema)] 
+                                                (required-key k#) 
+                                                v#)
                                               ~extra-key-schema?)) 
                          :extra-validator-fn ~extra-validator-fn?)))))
 
