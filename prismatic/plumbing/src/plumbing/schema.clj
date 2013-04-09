@@ -12,7 +12,7 @@
    (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
 
    all throw exceptions."
-  (:refer-clojure :exclude [defrecord])
+  (:refer-clojure :exclude [defrecord or and])
   (:use plumbing.core)
   (:require 
    [clojure.string :as str]))
@@ -138,6 +138,8 @@
   [& schemas]
   (Either. schemas))
 
+(def or either)
+
 (clojure.core/defrecord Both [schemas]
   Schema
   (validate [this x]
@@ -150,6 +152,7 @@
   [& schemas]
   (Both. schemas))
 
+(def and both)
 
 (clojure.core/defrecord Maybe [schema]
   Schema
@@ -161,6 +164,8 @@
   "Value can be nil or must satisfy schema"
   [schema]
   (Maybe. schema))
+
+(def ? maybe)
 
 
 (clojure.core/defrecord NamedSchema [name schema]
@@ -207,7 +212,7 @@
   (OptionalKey. k))
 
 (defn- specific-key? [ks]
-  (or (instance? RequiredKey ks) (instance? OptionalKey ks))
+  (clojure.core/or (instance? RequiredKey ks) (instance? OptionalKey ks))
   )
 
 (defn- find-more-keys [ks]
@@ -221,7 +226,7 @@
   (let [optional? (instance? OptionalKey schema-k)
         k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
     (when-not optional? (check (contains? m k) "Map is missing key %s" k))
-    (when-not (and optional? (not (contains? m k))) 
+    (when-not (clojure.core/and optional? (not (contains? m k))) 
       (with-context k
         (validate schema-v (get m k))))
     (dissoc m k)))
@@ -299,22 +304,6 @@
   (assert (map? schema))
   (Record. klass schema))
 
-(defn- extract-record-fields [schema]
-  (assert (vector? schema))
-  (assert (even? (count schema)))
-  (vec
-   (for [[k v-schema] (partition 2 schema)]
-     (do (assert (keyword? k))
-         (with-meta (symbol (name k))
-           (cond (or #_ (symbol? v-schema) ;; this can be a variable, and Clojure ignores class hints anyway, so fuck it for now...                     
-                     ('#{float double boolean byte char short int long} v-schema)
-                     (#{float double boolean byte char short int long} v-schema))
-                 {:tag v-schema}
-             
-                 (instance? Record v-schema)
-                 {:tag (.klass ^Record v-schema)}
-             
-                 :else {}))))))
 
 (def ^java.util.Map +record-schema-map+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
 
@@ -326,12 +315,23 @@
       (throw (RuntimeException. (str "No schema known for record class " klass))))
     s))
 
+(defn extract-schema [symbol]
+  (assert (symbol? symbol))
+  (let [{:keys [tag s schema]} (meta symbol)]
+    (if-let [schema (clojure.core/or s schema tag)]
+      (if (instance? clojure.lang.IRecord schema)
+        (get +record-schema-map+ schema schema)
+        schema)
+      +anything+)))
+
 (defmacro defrecord
   "Define a defrecord 'name' using a modified map schema format.
 
-   field-schema is a let-binding-style vector from keys to value schemata,
-   which defines the actual base keys in the record.
-   e.g., [:foo long :bar {:a double}]
+   field-schema looks just like an ordinary defrecord field binding, except that you 
+   can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints 
+   to fields, and classes naming sub-records are magically auto-expanded into their 
+   record-schemata. 
+   e.g., [^long foo  ^{:schema {:a double}} bar]
    defines a record with two base keys foo and bar.
 
    extra-key-schema? is an optional map schema that defines additional optional
@@ -356,11 +356,11 @@
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
        (when ~extra-validator-fn?
          (assert (fn? ~extra-validator-fn?)))
-       (clojure.core/defrecord ~name ~(extract-record-fields field-schema) ~@more-args)
+       (clojure.core/defrecord ~name ~field-schema ~@more-args)
        (.put +record-schema-map+ ~name
-             (assoc-when (record ~name (merge (for-map [[k# v#] (partition 2 ~field-schema)] 
-                                                (required-key k#) 
-                                                v#)
+             (assoc-when (record ~name (merge ~(for-map [k field-schema]
+                                                 (required-key (keyword (clojure.core/name k)))
+                                                 (extract-schema k))
                                               ~extra-key-schema?)) 
                          :extra-validator-fn ~extra-validator-fn?)))))
 
@@ -373,3 +373,30 @@
     (let [o (apply f args)]
       (validate output-schema o)
       o)))
+
+(comment
+ (defn validate* [& args]
+   (when *test-time*
+                                        ;...
+    
+     ))
+
+ (defmacro fn
+   
+   `{:pre [(validate* ...)]
+     }
+   )
+
+ (fn-schemata ;; seq of [input-schema output-schema] pairs for each implementation
+  )
+
+ (schema/defn my-validated-fn
+   ^Object 
+   [^{:schema +ner-schema+} a
+    ^String d    
+    b 
+    ^Record c]
+   
+   (+ a b c d)
+   
+   ))

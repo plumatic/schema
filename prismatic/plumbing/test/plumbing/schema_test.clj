@@ -139,22 +139,22 @@
   (do-something [this]))
 
 (schema/defrecord Bar 
-  [:foo long :bar String]
+  [^long foo ^String bar]
   {(schema/optional-key :baz) clojure.lang.Keyword})
 
 (schema/defrecord Bar2
-  [:foo long :bar String]
+  [^long foo ^String bar]
   {(schema/optional-key :baz) clojure.lang.Keyword}
   PProtocol 
   (do-something [this] 2))
 
 (schema/defrecord Bar3
-  [:foo long :bar String]
+  [^long foo ^String bar]
   PProtocol 
   (do-something [this] 3))
 
 (schema/defrecord Bar4
-  [:foo long :bar String]
+  [^long foo ^String bar]
   (fn [this] (odd? (:foo this)))
   PProtocol 
   (do-something [this] 4))
