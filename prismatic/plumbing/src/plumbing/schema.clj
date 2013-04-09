@@ -264,17 +264,16 @@
     (check (not (instance? java.util.Map x)) "Expected a seq, got a map %s" (class x))
     (check (do (seq x) true) "Expected a seq, got non-seqable %s" (class x))
     (let [[singles multi] (extract-multi this)]
-      (if multi
-        (check (>= (count x) (count singles)) "Seq too short: need at least %s elements, got %s"
-               (count singles) (count x))
-        (check (= (count x) (count singles)) "Seq wrong length: need exactly %s elements, got %s"
-               (count singles) (count x)))
       (loop [i 0 singles (seq singles) x (seq x)]
         (if-not singles
-          (when multi 
+          (if multi
             (doseq [[offset item] (indexed x)]
-              (with-context (+ offset i) (validate multi item))))
-          (do (with-context i (validate (first singles) (first x)))
+              (with-context (+ offset i) (validate multi item)))
+            (check (not x) "Seq too long: extra elements with classes %s"
+                   (mapv class x)))
+          (do (check x "Seq too short: missing (at least) %s elements"
+                     (count singles))
+              (with-context i (validate (first singles) (first x)))
               (recur (inc i) (next singles) (next x))))))))
 
 
