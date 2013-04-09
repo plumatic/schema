@@ -17,6 +17,10 @@
   (:require 
    [clojure.string :as str]))
 
+;; TODO: unify default for sequences and maps? 
+;;  - option 1: no 'single' have 'many' instead
+;;  - option 2: have 'exact-key' or some such -- plus sugar for defrecord.
+
 ;; TODO: custom array types
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
