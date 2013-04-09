@@ -173,6 +173,7 @@
   (NamedSchema. name schema))
 
 
+
 (clojure.core/defrecord EnumSchema [vs]
   Schema
   (validate [this x]
@@ -182,6 +183,8 @@
   "A value that must be = to one element of vs."
   [& vs]
   (EnumSchema. vs))
+
+(def integral-number (either long int))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -243,8 +246,9 @@
 
 (defn single
   "A single element of a sequence (not repeated, the implicit default)"
-  [schema]
-  (Single. schema))
+  [schema & [name]]
+  (Single. (if name (named name schema)
+               schema)))
 
 (defn- extract-multi 
   "Return a pair [single-schemas repeated-schema-or-nil]"
@@ -299,7 +303,8 @@
    (for [[k v-schema] (partition 2 schema)]
      (do (assert (keyword? k))
          (with-meta (symbol (name k))
-           (cond (or (symbol? v-schema) 
+           (cond (or #_ (symbol? v-schema) ;; this can be a variable, and Clojure ignores class hints anyway, so fuck it for now...                     
+                     ('#{float double boolean byte char short int long} v-schema)
                      (#{float double boolean byte char short int long} v-schema))
                  {:tag v-schema}
              
