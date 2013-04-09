@@ -83,6 +83,13 @@
    (valid! schema 1)
    (invalid! schema 1.0)))
 
+(deftest enum-test
+  (let [schema (schema/enum :a :b 1)]
+    (valid! schema :a)
+    (valid! schema 1)
+    (invalid! schema :c)
+    (invalid! schema 2)))
+
 (deftest simple-repeated-seq-test
  (let [schema [long]]
    (valid! schema [])

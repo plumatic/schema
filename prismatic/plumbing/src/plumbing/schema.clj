@@ -169,6 +169,17 @@
   (NamedSchema. name schema))
 
 
+(clojure.core/defrecord EnumSchema [vs]
+  Schema
+  (validate [this x]
+    (check (some #(= % x) vs) "Got an invalid enum element")))
+
+(defn enum
+  "A value that must be = to one element of vs."
+  [& vs]
+  (EnumSchema. vs))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
 
