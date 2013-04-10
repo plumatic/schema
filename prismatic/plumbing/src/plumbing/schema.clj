@@ -308,7 +308,7 @@
 
 (def ^java.util.Map +record-schema-map+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
 
-(defn record-schema
+(defn ^Record record-schema
   "The schema for a defrecord class defined with schema/defrecord"
   [klass]
   (let [s (.get +record-schema-map+ klass)]
