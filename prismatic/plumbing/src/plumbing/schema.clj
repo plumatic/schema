@@ -17,12 +17,7 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: allow bare keywords to be required-key ?
-
-;; TODO: unify default for sequences and maps? 
-;;  - option 1: no 'single' have 'many' instead
-;;  - option 2: have 'exact-key' or some such -- plus sugar for defrecord.
-
+;; TODO: allow bare keywords to be required-key by default ?
 ;; TODO: custom array types
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -124,8 +119,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple helpers / wrappers
 
-(def +anything+
-  (reify Schema (validate [this x])))
+;; _ is to work around bug in Clojure where eval-ing defrecord with no fields 
+;; loses type info, which makes this unusable in schema-fn.
+;; http://dev.clojure.org/jira/browse/CLJ-1196
+(clojure.core/defrecord Anything [_]
+  Schema
+  (validate [this x]))
+
+(def +anything+ (Anything. nil))
 
 (clojure.core/defrecord Either [schemas]
   Schema
@@ -316,13 +317,18 @@
     s))
 
 (defn extract-schema [symbol]
-  (assert (symbol? symbol))
   (let [{:keys [tag s schema]} (meta symbol)]
     (if-let [schema (clojure.core/or s schema tag)]
       (if (instance? clojure.lang.IRecord schema)
         (get +record-schema-map+ schema schema)
         schema)
       +anything+)))
+
+(defn maybe-split-first [pred s]
+  (if (pred (first s))
+    [(first s) (next s)]
+    [nil s]))
+
 
 (defmacro defrecord
   "Define a defrecord 'name' using a modified map schema format.
@@ -345,12 +351,8 @@
    definitions, etc."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
-  (let [[extra-key-schema? more-args] (if (map? (first more-args))
-                                        [(first more-args) (next more-args)]
-                                        [nil more-args])
-        [extra-validator-fn? more-args] (if-not (symbol? (first more-args))
-                                          [(first more-args) (next more-args)]
-                                          [nil more-args])]
+  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
+        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)]
     `(do 
        (when-let [bad-keys# (seq (filter #(instance? RequiredKey %) (keys ~extra-key-schema?)))]
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
@@ -360,7 +362,8 @@
        (.put +record-schema-map+ ~name
              (assoc-when (record ~name (merge ~(for-map [k field-schema]
                                                  (required-key (keyword (clojure.core/name k)))
-                                                 (extract-schema k))
+                                                 (do (assert (symbol? k))
+                                                     (extract-schema k)))
                                               ~extra-key-schema?)) 
                          :extra-validator-fn ~extra-validator-fn?)))))
 
@@ -374,29 +377,3 @@
       (validate output-schema o)
       o)))
 
-(comment
- (defn validate* [& args]
-   (when *test-time*
-                                        ;...
-    
-     ))
-
- (defmacro fn
-   
-   `{:pre [(validate* ...)]
-     }
-   )
-
- (fn-schemata ;; seq of [input-schema output-schema] pairs for each implementation
-  )
-
- (schema/defn my-validated-fn
-   ^Object 
-   [^{:schema +ner-schema+} a
-    ^String d    
-    b 
-    ^Record c]
-   
-   (+ a b c d)
-   
-   ))
