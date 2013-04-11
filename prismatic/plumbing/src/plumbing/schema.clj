@@ -17,6 +17,8 @@
   (:require 
    [clojure.string :as str]))
 
+;; TODO: make (vec-of ), array-of
+;; TODO: propagate type hint into defn name.
 ;; TODO: allow bare keywords to be required-key by default ?
 ;; TODO: custom array types
 
