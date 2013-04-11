@@ -17,10 +17,14 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: make (vec-of ), array-of
+;; TODO: test array thing
 ;; TODO: propagate type hint into defn name.
-;; TODO: allow bare keywords to be required-key by default ?
-;; TODO: custom array types
+;; TODO: rename single to one?
+;; TODO: fix 'named' to switch arg order.
+;; TODO: rename validate to validate*, takes second arg context,
+;;  new fn validate is (validate* x []), kill with-context and validation-context
+;; TODO: #{} notation for sets #{schema} and that's it.
+;; TODO: kill or/and
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -80,6 +84,11 @@
 (extend-protocol Schema
   Class
   (validate [this x] (check (instance? this x) "Wanted instance of %s, got %s" this (class x)))
+  
+  String 
+  (validate [this x]
+    (check (= this (.name (class x))) "Wanted instance of %s, got %s" this (class x)))
+
 
   ;; prevent coersion, so you have to be exactly the given type.
   clojure.core$float
@@ -113,7 +122,7 @@
   clojure.core$long
   (validate [this x]
     (check (instance? Long x) "Wanted long, got %s" (class x)))
-
+  
   clojure.lang.AFn 
   (validate [this x] 
     (check (this x) "Value did not satisfy %s" this)))
