@@ -325,6 +325,9 @@
       (throw (RuntimeException. (str "No schema known for record class " klass))))
     s))
 
+;; TODO: we can use 'resolve' here with &env to check if we got a class.
+;; TODO: 'Record' check doesn't work since we haven't resolved class, probably
+;;   - fix and add test.
 (defn extract-schema [symbol]
   (let [{:keys [tag s schema]} (meta symbol)]
     (if-let [schema (clojure.core/or s schema tag)]
