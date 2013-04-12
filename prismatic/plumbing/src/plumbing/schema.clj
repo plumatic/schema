@@ -23,6 +23,9 @@
 ;;  new fn validate is (validate* x []), kill with-context and validation-context
 ;; TODO: #{} notation for sets #{schema} and that's it.
 ;; TODO: kill or/and
+;; TODO: extensible handling for Classes (declare-schema, get-schema), they no
+;;      longer directly need to auto-expand.  Records just use this.
+;; TODO: expand-schema method that expands Class schemata and checks methods.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -328,6 +331,7 @@
 ;; TODO: we can use 'resolve' here with &env to check if we got a class.
 ;; TODO: 'Record' check doesn't work since we haven't resolved class, probably
 ;;   - fix and add test.
+;; TODO: allow 'canonical' schemas for arguments in a ns?
 (defn extract-schema [symbol]
   (let [{:keys [tag s schema]} (meta symbol)]
     (if-let [schema (clojure.core/or s schema tag)]
