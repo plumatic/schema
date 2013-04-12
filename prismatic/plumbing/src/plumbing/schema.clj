@@ -17,9 +17,7 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: test array thing
 ;; TODO: propagate type hint into defn name.
-;; TODO: rename single to one?
 ;; TODO: fix 'named' to switch arg order.
 ;; TODO: rename validate to validate*, takes second arg context,
 ;;  new fn validate is (validate* x []), kill with-context and validation-context
@@ -263,21 +261,21 @@
 ;; to do destructuring style, can use any number of 'single' elements
 ;; followed by an optional (implicit) repeated.
 
-(clojure.core/defrecord Single [schema])
+(clojure.core/defrecord One [schema])
 
-(defn single
+(defn one
   "A single element of a sequence (not repeated, the implicit default)"
   [schema & [name]]
-  (Single. (if name (named name schema)
+  (One. (if name (named name schema)
                schema)))
 
 (defn- extract-multi 
-  "Return a pair [single-schemas repeated-schema-or-nil]"
+  "Return a pair [one-schemas repeated-schema-or-nil]"
   [seq-schema]
-  (let [[singles multi] (if (instance? Single (last seq-schema))
+  (let [[singles multi] (if (instance? One (last seq-schema))
                           [seq-schema nil]
                           [(butlast seq-schema) (last seq-schema)])]
-    [(map #(.schema ^Single %) singles) multi]))
+    [(map #(.schema ^One %) singles) multi]))
 
 (extend-protocol Schema
   clojure.lang.APersistentVector

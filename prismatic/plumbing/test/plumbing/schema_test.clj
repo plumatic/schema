@@ -103,8 +103,8 @@
    (invalid! schema {})
    (invalid! schema [1 2 1.0])))
 
-(deftest simple-single-seq-test
- (let [schema [(schema/single long) (schema/single double)]]
+(deftest simple-one-seq-test
+ (let [schema [(schema/one long) (schema/one double)]]
    (valid! schema [1 1.0])
    (invalid! schema [1])
    (invalid! schema [1 1.0 2])
@@ -112,7 +112,7 @@
    (invalid! schema [1.0 1.0])))
 
 (deftest combo-seq-test
- (let [schema [(schema/single (schema/maybe long)) double]]
+ (let [schema [(schema/one (schema/maybe long)) double]]
    (valid! schema [1])
    (valid! schema [1 1.0 2.0 3.0])
    (valid! schema [nil 1.0 2.0 3.0])
@@ -120,7 +120,7 @@
    (invalid! schema [])))
 
 (deftest named-test
- (let [schema [(schema/single (schema/named "topic" String)) (schema/single (schema/named "score" double))]]
+ (let [schema [(schema/one (schema/named "topic" String)) (schema/one (schema/named "score" double))]]
    (valid! schema ["foo" 1.0])
    (invalid! schema [1 2])))
 
@@ -202,7 +202,7 @@
               (if (= l 100)
                 {:baz l}
                 {:bar (when (= l 1) (+ l (:foo m)))}))
-            {:input-schema [(schema/single long) (schema/single {(schema/required-key :foo) double})]
+            {:input-schema [(schema/one long) (schema/one {(schema/required-key :foo) double})]
              :output-schema {(schema/required-key :bar) (schema/maybe double)}})]
     (valid-call! {:bar nil} (f 2 {:foo 1.0}))
     (valid-call! {:bar 4.0} (f 1 {:foo 3.0}))
