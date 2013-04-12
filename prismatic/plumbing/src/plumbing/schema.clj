@@ -26,6 +26,9 @@
 ;; TODO: extensible handling for Classes (declare-schema, get-schema), they no
 ;;      longer directly need to auto-expand.  Records just use this.
 ;; TODO: expand-schema method that expands Class schemata and checks methods.
+;; TODO: schemas for names in namespace?
+;; TODO: redo existing schemas to look like class names.
+;; TODO: test s/defn so we can use new syntax.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
