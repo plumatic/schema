@@ -87,7 +87,7 @@
   
   String 
   (validate [this x]
-    (check (= this (.name (class x))) "Wanted instance of %s, got %s" this (class x)))
+    (check (= this (.getName (class x))) "Wanted instance of %s, got %s" this (class x)))
 
 
   ;; prevent coersion, so you have to be exactly the given type.
