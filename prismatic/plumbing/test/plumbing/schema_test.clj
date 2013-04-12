@@ -90,6 +90,12 @@
     (invalid! schema :c)
     (invalid! schema 2)))
 
+(deftest array-test
+  (valid! "[Ljava.lang.String;" (into-array String ["a"]))
+  (invalid! "[Ljava.lang.Object;" (into-array String ["a"]))
+  (valid! "[Ljava.lang.Double;" (into-array Double [1.0]))
+  (valid! "[D" (double-array [1.0])))
+
 (deftest simple-repeated-seq-test
  (let [schema [long]]
    (valid! schema [])
