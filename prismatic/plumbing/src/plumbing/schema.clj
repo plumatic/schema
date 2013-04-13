@@ -74,11 +74,11 @@
    validation context."
   [condition context & format-args]
   `(try (when-not ~condition
-          (check-throw ~@format-args))
+          (check-throw ~context ~@format-args))
         (catch Throwable t#
           (if (= (:type (ex-data t#)) ::schema-mismatch)
             (throw t#)
-           (check-throw "Condition %s threw exception %s" '~condition t#)))))
+           (check-throw ~context "Condition %s threw exception %s" '~condition t#)))))
 
 (defprotocol Schema
   (validate* [this x context]    
@@ -156,7 +156,7 @@
   
   clojure.lang.AFn 
   (validate* [this x c] 
-    (check (this x) c "Value did not satisfy %s" this)))
+    (check (this x) c "Value did not satisfy %s %s" this)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple helpers / wrappers
@@ -307,7 +307,8 @@
         (if-let [[^One first-single & more-singles] (seq singles)]
           (do (check (seq x) c "Seq too short: missing (at least) %s elements"
                      (count singles))
-              (validate* (.schema first-single) (first x) (conj c (.name first-single)))
+              (validate* (.schema first-single) (first x) 
+                         (conj c (format "%d <%s>" i (.name first-single))))
               (recur (inc i) more-singles (rest x)))
           (if multi
             (doseq [[offset item] (indexed x)]
@@ -338,8 +339,9 @@
 ;; TODO: 'Record' check doesn't work since we haven't resolved class, probably
 ;;   - fix and add test.
 (defn extract-schema [symbol]
-  (let [{:keys [tag s schema]} (meta symbol)]
-    (if-let [schema (or s schema tag)]
+  (let [{:keys [tag s s? schema]} (meta symbol)]
+    (assert (< (count (remove nil? [s s? schema])) 2))
+    (if-let [schema (or s schema (when s? `(maybe ~s?)) tag)]
       (or (when (class? schema) 
             (class-schema schema))
           schema)

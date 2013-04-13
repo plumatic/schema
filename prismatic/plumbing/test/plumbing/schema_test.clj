@@ -79,6 +79,7 @@
 
 (deftest maybe-test
  (let [schema (s/maybe long)]
+   (is (= schema (s/? long)))
    (valid! schema nil)
    (valid! schema 1)
    (invalid! schema 1.0)))
@@ -160,16 +161,15 @@
   (do-something [this] 3))
 
 (s/defrecord Bar4
-  [^long foo ^String bar]
-  (fn [this] (odd? (:foo this)))
+  [^{:s [long]} foo ^{:s? {String String}} bar]
   PProtocol 
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
   (is (= (s/class-schema Bar) 
          (s/record Bar {(s/required-key :foo) long 
-                             (s/required-key :bar) String 
-                             (s/optional-key :baz) clojure.lang.Keyword})))
+                        (s/required-key :bar) String 
+                        (s/optional-key :baz) clojure.lang.Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   (is (thrown? Exception (map->Bar {})))
@@ -187,8 +187,9 @@
   (invalid! (s/class-schema Bar3) (assoc (Bar3. 1 "test") :foo :bar))
   (is (= 3 (do-something (Bar3. 1 "test"))))
   
-  (valid! (s/class-schema Bar4) (Bar4. 1 "test"))
-  (invalid! (s/class-schema Bar4) (Bar4. 2 "test"))
+  (valid! (s/class-schema Bar4) (Bar4. [1] {"test" "test"}))
+  (valid! (s/class-schema Bar4) (Bar4. [1] nil))
+  (invalid! (s/class-schema Bar4) (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
 
