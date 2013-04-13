@@ -12,7 +12,7 @@
    (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
 
    all throw exceptions."
-  (:refer-clojure :exclude [defrecord or and])
+  (:refer-clojure :exclude [defrecord])
   (:use plumbing.core)
   (:require 
    [clojure.string :as str]))
@@ -21,14 +21,19 @@
 ;; TODO: fix 'named' to switch arg order.
 ;; TODO: rename validate to validate*, takes second arg context,
 ;;  new fn validate is (validate* x []), kill with-context and validation-context
-;; TODO: #{} notation for sets #{schema} and that's it.
-;; TODO: kill or/and
+;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: extensible handling for Classes (declare-schema, get-schema), they no
 ;;      longer directly need to auto-expand.  Records just use this.
 ;; TODO: expand-schema method that expands Class schemata and checks methods.
 ;; TODO: schemas for names in namespace?
 ;; TODO: redo existing schemas to look like class names.
 ;; TODO: test s/defn so we can use new syntax.
+
+;; TODO: schema intersection
+;; TODO: reduce uses of both so that we can better intersect?
+;; TODO: schema satisfaction
+;; TODO: schema diff
+;;  (diff plus union can solve everything?)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -154,8 +159,6 @@
   [& schemas]
   (Either. schemas))
 
-(def or either)
-
 (clojure.core/defrecord Both [schemas]
   Schema
   (validate [this x]
@@ -167,8 +170,6 @@
    purpose function validator with a normal map schema."
   [& schemas]
   (Both. schemas))
-
-(def and both)
 
 (clojure.core/defrecord Maybe [schema]
   Schema
@@ -228,7 +229,7 @@
   (OptionalKey. k))
 
 (defn- specific-key? [ks]
-  (clojure.core/or (instance? RequiredKey ks) (instance? OptionalKey ks))
+  (or (instance? RequiredKey ks) (instance? OptionalKey ks))
   )
 
 (defn- find-more-keys [ks]
@@ -242,7 +243,7 @@
   (let [optional? (instance? OptionalKey schema-k)
         k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
     (when-not optional? (check (contains? m k) "Map is missing key %s" k))
-    (when-not (clojure.core/and optional? (not (contains? m k))) 
+    (when-not (and optional? (not (contains? m k))) 
       (with-context k
         (validate schema-v (get m k))))
     (dissoc m k)))
@@ -267,39 +268,33 @@
 ;; to do destructuring style, can use any number of 'single' elements
 ;; followed by an optional (implicit) repeated.
 
-(clojure.core/defrecord One [schema])
+(clojure.core/defrecord One [schema name])
 
 (defn one
   "A single element of a sequence (not repeated, the implicit default)"
-  [schema & [name]]
-  (One. (if name (named name schema)
-               schema)))
-
-(defn- extract-multi 
-  "Return a pair [one-schemas repeated-schema-or-nil]"
-  [seq-schema]
-  (let [[singles multi] (if (instance? One (last seq-schema))
-                          [seq-schema nil]
-                          [(butlast seq-schema) (last seq-schema)])]
-    [(map #(.schema ^One %) singles) multi]))
+  [schema name]
+  (One. schema name))
 
 (extend-protocol Schema
   clojure.lang.APersistentVector
   (validate [this x]
     (check (not (instance? java.util.Map x)) "Expected a seq, got a map %s" (class x))
     (check (do (seq x) true) "Expected a seq, got non-seqable %s" (class x))
-    (let [[singles multi] (extract-multi this)]
-      (loop [i 0 singles (seq singles) x (seq x)]
-        (if-not singles
+    (let [[singles multi] (if (instance? One (last this))
+                            [this nil]
+                            [(butlast this) (last this)])]
+      (loop [i 0 singles singles x x]
+        (if-let [[^One first-single & more-singles] (seq singles)]
+          (do (check (seq x) "Seq too short: missing (at least) %s elements"
+                     (count singles))
+              (with-context [i (.name first-single)] 
+                (validate (.schema first-single) (first x)))
+              (recur (inc i) more-singles (rest x)))
           (if multi
             (doseq [[offset item] (indexed x)]
               (with-context (+ offset i) (validate multi item)))
-            (check (not x) "Seq too long: extra elements with classes %s"
-                   (mapv class x)))
-          (do (check x "Seq too short: missing (at least) %s elements"
-                     (count singles))
-              (with-context i (validate (first singles) (first x)))
-              (recur (inc i) (next singles) (next x))))))))
+            (check (empty? x) "Seq too long: extra elements with classes %s"
+                   (mapv class x))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -337,7 +332,7 @@
 ;; TODO: allow 'canonical' schemas for arguments in a ns?
 (defn extract-schema [symbol]
   (let [{:keys [tag s schema]} (meta symbol)]
-    (if-let [schema (clojure.core/or s schema tag)]
+    (if-let [schema (or s schema tag)]
       (if (instance? clojure.lang.IRecord schema)
         (get +record-schema-map+ schema schema)
         schema)
