@@ -172,7 +172,7 @@
                         (s/optional-key :baz) clojure.lang.Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
-  (is (thrown? Exception (map->Bar {})))
+  (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
   (valid! (s/class-schema Bar) (Bar. 1 "test"))
   (invalid! (s/class-schema Bar) (Bar. 1 :foo))
   (valid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baz :foo))
@@ -191,6 +191,30 @@
   (valid! (s/class-schema Bar4) (Bar4. [1] nil))
   (invalid! (s/class-schema Bar4) (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
+
+(deftest fixup-tag-metadata-test
+  (let [correct! (fn [symbol desired-meta]
+                   (let [fix (@#'s/fixup-tag-metadata {} symbol)]                     
+                     (is (= symbol fix))
+                     (is (= desired-meta (or (meta fix) {})))))]
+    (correct! 'foo {})
+    (correct! (with-meta 'foo {:tag 'long}) {:tag 'long})
+    (correct! (with-meta 'foo {:tag 'String}) {:tag 'String})
+    (correct! (with-meta 'foo {:tag 'asdf}) {:schema 'asdf})))
+
+(deftest extract-schema-test
+  (let [correct! (fn [m out]
+                   (is (= out (s/extract-schema (with-meta 'foo m)))))]
+    (correct! {} s/+anything+)
+    (correct! {:asdf :foo} s/+anything+)
+    (correct! {:tag 'long} 'long)
+    (correct! {:schema []} [])    
+    (correct! {:s []} [])
+    (correct! {:s? []} `(s/maybe []))
+    (correct! {:tag 'long :s? []} `(s/maybe []))
+    (is (thrown? Throwable (s/extract-schema (with-meta 'foo {:s [] :schema []}))))))
+
+(s/defrecord Nested [^Bar4 b])
 
 
 

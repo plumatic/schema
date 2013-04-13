@@ -30,8 +30,6 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: two todos below about records
-
 ;; TODO: propagate type hint into defn name.
 ;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: schemas for names in namespace?
@@ -376,16 +374,29 @@
   (assert (map? schema))
   (Record. klass schema))
 
-;; TODO: we can use 'resolve' here with &env to check if we got a class.
-;; TODO: 'Record' check doesn't work since we haven't resolved class, probably
-;;   - fix and add test.
-(defn extract-schema [symbol]
+(def primitive-sym? '#{float double boolean byte character short int long})
+
+(defn- fixup-tag-metadata
+  "Allow hints like ^+a-schema+ foo, where +a-schema+ refers to a local or var 
+   that defines a schema, rather than a literal tag.  In this case, the schema
+   must be moved from :tag to :schema so that Clojure doesn't get upset, since
+   it's not a literal primitive or Class."
+  [env symbol]
+  (if-let [tag (:tag (meta symbol))]
+    (if (or (primitive-sym? tag) (class? (resolve env tag)))
+      symbol
+      (with-meta symbol (-> (meta symbol) (dissoc :tag) (assoc :schema tag))))
+    symbol))
+
+(defn extract-schema 
+  "Extract the schema metadata from a symbol.  Schema can be a primitive/class
+   hint in :tag, any schema in :schema or :s, or a 'maybe' schema in :s?.
+   If both a tag and an explicit schema are present, the explicit schema wins."
+  [symbol]
   (let [{:keys [tag s s? schema]} (meta symbol)]
     (assert (< (count (remove nil? [s s? schema])) 2))
     (if-let [schema (or s schema (when s? `(maybe ~s?)) tag)]
-      (or (when (class? schema) 
-            (class-schema schema))
-          schema)
+      schema
       +anything+)))
 
 (defn maybe-split-first [pred s]
@@ -402,6 +413,9 @@
    to fields.
    e.g., [^long foo  ^{:schema {:a double}} bar]
    defines a record with two base keys foo and bar.
+   You can also use ^{:s? schema} as shorthand for {:s (maybe schema)}, 
+   or ^+schema+ to refer to a var/local defining a schema (note that this form
+   is not legal on an ordinary defrecord, however, unlike all the others).
 
    extra-key-schema? is an optional map schema that defines additional optional
    keys (and/or a key-schemas) -- without it, the schema specifies that extra
@@ -415,7 +429,8 @@
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
-        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)]
+        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
+        field-schema (mapv (partial fixup-tag-metadata &env) field-schema)]
     `(do 
        (when-let [bad-keys# (seq (filter #(instance? RequiredKey %) (keys ~extra-key-schema?)))]
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
