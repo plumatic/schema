@@ -11,13 +11,25 @@
    (validate {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
    (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
 
-   all throw exceptions."
+   all throw exceptions.  
+
+   Schemas are also supported as field/argument 
+   metadata in special defrecord/fn/defn replacements, using standard 
+   ^long ^Class ^Record syntax for classes and primitives as usual.
+   For more complex schemata, you must use a map like
+   ^{:schema +a-schema+} or ^{:s +a-schema+} for short, or 
+   ^{:s? +a-schema+} as shorthand for ^{:s (s/maybe +a-schema+)}.
+   This metadata is bakwards compatible, and is ignored by usual Clojure
+   forms.  The new forms are also able to directly accept hints of the 
+   form ^+a-schema+ where +a-schema+ is a symbol referencing a schema, 
+   but these hints are not backwards compatible with ordinary defrecord/
+   defn/etc."
+  
   (:refer-clojure :exclude [defrecord])
   (:use plumbing.core)
   (:require 
    [clojure.string :as str]))
 
-;; TODO: maybe :? rather than :s as maybe shorthand?
 ;; TODO: expand-schema method that expands Class schemata and checks methods.
 ;; TODO: two todos below about records
 
