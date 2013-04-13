@@ -17,13 +17,12 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: propagate type hint into defn name.
-;; TODO: rename validate to validate*, takes second arg context,
-;;  new fn validate is (validate* x []), kill with-context and validation-context
-;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: extensible handling for Classes (declare-schema, get-schema), they no
 ;;      longer directly need to auto-expand.  Records just use this.
 ;; TODO: expand-schema method that expands Class schemata and checks methods.
+
+;; TODO: propagate type hint into defn name.
+;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: schemas for names in namespace?
 ;; TODO: redo existing schemas to look like class names.
 ;; TODO: test s/defn so we can use new syntax.
@@ -37,23 +36,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
-(def ^:dynamic *validation-context*  
-  "A path through the current data structure being validated, used to generate
-   a helpful error message about the context of a validation fail." 
-  [])
-
-(defmacro with-context 
-  "Execute 'body' in with 'context' pushed onto the end of the validation context stack"
-  [context & body]
-  `(binding [*validation-context* (conj *validation-context* ~context)]
-     ~@body))
-
 (defn context-str
   "Produce a human-readable representation of the current validation context"
-  []
+  [context]
   (str/join   
    ","
-   (for [c *validation-context*]
+   (for [c context]
      (let [s (pr-str c)]       
        (if (< (count s) 20)
          s
@@ -61,10 +49,10 @@
 
 (defn check-throw 
   "Throw an exception for a failed validation"
-  [& format-args]
+  [context & format-args]
   (throw (ex-info 
-          (str (when (seq *validation-context*)
-                 (format "In context %s: " (context-str)))
+          (str (when (seq context)
+                 (format "In context %s: " (context-str context)))
                (apply format format-args))
           {:type ::schema-mismatch})))
 
@@ -72,7 +60,7 @@
   "Check that condition is true; if not (or it thows an exception), throw an
    exception describing the failure (via format-args) as well as the current 
    validation context."
-  [condition & format-args]
+  [condition context & format-args]
   `(try (when-not ~condition
           (check-throw ~@format-args))
         (catch Throwable t#
@@ -81,59 +69,63 @@
            (check-throw "Condition %s threw exception %s" '~condition t#)))))
 
 (defprotocol Schema
-  (validate [this x]    
-    "Validate that x satisfies this schema by calling 'check', using 'with-context'
-     to provide context about the path taken through the object"))
+  (validate* [this x context]    
+    "Validate that x satisfies this schema by calling 'check'.  Context is a vec
+     of the path to x from the root object being validated, used to present
+     useful error messages."))
 
+(defn validate [this x]
+  (validate* this x []))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
 
 (extend-protocol Schema
   Class
-  (validate [this x] (check (instance? this x) "Wanted instance of %s, got %s" this (class x)))
+  (validate* [this x c] 
+    (check (instance? this x) c "Wanted instance of %s, got %s" this (class x)))
   
   String 
-  (validate [this x]
-    (check (= this (.getName (class x))) "Wanted instance of %s, got %s" this (class x)))
+  (validate* [this x c]
+    (check (= this (.getName (class x))) c "Wanted instance of %s, got %s" this (class x)))
 
 
   ;; prevent coersion, so you have to be exactly the given type.
   clojure.core$float
-  (validate [this x]
-    (check (instance? Float x) "Wanted float, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Float x) c "Wanted float, got %s" (class x)))
   
   clojure.core$double
-  (validate [this x]
-    (check (instance? Double x) "Wanted double, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Double x) c "Wanted double, got %s" (class x)))
   
   clojure.core$boolean
-  (validate [this x]
-    (check (instance? Boolean x) "Wanted boolean, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Boolean x) c "Wanted boolean, got %s" (class x)))
   
   clojure.core$byte
-  (validate [this x]
-    (check (instance? Byte x) "Wanted byte, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Byte x) c "Wanted byte, got %s" (class x)))
   
   clojure.core$char
-  (validate [this x]
-    (check (instance? Character x) "Wanted char, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Character x) c "Wanted char, got %s" (class x)))
   
   clojure.core$short
-  (validate [this x]
-    (check (instance? Short x) "Wanted short, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Short x) c "Wanted short, got %s" (class x)))
   
   clojure.core$int
-  (validate [this x]
-    (check (instance? Integer x) "Wanted int, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Integer x) c "Wanted int, got %s" (class x)))
   
   clojure.core$long
-  (validate [this x]
-    (check (instance? Long x) "Wanted long, got %s" (class x)))
+  (validate* [this x c]
+    (check (instance? Long x) c "Wanted long, got %s" (class x)))
   
   clojure.lang.AFn 
-  (validate [this x] 
-    (check (this x) "Value did not satisfy %s" this)))
+  (validate* [this x c] 
+    (check (this x) c "Value did not satisfy %s" this)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple helpers / wrappers
@@ -143,15 +135,15 @@
 ;; http://dev.clojure.org/jira/browse/CLJ-1196
 (clojure.core/defrecord Anything [_]
   Schema
-  (validate [this x]))
+  (validate* [this x c]))
 
 (def +anything+ (Anything. nil))
 
 (clojure.core/defrecord Either [schemas]
   Schema
-  (validate [this x]
-    (let [fails (map #(try (validate % x) nil (catch Exception e e)) schemas)]
-      (check (some not fails) "Did not match any schema: %s" (vec fails)))))
+  (validate* [this x c]
+    (let [fails (map #(try (validate* % x c) nil (catch Exception e e)) schemas)]
+      (check (some not fails) c "Did not match any schema: %s" (vec fails)))))
 
 (defn either
   "The disjunction of multiple schemas."
@@ -160,9 +152,9 @@
 
 (clojure.core/defrecord Both [schemas]
   Schema
-  (validate [this x]
+  (validate* [this x c]
     (doseq [schema schemas]
-      (validate schema x))))
+      (validate* schema x c))))
 
 (defn both
   "The intersection of multiple schemas.  Useful, e.g., to combine a special-
@@ -172,9 +164,9 @@
 
 (clojure.core/defrecord Maybe [schema]
   Schema
-  (validate [this x]
+  (validate* [this x c]
     (when-not (nil? x)
-      (validate schema x))))
+      (validate* schema x c))))
 
 (defn maybe
   "Value can be nil or must satisfy schema"
@@ -186,9 +178,8 @@
 
 (clojure.core/defrecord NamedSchema [name schema]
   Schema
-  (validate [this x]
-    (with-context (format "<%s>" name)
-      (validate schema x))))
+  (validate* [this x c]
+    (validate* schema x (conj c (format "<%s>" name)))))
 
 (defn named 
   "Provide an explicit name for this schema element, useful for seqs."
@@ -199,8 +190,8 @@
 
 (clojure.core/defrecord EnumSchema [vs]
   Schema
-  (validate [this x]
-    (check (contains? vs x) "Got an invalid enum element")))
+  (validate* [this x c]
+    (check (contains? vs x) c "Got an invalid enum element")))
 
 (defn enum
   "A value that must be = to one element of vs."
@@ -238,27 +229,26 @@
 
 (defn- validate-key 
   "Validate a single schema key and dissoc the value from m"
-  [m [schema-k schema-v]]
+  [context m [schema-k schema-v]]
   (let [optional? (instance? OptionalKey schema-k)
         k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
     (when-not optional? (check (contains? m k) "Map is missing key %s" k))
     (when-not (and optional? (not (contains? m k))) 
-      (with-context k
-        (validate schema-v (get m k))))
+      (validate* schema-v (get m k) (conj context k)))
     (dissoc m k)))
 
 (extend-protocol Schema
   clojure.lang.APersistentMap
-  (validate [this x]
+  (validate* [this x c]
     (check (instance? clojure.lang.APersistentMap x) "Expected a map, got a %s" (class x))
     (let [more-keys (find-more-keys (keys this))]
-      (let [remaining (reduce validate-key x (dissoc this more-keys))]
+      (let [remaining (reduce (partial validate-key c) x (dissoc this more-keys))]
         (if more-keys
           (let [value-schema (safe-get this more-keys)]
            (doseq [[k v] remaining]
-             (validate more-keys k)
-             (with-context k (validate value-schema v))))
-          (check (empty? remaining) "Got extra map keys %s" (vec (keys remaining))))))))
+             (validate* more-keys k c)
+             (validate* value-schema v (conj c k))))
+          (check (empty? remaining) c "Got extra map keys %s" (vec (keys remaining))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence schemata
@@ -276,7 +266,7 @@
 
 (extend-protocol Schema
   clojure.lang.APersistentVector
-  (validate [this x]
+  (validate* [this x c]
     (check (not (instance? java.util.Map x)) "Expected a seq, got a map %s" (class x))
     (check (do (seq x) true) "Expected a seq, got non-seqable %s" (class x))
     (let [[singles multi] (if (instance? One (last this))
@@ -284,15 +274,14 @@
                             [(butlast this) (last this)])]
       (loop [i 0 singles singles x x]
         (if-let [[^One first-single & more-singles] (seq singles)]
-          (do (check (seq x) "Seq too short: missing (at least) %s elements"
+          (do (check (seq x) c "Seq too short: missing (at least) %s elements"
                      (count singles))
-              (with-context [i (.name first-single)] 
-                (validate (.schema first-single) (first x)))
+              (validate* (.schema first-single) (first x) (conj c (.name first-single)))
               (recur (inc i) more-singles (rest x)))
           (if multi
             (doseq [[offset item] (indexed x)]
-              (with-context (+ offset i) (validate multi item)))
-            (check (empty? x) "Seq too long: extra elements with classes %s"
+              (validate* multi item (conj c (+ offset i))))
+            (check (empty? x) c "Seq too long: extra elements with classes %s"
                    (mapv class x))))))))
 
 
@@ -301,11 +290,11 @@
 
 (clojure.core/defrecord Record [klass schema]
   Schema
-  (validate [this r]
+  (validate* [this r c]
     (check (instance? klass r) "Expected record %s, got class %s" klass (class r))
-    (validate schema (into {} r))
+    (validate* schema (into {} r) c)
     (when-let [f (:extra-validator-fn this)]
-      (check (f r) "Record %s did not satisfy extra validation fn." klass))))
+      (check (f r) c "Record %s did not satisfy extra validation fn." klass))))
 
 (defn record 
   "A schema for record with class klass and map schema schema"
