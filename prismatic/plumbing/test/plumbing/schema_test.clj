@@ -211,4 +211,14 @@
     (invalid-call! (f 3 {:foo 1}))
     (invalid-call! (f 100 {:foo 1.0}))))
 
-
+(deftest explain-test
+  (is (= (s/explain {(s/required-key :x) long
+                     String [(s/one int "foo") (s/maybe Bar)]})
+         '{(required-key :x) long
+           java.lang.String [("foo" int)
+                             &
+                             (maybe 
+                              (plumbing.schema_test.Bar 
+                               {(required-key :foo) long
+                                (required-key :bar) java.lang.String
+                                (optional-key :baz) clojure.lang.Keyword}))]})))
