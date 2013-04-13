@@ -173,23 +173,23 @@
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
-  (valid! (s/class-schema Bar) (Bar. 1 "test"))
-  (invalid! (s/class-schema Bar) (Bar. 1 :foo))
-  (valid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baz :foo))
-  (invalid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baaaz :foo))
-  (invalid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baz "foo"))
+  (valid! Bar (Bar. 1 "test"))
+  (invalid! Bar (Bar. 1 :foo))
+  (valid! Bar (assoc (Bar. 1 "test") :baz :foo))
+  (invalid! Bar (assoc (Bar. 1 "test") :baaaz :foo))
+  (invalid! Bar (assoc (Bar. 1 "test") :baz "foo"))
   
-  (valid! (s/class-schema Bar2) (assoc (Bar2. 1 "test") :baz :foo))
-  (invalid! (s/class-schema Bar2) (assoc (Bar2. 1 "test") :baaaaz :foo))
+  (valid! Bar2 (assoc (Bar2. 1 "test") :baz :foo))
+  (invalid! Bar2 (assoc (Bar2. 1 "test") :baaaaz :foo))
   (is (= 2 (do-something (Bar2. 1 "test"))))
   
-  (valid! (s/class-schema Bar3) (Bar3. 1 "test"))
-  (invalid! (s/class-schema Bar3) (assoc (Bar3. 1 "test") :foo :bar))
+  (valid! Bar3 (Bar3. 1 "test"))
+  (invalid! Bar3 (assoc (Bar3. 1 "test") :foo :bar))
   (is (= 3 (do-something (Bar3. 1 "test"))))
   
-  (valid! (s/class-schema Bar4) (Bar4. [1] {"test" "test"}))
-  (valid! (s/class-schema Bar4) (Bar4. [1] nil))
-  (invalid! (s/class-schema Bar4) (Bar4. ["a"] {"test" "test"}))
+  (valid! Bar4 (Bar4. [1] {"test" "test"}))
+  (valid! Bar4 (Bar4. [1] nil))
+  (invalid! Bar4 (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
 (deftest fixup-tag-metadata-test
@@ -214,8 +214,19 @@
     (correct! {:tag 'long :s? []} `(s/maybe []))
     (is (thrown? Throwable (s/extract-schema (with-meta 'foo {:s [] :schema []}))))))
 
-(s/defrecord Nested [^Bar4 b])
+(def LongOrString (s/either long String))
 
+(s/defrecord Nested [^Bar4 b ^LongOrString c])
+
+(deftest fancier-defrecord-schema-test
+  (is (= (s/class-schema Nested)
+         (s/record Nested {(s/required-key :b) Bar4
+                           (s/required-key :c) LongOrString})))
+  (valid! Nested (Nested. (Bar4. [1] {}) 1))
+  (valid! Nested (Nested. (Bar4. [1] {}) "hi"))
+  (invalid! Nested (Nested. (Bar4. [1] {}) (int 5)))
+  (invalid! Nested (Nested. (Bar4. [1] {:foo :bar}) 1))
+  (invalid! Nested (Nested. nil "hi")))
 
 
 (defmacro valid-call! [o c] `(is (= ~o (s/validated-call ~@c))))
