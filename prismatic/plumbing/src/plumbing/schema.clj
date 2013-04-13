@@ -17,9 +17,9 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: extensible handling for Classes (declare-schema, get-schema), they no
-;;      longer directly need to auto-expand.  Records just use this.
+;; TODO: maybe :? rather than :s as maybe shorthand?
 ;; TODO: expand-schema method that expands Class schemata and checks methods.
+;; TODO: two todos below about records
 
 ;; TODO: propagate type hint into defn name.
 ;; TODO: #{} notation for sets #{schema} and maybe vec.
@@ -80,17 +80,36 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
 
+(def ^java.util.Map +class-schemata+
+  (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
+
+;; Can we do this in a way that respects hierarchy?
+;; can do it with defmethods,
+(defn declare-class-schema! 
+  "Globally set the schema for a class (above and beyond a simple instance? check).
+   Use with care, i.e., only on classes that you control.  Also note that this
+   schema only applies to instances of the concrete type passed, i.e., 
+   (= (class x) klass), not (instance? klass x)."
+  [klass schema]
+  (.put +class-schemata+ klass schema))
+
+(defn class-schema
+  "The last schema for a class set by declare-class-schema!, or nil."
+  [klass]
+  (get +class-schemata+ klass))
+
 (extend-protocol Schema
   Class
-  (validate* [this x c] 
-    (check (instance? this x) c "Wanted instance of %s, got %s" this (class x)))
+  (validate* [this x c]
+    (check (instance? this x) c "Wanted instance of %s, got %s" this (class x))
+    (when-let [more-schema (class-schema this)]
+      (validate* more-schema x c)))
   
   String 
   (validate* [this x c]
     (check (= this (.getName (class x))) c "Wanted instance of %s, got %s" this (class x)))
 
-
-  ;; prevent coersion, so you have to be exactly the given type.
+  ;; prevent coersion, so you have to be exactly the given type.  
   clojure.core$float
   (validate* [this x c]
     (check (instance? Float x) c "Wanted float, got %s" (class x)))
@@ -303,27 +322,15 @@
   (assert (map? schema))
   (Record. klass schema))
 
-
-(def ^java.util.Map +record-schema-map+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
-
-(defn ^Record record-schema
-  "The schema for a defrecord class defined with schema/defrecord"
-  [klass]
-  (let [s (.get +record-schema-map+ klass)]
-    (when-not s
-      (throw (RuntimeException. (str "No schema known for record class " klass))))
-    s))
-
 ;; TODO: we can use 'resolve' here with &env to check if we got a class.
 ;; TODO: 'Record' check doesn't work since we haven't resolved class, probably
 ;;   - fix and add test.
-;; TODO: allow 'canonical' schemas for arguments in a ns?
 (defn extract-schema [symbol]
   (let [{:keys [tag s schema]} (meta symbol)]
     (if-let [schema (or s schema tag)]
-      (if (instance? clojure.lang.IRecord schema)
-        (get +record-schema-map+ schema schema)
-        schema)
+      (or (when (class? schema) 
+            (class-schema schema))
+          schema)
       +anything+)))
 
 (defn maybe-split-first [pred s]
@@ -337,8 +344,7 @@
 
    field-schema looks just like an ordinary defrecord field binding, except that you 
    can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints 
-   to fields, and classes naming sub-records are magically auto-expanded into their 
-   record-schemata. 
+   to fields.
    e.g., [^long foo  ^{:schema {:a double}} bar]
    defines a record with two base keys foo and bar.
 
@@ -361,13 +367,14 @@
        (when ~extra-validator-fn?
          (assert (fn? ~extra-validator-fn?)))
        (clojure.core/defrecord ~name ~field-schema ~@more-args)
-       (.put +record-schema-map+ ~name
-             (assoc-when (record ~name (merge ~(for-map [k field-schema]
-                                                 (required-key (keyword (clojure.core/name k)))
-                                                 (do (assert (symbol? k))
-                                                     (extract-schema k)))
-                                              ~extra-key-schema?)) 
-                         :extra-validator-fn ~extra-validator-fn?)))))
+       (declare-class-schema! 
+        ~name
+        (assoc-when (record ~name (merge ~(for-map [k field-schema]
+                                            (required-key (keyword (clojure.core/name k)))
+                                            (do (assert (symbol? k))
+                                                (extract-schema k)))
+                                         ~extra-key-schema?)) 
+                    :extra-validator-fn ~extra-validator-fn?)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions

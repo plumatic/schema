@@ -166,29 +166,29 @@
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
-  (is (= (s/record-schema Bar) 
+  (is (= (s/class-schema Bar) 
          (s/record Bar {(s/required-key :foo) long 
                              (s/required-key :bar) String 
                              (s/optional-key :baz) clojure.lang.Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   (is (thrown? Exception (map->Bar {})))
-  (valid! (s/record-schema Bar) (Bar. 1 "test"))
-  (invalid! (s/record-schema Bar) (Bar. 1 :foo))
-  (valid! (s/record-schema Bar) (assoc (Bar. 1 "test") :baz :foo))
-  (invalid! (s/record-schema Bar) (assoc (Bar. 1 "test") :baaaz :foo))
-  (invalid! (s/record-schema Bar) (assoc (Bar. 1 "test") :baz "foo"))
+  (valid! (s/class-schema Bar) (Bar. 1 "test"))
+  (invalid! (s/class-schema Bar) (Bar. 1 :foo))
+  (valid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baz :foo))
+  (invalid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baaaz :foo))
+  (invalid! (s/class-schema Bar) (assoc (Bar. 1 "test") :baz "foo"))
   
-  (valid! (s/record-schema Bar2) (assoc (Bar2. 1 "test") :baz :foo))
-  (invalid! (s/record-schema Bar2) (assoc (Bar2. 1 "test") :baaaaz :foo))
+  (valid! (s/class-schema Bar2) (assoc (Bar2. 1 "test") :baz :foo))
+  (invalid! (s/class-schema Bar2) (assoc (Bar2. 1 "test") :baaaaz :foo))
   (is (= 2 (do-something (Bar2. 1 "test"))))
   
-  (valid! (s/record-schema Bar3) (Bar3. 1 "test"))
-  (invalid! (s/record-schema Bar3) (assoc (Bar3. 1 "test") :foo :bar))
+  (valid! (s/class-schema Bar3) (Bar3. 1 "test"))
+  (invalid! (s/class-schema Bar3) (assoc (Bar3. 1 "test") :foo :bar))
   (is (= 3 (do-something (Bar3. 1 "test"))))
   
-  (valid! (s/record-schema Bar4) (Bar4. 1 "test"))
-  (invalid! (s/record-schema Bar4) (Bar4. 2 "test"))
+  (valid! (s/class-schema Bar4) (Bar4. 1 "test"))
+  (invalid! (s/class-schema Bar4) (Bar4. 2 "test"))
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
 
