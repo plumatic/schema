@@ -120,7 +120,7 @@
    (invalid! schema [])))
 
 (deftest named-test
-  (let [schema [(s/one String "topic") (s/one (s/named "score" double) "asdf")]]
+  (let [schema [(s/one String "topic") (s/one (s/named double "score") "asdf")]]
    (valid! schema ["foo" 1.0])
    (invalid! schema [1 2])))
 

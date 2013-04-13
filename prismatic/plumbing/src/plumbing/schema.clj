@@ -18,7 +18,6 @@
    [clojure.string :as str]))
 
 ;; TODO: propagate type hint into defn name.
-;; TODO: fix 'named' to switch arg order.
 ;; TODO: rename validate to validate*, takes second arg context,
 ;;  new fn validate is (validate* x []), kill with-context and validation-context
 ;; TODO: #{} notation for sets #{schema} and maybe vec.
@@ -193,7 +192,7 @@
 
 (defn named 
   "Provide an explicit name for this schema element, useful for seqs."
-  [name schema]
+  [schema name]
   (NamedSchema. name schema))
 
 
