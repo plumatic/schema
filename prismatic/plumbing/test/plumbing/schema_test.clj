@@ -257,3 +257,108 @@
                                {(required-key :foo) long
                                 (required-key :bar) java.lang.String
                                 (optional-key :baz) clojure.lang.Keyword}))]})))
+
+
+
+
+;;; fn test 
+
+(def OddLong (s/both odd? long))
+
+(reset! s/compile-fn-validation true)
+
+(deftest simple-validated-meta-test
+  (let [f (s/fn ^String [^OddLong x y])]
+    (is (= (:io-schemata (meta f))
+           [[[(s/one OddLong "x") (s/one s/+anything+ "y")] String]]))))
+
+(deftest simple-validated-fn-test
+  (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
+            (+ x (:foo y -100)))]
+    (is (= 4 (f 1 {:foo 3})))
+    (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints ignored for now
+        
+    (binding [s/*use-fn-validation* false]
+      (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
+      (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+      (is (= 5 (f 2 {:foo 3}))))  ;; return not even?
+
+    (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
+    (is (thrown? Exception (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+    (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?      
+  )
+
+
+
+(reset! s/compile-fn-validation false)
+
+(deftest simple-unvalidated-meta-test
+  (let [f (s/fn ^String [^OddLong x y])]
+    (is (= (:io-schemata (meta f))
+           [[[(s/one OddLong "x") (s/one s/+anything+ "y")] String]]))))
+
+(deftest simple-unvalidated-fn-test
+  (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
+            (+ x (:foo y -100)))]
+    (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
+    (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+    (is (= 5 (f 2 {:foo 3})))  ;; return not even?
+    ))
+
+
+(reset! s/compile-fn-validation true)
+
+(s/defn simple-validated-defn
+  "I am a simple schema fn"
+  {:metadata :bla}
+  ^String [^OddLong x]
+  (str x))
+
+(deftest simple-validated-defn-test 
+  (let [{:keys [tag io-schemata doc metadata]} (meta #'simple-validated-defn)]
+    (is (= tag String))
+    (is (= io-schemata [[[(s/one OddLong "x")] String]]))
+    (is (= doc "I am a simple schema fn"))
+    (is (= metadata :bla)))
+  (is (= (:io-schemata (meta simple-validated-defn)) [[[(s/one OddLong "x")] String]]))
+  
+  (is (= "3" (simple-validated-defn 3)))
+  (is (thrown? Exception (simple-validated-defn 4)))
+  (is (thrown? Exception (simple-validated-defn "a")))
+  
+  (binding [s/*use-fn-validation* false]
+    (is (= "4" (simple-validated-defn 4)))))
+
+(reset! s/compile-fn-validation false)
+
+(s/defn simple-unvalidated-defn
+  "I am a simple schema fn"
+  {:metadata :bla}
+  ^String [^OddLong x]
+  (str x))
+
+(deftest simple-unvalidated-defn-test 
+  (let [{:keys [tag io-schemata doc metadata]} (meta #'simple-unvalidated-defn)]
+    (is (= tag String))
+    (is (= io-schemata [[[(s/one OddLong "x")] String]]))
+    (is (= doc "I am a simple schema fn"))
+    (is (= metadata :bla)))
+  (is (= (:io-schemata (meta simple-unvalidated-defn)) [[[(s/one OddLong "x")] String]]))
+  
+  (is (= "3" (simple-unvalidated-defn 3)))
+  (is (= "4" (simple-unvalidated-defn 4))))
+
+
+(defn ^String simple-defn [x] (str x))
+
+(require '[plumbing.timing :as timing])
+(defn validated-fn-benchmark []
+  (timing/microbenchmark
+   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
+   (binding [s/*use-fn-validation* false]
+     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
+   (reduce #(when (simple-unvalidated-defn %2) %1) (range 1 1000001 2))
+   (reduce #(when (simple-defn %2) %1) (range 1 1000001 2))))
+
+
+(reset! s/compile-fn-validation true)

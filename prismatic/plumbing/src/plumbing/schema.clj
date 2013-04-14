@@ -1,31 +1,38 @@
 (ns plumbing.schema
   "A library for data structure schema definition and validation.
 
-   For example, 
+   For example,
 
    (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0]})
 
-   returns true but 
+   returns true but
 
    (validate {:foo long :bar [double]} {:bar [1.0 2.0 3.0]})
+
    (validate {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
+
    (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
 
-   all throw exceptions.  
+   all throw exceptions.
 
-   Schemas are also supported as field/argument 
-   metadata in special defrecord/fn/defn replacements, using standard 
-   ^long ^Class ^Record syntax for classes and primitives as usual.
-   For more complex schemata, you must use a map like
-   ^{:schema +a-schema+} or ^{:s +a-schema+} for short, or 
+   Schemas are also supported as field/argument metadata in special
+   defrecord/fn/defn replacements, using standard ^long ^Class ^Record
+   syntax for classes and primitives as usual.  For more complex
+   schemata, you must use a map like:
+
+   ^{:schema +a-schema+} or ^{:s +a-schema+} for short, or
+
    ^{:s? +a-schema+} as shorthand for ^{:s (s/maybe +a-schema+)}.
-   This metadata is bakwards compatible, and is ignored by usual Clojure
-   forms.  The new forms are also able to directly accept hints of the 
-   form ^+a-schema+ where +a-schema+ is a symbol referencing a schema, 
-   but these hints are not backwards compatible with ordinary defrecord/
-   defn/etc."
+
+   This metadata is bakwards compatible, and is ignored by usual
+   Clojure forms.  
+
+   The new forms are also able to directly accept hints of the form
+   ^+a-schema+ where +a-schema+ is a symbol referencing a schema, 
+   but these hints are not backwards compatible with ordinary 
+   defrecord/ defn/etc."
   
-  (:refer-clojure :exclude [defrecord])
+  (:refer-clojure :exclude [defrecord defn])
   (:use plumbing.core)
   (:require 
    [clojure.string :as str]))
@@ -42,7 +49,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
-(defn context-str
+(defn- context-str
   "Produce a human-readable representation of the current validation context"
   [context]
   (str/join   
@@ -53,8 +60,9 @@
          s
          (subs s 0 20))))))
 
-(defn check-throw 
-  "Throw an exception for a failed validation"
+(clojure.core/defn check-throw 
+  "Throw an exception for a failed validation.  Public only so check
+   can be called from other namespaces, due to macroexpansion rules."
   [context & format-args]
   (throw (ex-info 
           (str (when (seq context)
@@ -83,7 +91,7 @@
     "Expand this schema to a human-readable format suitable for pprinting, 
      also expanding classes schematas at the leaves"))
 
-(defn validate [this x]
+(clojure.core/defn validate [this x]
   (validate* this x []))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -94,7 +102,7 @@
 
 ;; Can we do this in a way that respects hierarchy?
 ;; can do it with defmethods,
-(defn declare-class-schema! 
+(clojure.core/defn declare-class-schema! 
   "Globally set the schema for a class (above and beyond a simple instance? check).
    Use with care, i.e., only on classes that you control.  Also note that this
    schema only applies to instances of the concrete type passed, i.e., 
@@ -102,7 +110,7 @@
   [klass schema]
   (.put +class-schemata+ klass schema))
 
-(defn class-schema
+(clojure.core/defn class-schema
   "The last schema for a class set by declare-class-schema!, or nil."
   [klass]
   (get +class-schemata+ klass))
@@ -189,7 +197,7 @@
       (check (some not fails) c "Did not match any schema: %s" (vec fails))))
   (explain [this] (cons 'either (map explain schemas))))
 
-(defn either
+(clojure.core/defn either
   "The disjunction of multiple schemas."
   [& schemas]
   (Either. schemas))
@@ -201,7 +209,7 @@
       (validate* schema x c)))
   (explain [this] (cons 'both (map explain schemas))))
 
-(defn both
+(clojure.core/defn both
   "The intersection of multiple schemas.  Useful, e.g., to combine a special-
    purpose function validator with a normal map schema."
   [& schemas]
@@ -214,7 +222,7 @@
       (validate* schema x c)))
   (explain [this] (list 'maybe (explain schema))))
 
-(defn maybe
+(clojure.core/defn maybe
   "Value can be nil or must satisfy schema"
   [schema]
   (Maybe. schema))
@@ -228,7 +236,7 @@
     (validate* schema x (conj c (format "<%s>" name))))
   (explain [this] (list 'named name (explain schema))))
 
-(defn named 
+(clojure.core/defn named 
   "Provide an explicit name for this schema element, useful for seqs."
   [schema name]
   (NamedSchema. name schema))
@@ -241,7 +249,7 @@
     (check (contains? vs x) c "Got an invalid enum element"))
   (explain [this] (cons 'enum vs)))
 
-(defn enum
+(clojure.core/defn enum
   "A value that must be = to one element of vs."
   [& vs]
   (EnumSchema. (set vs)))
@@ -254,14 +262,14 @@
 
 (clojure.core/defrecord RequiredKey [k])
 
-(defn required-key
+(clojure.core/defn required-key
   "An optional key in a map"
   [k]
   (RequiredKey. k))
 
 (clojure.core/defrecord OptionalKey [k])
 
-(defn optional-key
+(clojure.core/defn optional-key
   "An optional key in a map"
   [k]
   (OptionalKey. k))
@@ -314,7 +322,7 @@
 
 (clojure.core/defrecord One [schema name])
 
-(defn one
+(clojure.core/defn one
   "A single element of a sequence (not repeated, the implicit default)"
   [schema name]
   (One. schema name))
@@ -365,7 +373,7 @@
   (explain [this]
     (list (symbol (.getName ^Class klass)) (explain schema))))
 
-(defn record 
+(clojure.core/defn record 
   "A schema for record with class klass and map schema schema"
   [klass schema]
   (assert (class? klass))
@@ -386,10 +394,11 @@
       (with-meta symbol (-> (meta symbol) (dissoc :tag) (assoc :schema tag))))
     symbol))
 
-(defn extract-schema 
+(clojure.core/defn extract-schema 
   "Extract the schema metadata from a symbol.  Schema can be a primitive/class
    hint in :tag, any schema in :schema or :s, or a 'maybe' schema in :s?.
-   If both a tag and an explicit schema are present, the explicit schema wins."
+   If both a tag and an explicit schema are present, the explicit schema wins.
+   Public only because of its use in a public macro."
   [symbol]
   (let [{:keys [tag s s? schema]} (meta symbol)]
     (assert (< (count (remove nil? [s s? schema])) 2))
@@ -397,7 +406,7 @@
       schema
       +anything+)))
 
-(defn maybe-split-first [pred s]
+(defn- maybe-split-first [pred s]
   (if (pred (first s))
     [(first s) (next s)]
     [nil s]))
@@ -447,10 +456,149 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
 
-(defn validated-call [f & args]
+;; Metadata syntax is the same as for schema/defrecord.
+
+;; Currently, overhead with compile-fn-validation off is about 2x of a
+;; normal fn call, because applying metadata to the fn seems to wrap it
+;; in an extra fn layer.  We could avoid this for defns and just apply
+;; the io-schemata to the var, but for consistency with fn it seems
+;; nice to leave it for now.  Leaving compile-time validation on but 
+;; turning it off at runtime is about 3x overhead of normal fn call,
+;; and of course validation on consumes however long your validation 
+;; requires.
+  
+;; Another issue with this decision is that the wrapping does not
+;; preserve primitive-ness, so you cannot have schema functions that
+;; take or return primitives.
+
+;; As a consequence, we should probably move the metadata elsewhere,
+;; i.e., into a global weak cache.  In fact, we can use the
+;; class-schema cache that already exists.  We just need to make sure
+;; this will work for Graph before proceeding.
+
+
+(clojure.core/defn validated-call [f & args]
   (letk [[input-schema output-schema] (meta f)]
     (validate input-schema args)
     (let [o (apply f args)]
       (validate output-schema o)
       o)))
+
+;; TODO: rather than io-schemata metadata, use class-schema on the fn class?
+;; Or is this a perversion?
+
+;; Clojure has a bug that makes it impossible to extend a protocol and define
+;; your own fn in the same namespace [1], so we have to be sneaky about 
+;; defining fn -- we can't :exclude it above, but we can unmap and then def
+;; it at the last minute down here, once we've already done our extending
+;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
+(ns-unmap *ns* 'fn)
+
+
+(def compile-fn-validation
+  "At compile-time, should we generate code for fns and defns that allows schema
+   validation to be turned on at run-time?"
+  (atom true))
+
+(def ^:dynamic *use-fn-validation* 
+  "Turn on run-time function validation for functions compiled when
+   *copmile-function-validation* was true -- has no effect for functions compiled
+   when it is false."
+  true)
+
+;; TODO: how do we handle destructuring...... ???
+;; for now we don't allow it i
+(defn- process-fn-arity
+  "Process a single (bind & body) form, producing an output 
+   [[input-schema-form output-schema]
+    new-arity]
+   body where new-arity may have asserts for validation purposes added if 
+   compile-fn-validation is true."
+  [env [bind & body]]
+  (assert (vector? bind))
+  (let [bind (with-meta (mapv #(fixup-tag-metadata env %) bind) (meta bind))
+        input-schema (mapv (clojure.core/fn [[i s]]
+                             `(let [schema# ~(extract-schema s)]
+                                (one
+                                 schema#
+                                 ~(if (symbol? s)
+                                   (name s)
+                                   (name (gensym (str "arg" i)))))))
+                           (indexed bind))
+        output-schema (extract-schema bind)]
+    [[input-schema output-schema]
+     (if @compile-fn-validation
+       ;; TODO: would be much more efficient to let the schemata outside with a big
+       ;;  gensym nonsense for each arity, but for now we are lazy, and expect
+       ;;  that validation will only be turned on during tests anyway...
+       (let [bind-syms (vec (repeatedly (count bind) gensym))]
+         (list
+          ;; TODO: yet another Clojure bug prevents us from primitive type hints
+          ;; since with-meta ruins them.
+          bind-syms #_  (mapv #(with-meta %1 (meta %2)) bind-syms bind)
+          `(let ~(vec (interleave bind bind-syms))
+             (let [validate# *use-fn-validation*]
+               (when validate#
+                 (validate ~input-schema ~bind-syms))
+               (let [o# (do ~@body)]
+                 (when validate# (validate ~output-schema o#))
+                 o#)))))
+        (cons bind body))]))
+
+(defn- fn-
+  "Return a pair [io-schemata fn-form]"  
+  [env name? fn-body]
+  (let [arities (if (vector? (first fn-body))
+                  [fn-body]
+                  fn-body)
+        processed-arities (map (partial process-fn-arity env) arities)
+        io-schemata (mapv first processed-arities)]
+    [io-schemata 
+     `(with-meta 
+        (clojure.core/fn ~@(when name? [name?])
+          ~@(mapv second processed-arities))
+        ~{:io-schemata io-schemata})]))
+
+(defmacro fn
+  "Like clojure.core/fn, except that schema-style typehints can be given on the argument
+   symbols and on the arguemnt vector (for the return value), and (for now) 
+   schema metadata is only processed at the top-level.  i.e., you can use destructuring,
+   but you must put schema metadata on the top level arguments and not on the destructured
+   shit.
+
+   This produces a :io-schemata key in metadata on the outputted fn, which is a sequence
+   of pairs of [input-schema output-schema] pairs, one for each provided fn arity.
+
+   When compile-fn-validation is true (at compile-time), also automatically 
+   generates pre- and post-conditions on each arity that validate the input and output 
+   schemata whenever *use-fn-validation* is true (at run-time)."
+  [& fn-args]
+  (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)]
+    (second (fn- &env name? more-fn-args))))
+
+
+(defmacro defn
+  "defn : clojure.core/defn :: fn : clojure.core/fn.
+   Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions
+   (not sure why this exists anyway...) i.e., owe only support optional doc-string and attr-map
+   initially.  Output metadata goes on argument vector; if the same class hint is passed 
+   on each arg vector, it is auto-propagated to the fn name."
+  [name & more-defn-args]
+  (let [[doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
+        [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
+        [io-schemata fn-body] (fn- &env name more-defn-args)]
+    `(def ~(with-meta name 
+             (assoc-when (or attr-map? {}) 
+                         :doc doc-string? 
+                         :io-schemata io-schemata
+                         :tag (or (:tag (meta name))
+                                  (let [out-schemata (map second io-schemata)]
+                                    (when (and (seq out-schemata) (apply = out-schemata))
+                                      (let [out (first out-schemata)]
+                                        (when (and (symbol? out) (class? (resolve &env out)))
+                                          out)))))))
+       ~fn-body)))
+
+
+
 
