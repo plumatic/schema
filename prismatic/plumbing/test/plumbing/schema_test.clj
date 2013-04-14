@@ -325,7 +325,8 @@
       (is (= 5 (f 2 {:foo 3}))))  ;; return not even?
 
     (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
-    (is (thrown? Exception (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+    ;; (is (thrown? Exception (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long, cannot test 
+    ;; since we get coercion here due to your multipurpose type hint.
     (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?      
   )
 

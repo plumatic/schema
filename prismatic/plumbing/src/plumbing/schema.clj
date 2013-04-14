@@ -610,7 +610,7 @@
    and arity-form which may have asserts for validation purposes added if 
    compile-fn-validation is true. tag? is a prospective tag for the fn symbol
    based on the output schema."
-  [env no-prim? [bind & body]]
+  [env [bind & body]]
   (assert (vector? bind))
   (let [bind (with-meta (mapv #(fixup-tag-metadata env %) bind) (meta bind))
         input-schema (bind->input-schema-form bind)
@@ -626,7 +626,7 @@
                      (list
                       ;; we must omit primitive typehints 
                       ;; since with-meta ruins them.
-                      (if no-prim? bind-syms (mapv #(with-meta %1 (meta %2)) bind-syms bind))
+                      (mapv #(with-meta %1 (meta %2)) bind-syms bind)
                       `(let ~(vec (interleave (map #(with-meta % {}) bind) bind-syms))
                             (let [validate# *use-fn-validation*]
                               (when validate#
@@ -638,8 +638,8 @@
 
 (defn- process-fn-
   "Process the fn args into a final tag proposal, schema form, and fn form"
-  [env no-prim? name? fn-body]
-  (let [processed-arities (map (partial process-fn-arity env no-prim?)
+  [env name? fn-body]
+  (let [processed-arities (map (partial process-fn-arity env)
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
@@ -666,7 +666,7 @@
    schemata whenever *use-fn-validation* is true (at run-time)."
   [& fn-args]
   (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
-        {:keys [schema-form fn-form]} (process-fn- &env true name? more-fn-args)]
+        {:keys [schema-form fn-form]} (process-fn- &env name? more-fn-args)]
     `(with-meta ~fn-form ~{:schema schema-form})))
 
 (defmacro defn
@@ -678,7 +678,7 @@
   [name & more-defn-args]
   (let [[doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [tag? schema-form fn-form]} (process-fn- &env false name more-defn-args)]
+        {:keys [tag? schema-form fn-form]} (process-fn- &env name more-defn-args)]
     `(do 
        (def ~(with-meta name 
               (assoc-when (or attr-map? {}) 
