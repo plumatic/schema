@@ -194,9 +194,35 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
+
+(deftest fixup-tag-metadata-test
+  (let [correct! (fn [symbol desired-meta]
+                   (let [fix (@#'s/fixup-tag-metadata {} symbol)]                     
+                     (is (= symbol fix))
+                     (is (= desired-meta (or (meta fix) {})))))]
+    (correct! 'foo {})
+    (correct! (with-meta 'foo {:tag 'long}) {:tag 'long})
+    (correct! (with-meta 'foo {:tag 'String}) {:tag 'String})
+    (correct! (with-meta 'foo {:tag 'asdf}) {:schema 'asdf})))
+
+(deftest extract-schema-test
+  (let [correct! (fn [m out]
+                   (is (= out (s/extract-schema (with-meta 'foo m)))))]
+    (correct! {} s/+anything+)
+    (correct! {:asdf :foo} s/+anything+)
+    (correct! {:tag 'long} 'long)
+    (correct! {:schema []} [])    
+    (correct! {:s []} [])
+    (correct! {:s? []} `(s/maybe []))
+    (correct! {:tag 'long :s? []} `(s/maybe []))
+    (is (thrown? Throwable (s/extract-schema (with-meta 'foo {:s [] :schema []}))))))
+
+
+
 (defprotocol PProtocol
   (do-something [this]))
 
+;; exercies some different arities
 (s/defrecord Bar 
   [^long foo ^String bar]
   {(s/optional-key :baz) clojure.lang.Keyword})
@@ -244,41 +270,26 @@
   (invalid! Bar4 (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
-(deftest fixup-tag-metadata-test
-  (let [correct! (fn [symbol desired-meta]
-                   (let [fix (@#'s/fixup-tag-metadata {} symbol)]                     
-                     (is (= symbol fix))
-                     (is (= desired-meta (or (meta fix) {})))))]
-    (correct! 'foo {})
-    (correct! (with-meta 'foo {:tag 'long}) {:tag 'long})
-    (correct! (with-meta 'foo {:tag 'String}) {:tag 'String})
-    (correct! (with-meta 'foo {:tag 'asdf}) {:schema 'asdf})))
 
-(deftest extract-schema-test
-  (let [correct! (fn [m out]
-                   (is (= out (s/extract-schema (with-meta 'foo m)))))]
-    (correct! {} s/+anything+)
-    (correct! {:asdf :foo} s/+anything+)
-    (correct! {:tag 'long} 'long)
-    (correct! {:schema []} [])    
-    (correct! {:s []} [])
-    (correct! {:s? []} `(s/maybe []))
-    (correct! {:tag 'long :s? []} `(s/maybe []))
-    (is (thrown? Throwable (s/extract-schema (with-meta 'foo {:s [] :schema []}))))))
+;; Now test that schemata and protocols work as type hints.
 
 (def LongOrString (s/either long String))
 
-(s/defrecord Nested [^Bar4 b ^LongOrString c])
+(s/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
 
 (deftest fancier-defrecord-schema-test
-  (is (= (s/class-schema Nested)
-         (s/record Nested {(s/required-key :b) Bar4
-                           (s/required-key :c) LongOrString})))
-  (valid! Nested (Nested. (Bar4. [1] {}) 1))
-  (valid! Nested (Nested. (Bar4. [1] {}) "hi"))
-  (invalid! Nested (Nested. (Bar4. [1] {}) (int 5)))
-  (invalid! Nested (Nested. (Bar4. [1] {:foo :bar}) 1))
-  (invalid! Nested (Nested. nil "hi")))
+  (let [bar1 (Bar. 1 "a")
+        bar2 (Bar2. 1 "a")]
+    (is (= (s/class-schema Nested)
+           (s/record Nested {(s/required-key :b) Bar4
+                             (s/required-key :c) LongOrString
+                             (s/required-key :p) (s/protocol PProtocol)})))
+    (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
+    (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
+    (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))    
+    (invalid! Nested (Nested. (Bar4. [1] {}) (int 5) bar2))
+    (invalid! Nested (Nested. (Bar4. [1] {:foo :bar}) 1 bar2))
+    (invalid! Nested (Nested. nil "hi" bar2))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

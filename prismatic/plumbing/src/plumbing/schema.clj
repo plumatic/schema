@@ -29,6 +29,7 @@
 
    The new forms are also able to directly accept hints of the form
    ^+a-schema+ where +a-schema+ is a symbol referencing a schema, 
+   and ^AProtocol where AProtocol is a protocol (for realz),
    but these hints are not backwards compatible with ordinary 
    defrecord/ defn/etc."
   
@@ -408,16 +409,34 @@
 
 (def primitive-sym? '#{float double boolean byte character short int long})
 
+(defn- looks-like-a-protocol-var? 
+  "There is no 'protocol?'in Clojure, so here's a half-assed attempt."
+  [v]
+  (and (var? v)
+       (map? @v)
+       (= (:var @v) v)
+       (:on @v)))
+
+(defn- fix-protocol-tag [env tag]
+  (or (when (symbol? tag)
+        (when-let [v (resolve env tag)]
+          (when (looks-like-a-protocol-var? v)
+            `(protocol (deref ~v)))))
+      tag))
+
 (defn- fixup-tag-metadata
-  "Allow hints like ^+a-schema+ foo, where +a-schema+ refers to a local or var 
-   that defines a schema, rather than a literal tag.  In this case, the schema
+  "Allow type hints on symbols to include symbols that reference protocols
+   or schemas, as well as literal tags. In such cases, the schema
    must be moved from :tag to :schema so that Clojure doesn't get upset, since
    it's not a literal primitive or Class."
   [env symbol]
   (if-let [tag (:tag (meta symbol))]
     (if (or (primitive-sym? tag) (class? (resolve env tag)))
       symbol
-      (with-meta symbol (-> (meta symbol) (dissoc :tag) (assoc :schema tag))))
+      (with-meta symbol
+        (-> (meta symbol)
+            (dissoc :tag)
+            (assoc :schema (fix-protocol-tag env tag)))))
     symbol))
 
 (clojure.core/defn extract-schema 
