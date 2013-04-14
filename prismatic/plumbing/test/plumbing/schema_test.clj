@@ -205,9 +205,9 @@
     (correct! (with-meta 'foo {:tag 'String}) {:tag 'String})
     (correct! (with-meta 'foo {:tag 'asdf}) {:schema 'asdf})))
 
-(deftest extract-schema-test
+(deftest extract-schema-form-test
   (let [correct! (fn [m out]
-                   (is (= out (s/extract-schema (with-meta 'foo m)))))]
+                   (is (= out (s/extract-schema-form (with-meta 'foo m)))))]
     (correct! {} s/+anything+)
     (correct! {:asdf :foo} s/+anything+)
     (correct! {:tag 'long} 'long)
@@ -215,7 +215,7 @@
     (correct! {:s []} [])
     (correct! {:s? []} `(s/maybe []))
     (correct! {:tag 'long :s? []} `(s/maybe []))
-    (is (thrown? Throwable (s/extract-schema (with-meta 'foo {:s [] :schema []}))))))
+    (is (thrown? Throwable (s/extract-schema-form (with-meta 'foo {:s [] :schema []}))))))
 
 
 
@@ -295,25 +295,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
 
-(defmacro valid-call! [o c] `(is (= ~o (s/validated-call ~@c))))
-(defmacro invalid-call! [c] `(is (~'thrown? Exception (s/validated-call ~@c))))
-
-(deftest validated-call-test
-  (let [f (with-meta 
-            (fn schematized-fn [l m] 
-              (if (= l 100)
-                {:baz l}
-                {:bar (when (= l 1) (+ l (:foo m)))}))
-            {:input-schema [(s/one long "l") (s/one {(s/required-key :foo) double} "dm")]
-             :output-schema {(s/required-key :bar) (s/maybe double)}})]
-    (valid-call! {:bar nil} (f 2 {:foo 1.0}))
-    (valid-call! {:bar 4.0} (f 1 {:foo 3.0}))
-    (invalid-call! (f 3.0 {:foo 1.0}))
-    (invalid-call! (f 3 {:foo 1}))
-    (invalid-call! (f 100 {:foo 1.0}))))
-
-
-
 
 ;;; fn test 
 
@@ -321,10 +302,16 @@
 
 (reset! s/compile-fn-validation true)
 
+(def +test-fn-schema+ 
+  "Schema for (s/fn ^String [^OddLong x y])"
+  (s/make-fn-schema 
+   [(s/->Arity 
+     [(s/one OddLong "x") (s/one s/+anything+ "y")] 
+     String)]))
+
 (deftest simple-validated-meta-test
   (let [f (s/fn ^String [^OddLong x y])]
-    (is (= (:io-schemata (meta f))
-           [[[(s/one OddLong "x") (s/one s/+anything+ "y")] String]]))))
+    (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
   (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
@@ -348,8 +335,7 @@
 
 (deftest simple-unvalidated-meta-test
   (let [f (s/fn ^String [^OddLong x y])]
-    (is (= (:io-schemata (meta f))
-           [[[(s/one OddLong "x") (s/one s/+anything+ "y")] String]]))))
+    (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-unvalidated-fn-test
   (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
@@ -368,13 +354,19 @@
   ^String [^OddLong x]
   (str x))
 
+(def +simple-validated-defn-schema+
+  (s/make-fn-schema 
+   [(s/->Arity 
+     [(s/one OddLong "x")] 
+     String)]))
+
 (deftest simple-validated-defn-test 
-  (let [{:keys [tag io-schemata doc metadata]} (meta #'simple-validated-defn)]
+  (let [{:keys [tag schema doc metadata]} (meta #'simple-validated-defn)]
     (is (= tag String))
-    (is (= io-schemata [[[(s/one OddLong "x")] String]]))
+    (is (= +simple-validated-defn-schema+ schema))
     (is (= doc "I am a simple schema fn"))
     (is (= metadata :bla)))
-  (is (= (:io-schemata (meta simple-validated-defn)) [[[(s/one OddLong "x")] String]]))
+  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
   
   (is (= "3" (simple-validated-defn 3)))
   (is (thrown? Exception (simple-validated-defn 4)))
@@ -392,12 +384,12 @@
   (str x))
 
 (deftest simple-unvalidated-defn-test 
-  (let [{:keys [tag io-schemata doc metadata]} (meta #'simple-unvalidated-defn)]
+  (let [{:keys [tag schema doc metadata]} (meta #'simple-unvalidated-defn)]
     (is (= tag String))
-    (is (= io-schemata [[[(s/one OddLong "x")] String]]))
+    (is (= +simple-validated-defn-schema+ schema))
     (is (= doc "I am a simple schema fn"))
     (is (= metadata :bla)))
-  (is (= (:io-schemata (meta simple-unvalidated-defn)) [[[(s/one OddLong "x")] String]]))
+  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
   
   (is (= "3" (simple-unvalidated-defn 3)))
   (is (= "4" (simple-unvalidated-defn 4))))
