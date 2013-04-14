@@ -2,6 +2,23 @@
   (:use clojure.test)
   (:require [plumbing.schema :as s]))
 
+
+(s/defrecord Explainer 
+  [^long foo ^String bar]
+  {(s/optional-key :baz) clojure.lang.Keyword})
+
+(deftest explain-test
+  (is (= (s/explain {(s/required-key :x) long
+                     String [(s/one int "foo") (s/maybe Explainer)]})
+         '{(required-key :x) long
+           java.lang.String [("foo" int)
+                             &
+                             (maybe 
+                              (plumbing.schema_test.Explainer
+                               {(required-key :foo) long
+                                (required-key :bar) java.lang.String
+                                (optional-key :baz) clojure.lang.Keyword}))]})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema validation
 
@@ -32,6 +49,12 @@
   (valid! long 1)
   (invalid! long (byte 1)))
 
+(deftest array-test
+  (valid! "[Ljava.lang.String;" (into-array String ["a"]))
+  (invalid! "[Ljava.lang.Object;" (into-array String ["a"]))
+  (valid! "[Ljava.lang.Double;" (into-array Double [1.0]))
+  (valid! "[D" (double-array [1.0])))
+
 (deftest enum-test
   (let [schema (s/enum :a :b 1)]
     (valid! schema :a)
@@ -52,7 +75,6 @@
     (invalid! s (NonTestProtocolSatisfier.))
     (invalid! s nil)    
     (invalid! s 117)))
-
 
 ;;; helpers/wrappers
 
@@ -85,6 +107,11 @@
    (valid! schema nil)
    (valid! schema 1)
    (invalid! schema 1.0)))
+
+(deftest named-test
+  (let [schema [(s/one String "topic") (s/one (s/named double "score") "asdf")]]
+   (valid! schema ["foo" 1.0])
+   (invalid! schema [1 2])))
 
 ;;; maps
 
@@ -120,12 +147,7 @@
    (invalid! schema {:bar 1.0 :baz {:b1 3}})
    (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})))
 
-
-(deftest array-test
-  (valid! "[Ljava.lang.String;" (into-array String ["a"]))
-  (invalid! "[Ljava.lang.Object;" (into-array String ["a"]))
-  (valid! "[Ljava.lang.Double;" (into-array Double [1.0]))
-  (valid! "[D" (double-array [1.0])))
+;;; sequences
 
 (deftest simple-repeated-seq-test
  (let [schema [long]]
@@ -150,11 +172,7 @@
    (invalid! schema [1.0 2.0 3.0])
    (invalid! schema [])))
 
-(deftest named-test
-  (let [schema [(s/one String "topic") (s/one (s/named double "score") "asdf")]]
-   (valid! schema ["foo" 1.0])
-   (invalid! schema [1 2])))
-
+;;; records
 
 (defrecord Foo [x ^long y])
 
@@ -171,6 +189,10 @@
     (valid! schema  (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schematized defrecord
 
 (defprotocol PProtocol
   (do-something [this]))
@@ -259,6 +281,9 @@
   (invalid! Nested (Nested. nil "hi")))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schematized functions
+
 (defmacro valid-call! [o c] `(is (= ~o (s/validated-call ~@c))))
 (defmacro invalid-call! [c] `(is (~'thrown? Exception (s/validated-call ~@c))))
 
@@ -275,18 +300,6 @@
     (invalid-call! (f 3.0 {:foo 1.0}))
     (invalid-call! (f 3 {:foo 1}))
     (invalid-call! (f 100 {:foo 1.0}))))
-
-(deftest explain-test
-  (is (= (s/explain {(s/required-key :x) long
-                     String [(s/one int "foo") (s/maybe Bar)]})
-         '{(required-key :x) long
-           java.lang.String [("foo" int)
-                             &
-                             (maybe 
-                              (plumbing.schema_test.Bar 
-                               {(required-key :foo) long
-                                (required-key :bar) java.lang.String
-                                (optional-key :baz) clojure.lang.Keyword}))]})))
 
 
 

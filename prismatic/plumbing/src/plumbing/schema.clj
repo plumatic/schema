@@ -196,7 +196,6 @@
 (clojure.core/defrecord Protocol [p]
   Schema
   (validate* [this x c]
-             (println p x c)
     (check (satisfies? p x) c "Element does not satisfy protocol %s" (safe-get p :var)))
   (explain [this] (cons 'protocol (safe-get p :var))))
 
@@ -402,6 +401,10 @@
   (assert (class? klass))
   (assert (map? schema))
   (Record. klass schema))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schematized defrecord
 
 (def primitive-sym? '#{float double boolean byte character short int long})
 
