@@ -30,10 +30,8 @@
   (:require 
    [clojure.string :as str]))
 
-;; TODO: propagate type hint into defn name.
 ;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: schemas for names in namespace?
-;; TODO: test s/defn so we can use new syntax.
 
 ;; TODO: schema intersection
 ;; TODO: reduce uses of both so that we can better intersect?
@@ -168,7 +166,7 @@
   
   clojure.lang.AFn 
   (validate* [this x c] 
-    (check (this x) c "Value did not satisfy %s %s" this))
+    (check (this x) c "Value did not satisfy %s" this))
   (explain [this] this))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
