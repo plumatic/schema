@@ -59,7 +59,8 @@
   (str/join   
    ","
    (for [c context]
-     (let [s (pr-str c)]       
+     (let [c (if (fn? c) (c) c) ;; allow laziness
+           s (pr-str c)]
        (if (< (count s) 20)
          s
          (subs s 0 20))))))
@@ -275,7 +276,7 @@
 (clojure.core/defrecord NamedSchema [name schema]
   Schema
   (validate* [this x c]
-    (validate* schema x (conj c (format "<%s>" name))))
+    (validate* schema x (conj c #(format "<%s>" name))))
   (explain [this] (list 'named name (explain schema))))
 
 (clojure.core/defn named 
@@ -370,7 +371,7 @@
           (do (check (seq x) c "Seq too short: missing (at least) %s elements"
                      (count singles))
               (validate* (.schema first-single) (first x) 
-                         (conj c (format "%d <%s>" i (.name first-single))))
+                         (conj c #(format "%d <%s>" i (.name first-single))))
               (recur (inc i) more-singles (rest x)))
           (if multi
             (doseq [[offset item] (indexed x)]
