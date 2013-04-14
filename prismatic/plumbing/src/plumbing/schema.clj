@@ -177,8 +177,38 @@
     (check (this x) c "Value did not satisfy %s" this))
   (explain [this] this))
 
+
+;; enum
+
+(clojure.core/defrecord EnumSchema [vs]
+  Schema
+  (validate* [this x c]
+    (check (contains? vs x) c "Got an invalid enum element"))
+  (explain [this] (cons 'enum vs)))
+
+(clojure.core/defn enum
+  "A value that must be = to one element of vs."
+  [& vs]
+  (EnumSchema. (set vs)))
+
+;; protocol 
+
+(clojure.core/defrecord Protocol [p]
+  Schema
+  (validate* [this x c]
+             (println p x c)
+    (check (satisfies? p x) c "Element does not satisfy protocol %s" (safe-get p :var)))
+  (explain [this] (cons 'protocol (safe-get p :var))))
+
+(clojure.core/defn protocol [p]
+  (assert (:on p))
+  (Protocol. p))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple helpers / wrappers
+
+;; anything
 
 ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields 
 ;; loses type info, which makes this unusable in schema-fn.
@@ -189,6 +219,9 @@
   (explain [this] 'anything))
 
 (def +anything+ (Anything. nil))
+(def Top "in case you like type theory" +anything+)
+
+;; either
 
 (clojure.core/defrecord Either [schemas]
   Schema
@@ -202,6 +235,8 @@
   [& schemas]
   (Either. schemas))
 
+;; both
+
 (clojure.core/defrecord Both [schemas]
   Schema
   (validate* [this x c]
@@ -214,6 +249,8 @@
    purpose function validator with a normal map schema."
   [& schemas]
   (Both. schemas))
+
+;; maybe
 
 (clojure.core/defrecord Maybe [schema]
   Schema
@@ -229,6 +266,7 @@
 
 (def ? maybe)
 
+;; named
 
 (clojure.core/defrecord NamedSchema [name schema]
   Schema
@@ -240,21 +278,6 @@
   "Provide an explicit name for this schema element, useful for seqs."
   [schema name]
   (NamedSchema. name schema))
-
-
-
-(clojure.core/defrecord EnumSchema [vs]
-  Schema
-  (validate* [this x c]
-    (check (contains? vs x) c "Got an invalid enum element"))
-  (explain [this] (cons 'enum vs)))
-
-(clojure.core/defn enum
-  "A value that must be = to one element of vs."
-  [& vs]
-  (EnumSchema. (set vs)))
-
-(def integral-number (either long int))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -494,6 +517,17 @@
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
 (ns-unmap *ns* 'fn)
 
+;; These are deliberately schematized records -- why not, now that we've bootstrapped?
+
+;; (defrecord FnAritySchema [input-schema output-schema])
+
+;; (defrecord FnSchema [^{} arities]) ;;
+
+;; (defn make-fn-schema [])
+
+;; (clojure.core/defn fn-schema 
+;;   "Produce the schema "
+;;   [])
 
 (def compile-fn-validation
   "At compile-time, should we generate code for fns and defns that allows schema

@@ -2,8 +2,13 @@
   (:use clojure.test)
   (:require [plumbing.schema :as s]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schema validation
+
 (defmacro valid! [s x] `(is (do (s/validate ~s ~x) true)))
 (defmacro invalid! [s x] `(is (~'thrown? Exception (s/validate ~s ~x))))
+
+;;; leaves
 
 (deftest class-test
   (valid! String "foo")
@@ -26,6 +31,62 @@
     (invalid! f 1))
   (valid! long 1)
   (invalid! long (byte 1)))
+
+(deftest enum-test
+  (let [schema (s/enum :a :b 1)]
+    (valid! schema :a)
+    (valid! schema 1)
+    (invalid! schema :c)
+    (invalid! schema 2)))
+
+(defprotocol ATestProtocol)
+(def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
+(defrecord DirectTestProtocolSatisfier [] ATestProtocol)
+(defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
+(defrecord NonTestProtocolSatisfier [])
+
+(deftest protocol-test
+  (let [s (s/protocol ATestProtocol)]
+    (valid! s (DirectTestProtocolSatisfier.))
+    (valid! s (IndirectTestProtocolSatisfier.))
+    (invalid! s (NonTestProtocolSatisfier.))
+    (invalid! s nil)    
+    (invalid! s 117)))
+
+
+;;; helpers/wrappers
+
+(deftest anything-test
+  (valid! s/Top 1)
+  (valid! s/Top nil)
+  (valid! s/Top #{:hi :there}))
+
+(deftest either-test
+  (let [schema (s/either
+                {(s/required-key :l) long}
+                {(s/required-key :d) double})]
+    (valid! schema {:l 1})
+    (valid! schema {:d 1.0})
+    (invalid! schema {:l 1.0})
+    (invalid! schema {:d 1})))
+
+(deftest both-test
+ (let [schema (s/both
+               (fn equal-keys? [m] (doseq [[k v] m] (s/check (= k v) "Got non-equal key-value pair: %s %s" k v)) true)
+               {clojure.lang.Keyword clojure.lang.Keyword})]
+   (valid! schema {})
+   (valid! schema {:foo :foo :bar :bar})
+   (invalid! schema {"foo" "foo"})
+   (invalid! schema {:foo :bar})))
+
+(deftest maybe-test
+ (let [schema (s/maybe long)]
+   (is (= schema (s/? long)))
+   (valid! schema nil)
+   (valid! schema 1)
+   (invalid! schema 1.0)))
+
+;;; maps
 
 (deftest simple-map-schema-test
  (let [schema {(s/required-key :foo) long
@@ -59,37 +120,6 @@
    (invalid! schema {:bar 1.0 :baz {:b1 3}})
    (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})))
 
-(deftest either-test
-  (let [schema (s/either
-                {(s/required-key :l) long}
-                {(s/required-key :d) double})]
-    (valid! schema {:l 1})
-    (valid! schema {:d 1.0})
-    (invalid! schema {:l 1.0})
-    (invalid! schema {:d 1})))
-
-(deftest both-test
- (let [schema (s/both
-               (fn equal-keys? [m] (doseq [[k v] m] (s/check (= k v) "Got non-equal key-value pair: %s %s" k v)) true)
-               {clojure.lang.Keyword clojure.lang.Keyword})]
-   (valid! schema {})
-   (valid! schema {:foo :foo :bar :bar})
-   (invalid! schema {"foo" "foo"})
-   (invalid! schema {:foo :bar})))
-
-(deftest maybe-test
- (let [schema (s/maybe long)]
-   (is (= schema (s/? long)))
-   (valid! schema nil)
-   (valid! schema 1)
-   (invalid! schema 1.0)))
-
-(deftest enum-test
-  (let [schema (s/enum :a :b 1)]
-    (valid! schema :a)
-    (valid! schema 1)
-    (invalid! schema :c)
-    (invalid! schema 2)))
 
 (deftest array-test
   (valid! "[Ljava.lang.String;" (into-array String ["a"]))
