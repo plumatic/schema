@@ -296,7 +296,7 @@
 ;;; Schematized functions
 
 
-;;; fn test 
+;;; fn
 
 (def OddLong (s/both odd? long))
 
@@ -317,7 +317,7 @@
   (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
             (+ x (:foo y -100)))]
     (is (= 4 (f 1 {:foo 3})))
-    (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints ignored for now
+    (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
         
     (binding [s/*use-fn-validation* false]
       (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
@@ -345,6 +345,8 @@
     (is (= 5 (f 2 {:foo 3})))  ;; return not even?
     ))
 
+
+;;; defn 
 
 (reset! s/compile-fn-validation true)
 
@@ -375,6 +377,24 @@
   (binding [s/*use-fn-validation* false]
     (is (= "4" (simple-validated-defn 4)))))
 
+
+(def +primitive-validated-defn-schema+
+  (s/make-fn-schema [(s/->Arity [(s/one OddLong "x")] long)]))
+
+(s/defn primitive-validated-defn
+  ^long [^long ^{:s OddLong} x]
+  (inc x))
+
+(deftest simple-validated-defn-test 
+  (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
+  
+  (is (= 4 (primitive-validated-defn 3)))
+  (is (= 4 (.invokePrim primitive-validated-defn 3)))
+  (is (thrown? Exception (primitive-validated-defn 4)))
+  
+  (binding [s/*use-fn-validation* false]
+    (is (= 5 (primitive-validated-defn 4)))))
+
 (reset! s/compile-fn-validation false)
 
 (s/defn simple-unvalidated-defn
@@ -394,6 +414,20 @@
   (is (= "3" (simple-unvalidated-defn 3)))
   (is (= "4" (simple-unvalidated-defn 4))))
 
+
+(s/defn primitive-unvalidated-defn
+  ^long [^long ^{:s OddLong} x]
+  (inc x))
+
+(deftest primitive-unvalidated-defn-test 
+  (is (= +primitive-validated-defn-schema+ 
+         (s/fn-schema primitive-unvalidated-defn)))
+  
+  (is (= 4 (primitive-unvalidated-defn 3)))
+  (is (= 4 (.invokePrim primitive-unvalidated-defn 3)))
+  (is (= 5 (primitive-unvalidated-defn 4))))
+
+;;; Benchmarks
 
 (defn ^String simple-defn [x] (str x))
 
