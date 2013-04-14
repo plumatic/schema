@@ -295,6 +295,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
 
+;; helpers
+
+(deftest split-rest-arg-test
+  (is (= (@#'s/split-rest-arg ['a '& 'b])
+         '[[a] b]))
+  (is (= (@#'s/split-rest-arg ['a 'b])
+         '[[a b] nil])))
 
 ;;; fn
 
@@ -330,7 +337,44 @@
     (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?      
   )
 
+(deftest destructured-validated-fn-test
+  (let [LongPair [(s/one long "a") (s/one long "b")]
+        f (s/fn ^long [^{:s LongPair} [a b] ^long y]
+            (+ a b y))]
+    (is (= (s/make-fn-schema
+            [(s/->Arity
+              [(s/one LongPair "gensym") (s/one long "y")] 
+              long)])
+           (assoc-in (s/fn-schema f)
+                     [:arities 0 :input-schema 0 :name] ;; ugh
+                     "gensym")))
+    (is (= 6 (f [1 2] 3)))
+    (is (thrown? Exception (f [(Integer. 1) 2] 3)))))
 
+(deftest two-arity-fn-test
+  (let [f (s/fn foo
+            (^long [^String x ^long y] (+ y (foo x)))
+            (^long [^String x] (Long/parseLong x)))]
+    (is (= (s/make-fn-schema
+            [(s/->Arity [(s/one String "x")] long)
+             (s/->Arity [(s/one String "x") (s/one long "y")] long)])
+           (s/fn-schema f)))
+    (is (= 3 (f "3")))
+    (is (= 10 (f "3" 7)))))
+
+(deftest infinite-arity-fn-test
+  (let [f (s/fn foo
+            (^Long [^Long x] (inc x))
+            (^Long [^Long x & ^{:s [String]} strs]
+                   (reduce + (foo x) (map count strs))))]
+    (is (= (s/make-fn-schema
+            [(s/->Arity [(s/one Long "x")] Long)
+             (s/->Arity [(s/one Long "x") String] Long)])
+           (s/fn-schema f)))
+    (is (= 5 (f 4)))
+    (is (= 16 (f 4 "55555" "666666")))
+    (is (thrown? Exception (f (int 4) "55555" "666666")))
+    (is (thrown? Exception (f 4 [3 3 3])))))
 
 (reset! s/compile-fn-validation false)
 
@@ -389,12 +433,15 @@
 (deftest simple-validated-defn-test 
   (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
   
+  (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
   (is (= 4 (primitive-validated-defn 3)))
   (is (= 4 (.invokePrim primitive-validated-defn 3)))
   (is (thrown? Exception (primitive-validated-defn 4)))
   
   (binding [s/*use-fn-validation* false]
     (is (= 5 (primitive-validated-defn 4)))))
+
+;; TODO: multi-arity defn tests.
 
 (reset! s/compile-fn-validation false)
 
@@ -424,6 +471,7 @@
   (is (= +primitive-validated-defn-schema+ 
          (s/fn-schema primitive-unvalidated-defn)))
   
+  (is ((ancestors (class primitive-unvalidated-defn)) clojure.lang.IFn$LL))
   (is (= 4 (primitive-unvalidated-defn 3)))
   (is (= 4 (.invokePrim primitive-unvalidated-defn 3)))
   (is (= 5 (primitive-unvalidated-defn 4))))

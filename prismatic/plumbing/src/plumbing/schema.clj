@@ -40,6 +40,7 @@
 
 (set! *warn-on-reflection* true)
 
+;; TODO: convert asserts into something nicer
 ;; TODO: #{} notation for sets #{schema} and maybe vec.
 ;; TODO: schemas for names in namespace?
 
@@ -544,18 +545,6 @@
         +infinite-arity+)
     0))
 
-;; TODO: handle & properly, for now it's broken.
-(defn- bind->input-schema-form [bind]
-  (mapv (clojure.core/fn [[i s]]
-          `(let [schema# ~(extract-schema-form s)]
-             (one
-              schema#
-              ~(if (symbol? s)
-                 (name s)
-                 (name (gensym (str "arg" i)))))))
-        (indexed bind)))
-
-
 (defrecord Fn [^{:s [Arity]} arities] ;; sorted by arity
   Schema
   (validate* [this x c]
@@ -604,7 +593,36 @@
    when it is false."
   true)
 
-;; TODO: make sure we're doing something sane for destructuring, and we document it.
+;; Helpers for the macro magic
+
+(defn- single-arg-schema-form [[index arg]]
+  `(one
+    ~(extract-schema-form arg)
+    ~(if (symbol? arg)
+       (name arg)
+       (name (gensym (str "arg" index))))))
+
+(defn- rest-arg-schema-form [arg]
+  (let [s (extract-schema-form arg)]
+    (if (= s Top)
+      [Top]
+      (do (assert (vector? s))
+          s))))
+
+(defn- input-schema-form [regular-args rest-arg]
+  (let [base (mapv single-arg-schema-form (indexed regular-args))]
+    (if rest-arg
+      (vec (concat base (rest-arg-schema-form rest-arg)))
+      base)))
+
+(defn- split-rest-arg [bind]
+  (let [[pre-& post-&] (split-with #(not= % '&) bind)]
+    (if (seq post-&)
+      (do (assert (= (count post-&) 2))
+          (assert (symbol? (second post-&)))
+          [(vec pre-&) (last post-&)])
+      [bind nil])))
+
 (defn- process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which may have asserts for validation purposes added if 
@@ -612,8 +630,10 @@
    based on the output schema."
   [env [bind & body]]
   (assert (vector? bind))
-  (let [bind (with-meta (mapv #(fixup-tag-metadata env %) bind) (meta bind))
-        input-schema (bind->input-schema-form bind)
+  (let [bind-meta (meta bind)
+        bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
+        [regular-args rest-arg] (split-rest-arg bind)
+        input-schema (input-schema-form regular-args rest-arg)
         output-schema (extract-schema-form bind)]
     {:tag? (when (and (symbol? output-schema) (class? (resolve env output-schema)))
              output-schema)
@@ -622,15 +642,20 @@
                    ;; TODO: would be much more efficient to let the schemata outside with a big
                    ;;  gensym nonsense for each arity, but for now we are lazy, and expect
                    ;;  that validation will only be turned on during tests anyway...                   
-                   (let [bind-syms (vec (repeatedly (count bind) gensym))]
+                   (let [bind-syms (vec (repeatedly (count regular-args) gensym))
+                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
                      (list
-                      ;; we must omit primitive typehints 
-                      ;; since with-meta ruins them.
-                      (mapv #(with-meta %1 (meta %2)) bind-syms bind)
+                      (if rest-arg
+                        (-> metad-bind-syms (conj '&) (conj rest-arg))
+                        metad-bind-syms)
                       `(let ~(vec (interleave (map #(with-meta % {}) bind) bind-syms))
                             (let [validate# *use-fn-validation*]
                               (when validate#
-                                (validate ~input-schema ~bind-syms))
+                                (validate 
+                                 ~input-schema 
+                                 ~(if rest-arg
+                                    `(list* ~@bind-syms ~rest-arg)
+                                    bind-syms)))
                               (let [o# (do ~@body)]
                                 (when validate# (validate ~output-schema o#))
                                 o#)))))
@@ -651,19 +676,24 @@
      :fn-form `(clojure.core/fn ~@(when name? [name?])
                  ~@fn-forms)}))
 
+;; Finally we get to the prize
+
 (defmacro fn
   "Like clojure.core/fn, except that schema-style typehints can be given on the argument
    symbols and on the arguemnt vector (for the return value), and (for now) 
    schema metadata is only processed at the top-level.  i.e., you can use destructuring,
    but you must put schema metadata on the top level arguments and not on the destructured
-   shit.
+   shit.  The only unsupported form is the '& {}' map destructuring.
 
    This produces a :io-schemata key in metadata on the outputted fn, which is a sequence
    of pairs of [input-schema output-schema] pairs, one for each provided fn arity.
 
    When compile-fn-validation is true (at compile-time), also automatically 
    generates pre- and post-conditions on each arity that validate the input and output 
-   schemata whenever *use-fn-validation* is true (at run-time)."
+   schemata whenever *use-fn-validation* is true (at run-time).
+  
+   Primitive type hints are used on the inner fn, but applying metadata wraps this 
+   in an outer non-primitive fn, so you're not going to see the perf benefits."
   [& fn-args]
   (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
         {:keys [schema-form fn-form]} (process-fn- &env name? more-fn-args)]
