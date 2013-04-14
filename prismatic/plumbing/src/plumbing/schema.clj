@@ -627,21 +627,24 @@
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which may have asserts for validation purposes added if 
    compile-fn-validation is true. tag? is a prospective tag for the fn symbol
-   based on the output schema."
+   based on the output schema.
+   schema-bindings are bindings to lift eval outwards, so we don't build the schema
+   every time we do the validation."
   [env [bind & body]]
   (assert (vector? bind))
   (let [bind-meta (meta bind)
         bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg bind)
         input-schema (input-schema-form regular-args rest-arg)
-        output-schema (extract-schema-form bind)]
+        output-schema (extract-schema-form bind)
+        input-schema-sym (gensym "input-schema")
+        output-schema-sym (gensym "output-schema")]
     {:tag? (when (and (symbol? output-schema) (class? (resolve env output-schema)))
              output-schema)
-     :schema-form `(->Arity ~input-schema ~output-schema)
+     :schema-bindings [input-schema-sym input-schema
+                       output-schema-sym output-schema]
+     :schema-form `(->Arity ~input-schema-sym ~output-schema-sym)
      :arity-form (if @compile-fn-validation
-                   ;; TODO: would be much more efficient to let the schemata outside with a big
-                   ;;  gensym nonsense for each arity, but for now we are lazy, and expect
-                   ;;  that validation will only be turned on during tests anyway...                   
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
                      (list
@@ -652,26 +655,27 @@
                             (let [validate# *use-fn-validation*]
                               (when validate#
                                 (validate 
-                                 ~input-schema 
+                                 ~input-schema-sym
                                  ~(if rest-arg
                                     `(list* ~@bind-syms ~rest-arg)
                                     bind-syms)))
                               (let [o# (do ~@body)]
-                                (when validate# (validate ~output-schema o#))
+                                (when validate# (validate ~output-schema-sym o#))
                                 o#)))))
                    (cons bind body))}))
 
 (defn- process-fn-
-  "Process the fn args into a final tag proposal, schema form, and fn form"
+  "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name? fn-body]
   (let [processed-arities (map (partial process-fn-arity env)
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
-        [tags schema-forms fn-forms] (map #(map % processed-arities) 
-                                          [:tag? :schema-form :arity-form])]
+        [tags schema-bindings schema-forms fn-forms] 
+        (map #(map % processed-arities) [:tag? :schema-bindings :schema-form :arity-form])]
     {:tag? (when (and (seq tags) (apply = tags))
              (first tags))
+     :schema-bindings (vec (apply concat schema-bindings))
      :schema-form `(make-fn-schema ~(vec schema-forms))
      :fn-form `(clojure.core/fn ~@(when name? [name?])
                  ~@fn-forms)}))
@@ -695,8 +699,9 @@
    schemata whenever *use-fn-validation* is true (at run-time)."
   [& fn-args]
   (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
-        {:keys [schema-form fn-form]} (process-fn- &env name? more-fn-args)]
-    `(with-meta ~fn-form ~{:schema schema-form})))
+        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name? more-fn-args)]
+    `(let ~schema-bindings
+      (with-meta ~fn-form ~{:schema schema-form}))))
 
 (defmacro defn
   "defn : clojure.core/defn :: fn : clojure.core/fn.
@@ -711,8 +716,8 @@
   [name & more-defn-args]
   (let [[doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [tag? schema-form fn-form]} (process-fn- &env name more-defn-args)]
-    `(do 
+        {:keys [tag? schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
+    `(let ~schema-bindings 
        (def ~(with-meta name 
               (assoc-when (or attr-map? {}) 
                           :doc doc-string? 
