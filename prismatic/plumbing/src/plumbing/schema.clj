@@ -685,15 +685,14 @@
    but you must put schema metadata on the top level arguments and not on the destructured
    shit.  The only unsupported form is the '& {}' map destructuring.
 
-   This produces a :io-schemata key in metadata on the outputted fn, which is a sequence
-   of pairs of [input-schema output-schema] pairs, one for each provided fn arity.
+   This produces a fn that you can call fn-schema on to get a schema back. 
+   This is currently done using metadata for fns, which currently causes
+   clojure to wrap the fn in an outer non-primitive layer, so you may pay double
+   function call cost and lose the benefits of primitive type hints.
 
    When compile-fn-validation is true (at compile-time), also automatically 
    generates pre- and post-conditions on each arity that validate the input and output 
-   schemata whenever *use-fn-validation* is true (at run-time).
-  
-   Primitive type hints are used on the inner fn, but applying metadata wraps this 
-   in an outer non-primitive fn, so you're not going to see the perf benefits."
+   schemata whenever *use-fn-validation* is true (at run-time)."
   [& fn-args]
   (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
         {:keys [schema-form fn-form]} (process-fn- &env name? more-fn-args)]
@@ -701,10 +700,14 @@
 
 (defmacro defn
   "defn : clojure.core/defn :: fn : clojure.core/fn.
-   Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions
-   (not sure why this exists anyway...) i.e., owe only support optional doc-string and attr-map
-   initially.  Output metadata goes on argument vector; if the same class hint is passed 
-   on each arg vector, it is auto-propagated to the fn name."
+
+   Things of note:
+    - Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions
+    - The '& {}' map destructing form is not supported
+    - fn-schema works on the class of the fn, so primitive hints are supported and there
+      is no overhead, unlike with 'fn' above
+    - Output metadata always goes on the argument vector.  If you use the same bare 
+      class on every arity, this will automatically propagate to the tag on the name."
   [name & more-defn-args]
   (let [[doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
