@@ -413,7 +413,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
-(def primitive-sym? '#{float double boolean byte character short int long})
+(def primitive-sym? '#{float double boolean byte char short int long
+                       floats doubles booleans bytes chars shorts ints longs objects})
 
 (defn- looks-like-a-protocol-var? 
   "There is no 'protocol?'in Clojure, so here's a half-assed attempt."
@@ -587,7 +588,7 @@
 (def compile-fn-validation
   "At compile-time, should we generate code for fns and defns that allows schema
    validation to be turned on at run-time?"
-  (atom true))
+  (atom false))
 
 (def ^:dynamic *use-fn-validation* 
   "Turn on run-time function validation for functions compiled when
