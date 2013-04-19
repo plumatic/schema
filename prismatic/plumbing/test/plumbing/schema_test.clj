@@ -307,8 +307,6 @@
 
 (def OddLong (s/both odd? long))
 
-(reset! s/compile-fn-validation true)
-
 (def +test-fn-schema+ 
   "Schema for (s/fn ^String [^OddLong x y])"
   (s/make-fn-schema 
@@ -323,19 +321,16 @@
 (deftest simple-validated-fn-test
   (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
             (+ x (:foo y -100)))]
-    (is (= 4 (f 1 {:foo 3})))
-    (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
-        
-    (binding [s/*use-fn-validation* false]
-      (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
-      (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
-      (is (= 5 (f 2 {:foo 3}))))  ;; return not even?
-
-    (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
-    ;; (is (thrown? Exception (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long, cannot test 
-    ;; since we get coercion here due to your multipurpose type hint.
-    (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?      
-  )
+    (s/with-fn-validation      
+      (is (= 4 (f 1 {:foo 3})))
+      (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
+      (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
+      (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?      
+    
+    (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
+    (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+    (is (= 5 (f 2 {:foo 3})))  ;; return not even?
+    ))
 
 (deftest destructured-validated-fn-test
   (let [LongPair [(s/one long "a") (s/one long "b")]
@@ -348,8 +343,9 @@
            (assoc-in (s/fn-schema f)
                      [:arities 0 :input-schema 0 :name] ;; ugh
                      "gensym")))
-    (is (= 6 (f [1 2] 3)))
-    (is (thrown? Exception (f [(Integer. 1) 2] 3)))))
+    (s/with-fn-validation
+      (is (= 6 (f [1 2] 3)))
+      (is (thrown? Exception (f [(Integer. 1) 2] 3))))))
 
 (deftest two-arity-fn-test
   (let [f (s/fn foo
@@ -371,29 +367,14 @@
             [(s/->Arity [(s/one Long "x")] Long)
              (s/->Arity [(s/one Long "x") String] Long)])
            (s/fn-schema f)))
-    (is (= 5 (f 4)))
-    (is (= 16 (f 4 "55555" "666666")))
-    (is (thrown? Exception (f (int 4) "55555" "666666")))
-    (is (thrown? Exception (f 4 [3 3 3])))))
-
-(reset! s/compile-fn-validation false)
-
-(deftest simple-unvalidated-meta-test
-  (let [f (s/fn ^String [^OddLong x y])]
-    (is (= +test-fn-schema+ (s/fn-schema f)))))
-
-(deftest simple-unvalidated-fn-test
-  (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
-            (+ x (:foo y -100)))]
-    (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
-    (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
-    (is (= 5 (f 2 {:foo 3})))  ;; return not even?
-    ))
+    (s/with-fn-validation 
+      (is (= 5 (f 4)))
+      (is (= 16 (f 4 "55555" "666666")))
+      (is (thrown? Exception (f (int 4) "55555" "666666")))
+      (is (thrown? Exception (f 4 [3 3 3]))))))
 
 
 ;;; defn 
-
-(reset! s/compile-fn-validation true)
 
 (s/defn simple-validated-defn
   "I am a simple schema fn"
@@ -414,13 +395,13 @@
     (is (= doc "I am a simple schema fn"))
     (is (= metadata :bla)))
   (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
+
+  (s/with-fn-validation 
+    (is (= "3" (simple-validated-defn 3)))
+    (is (thrown? Exception (simple-validated-defn 4)))
+    (is (thrown? Exception (simple-validated-defn "a"))))
   
-  (is (= "3" (simple-validated-defn 3)))
-  (is (thrown? Exception (simple-validated-defn 4)))
-  (is (thrown? Exception (simple-validated-defn "a")))
-  
-  (binding [s/*use-fn-validation* false]
-    (is (= "4" (simple-validated-defn 4)))))
+  (is (= "4" (simple-validated-defn 4))))
 
 
 (def +primitive-validated-defn-schema+
@@ -434,47 +415,14 @@
   (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
   
   (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
-  (is (= 4 (primitive-validated-defn 3)))
-  (is (= 4 (.invokePrim primitive-validated-defn 3)))
-  (is (thrown? Exception (primitive-validated-defn 4)))
+  (s/with-fn-validation 
+    (is (= 4 (primitive-validated-defn 3)))
+    (is (= 4 (.invokePrim primitive-validated-defn 3)))
+    (is (thrown? Exception (primitive-validated-defn 4))))
   
-  (binding [s/*use-fn-validation* false]
-    (is (= 5 (primitive-validated-defn 4)))))
+  (is (= 5 (primitive-validated-defn 4))))
 
 ;; TODO: multi-arity defn tests.
-
-(reset! s/compile-fn-validation false)
-
-(s/defn simple-unvalidated-defn
-  "I am a simple schema fn"
-  {:metadata :bla}
-  ^String [^OddLong x]
-  (str x))
-
-(deftest simple-unvalidated-defn-test 
-  (let [{:keys [tag schema doc metadata]} (meta #'simple-unvalidated-defn)]
-    (is (= tag String))
-    (is (= +simple-validated-defn-schema+ schema))
-    (is (= doc "I am a simple schema fn"))
-    (is (= metadata :bla)))
-  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
-  
-  (is (= "3" (simple-unvalidated-defn 3)))
-  (is (= "4" (simple-unvalidated-defn 4))))
-
-
-(s/defn primitive-unvalidated-defn
-  ^long [^long ^{:s OddLong} x]
-  (inc x))
-
-(deftest primitive-unvalidated-defn-test 
-  (is (= +primitive-validated-defn-schema+ 
-         (s/fn-schema primitive-unvalidated-defn)))
-  
-  (is ((ancestors (class primitive-unvalidated-defn)) clojure.lang.IFn$LL))
-  (is (= 4 (primitive-unvalidated-defn 3)))
-  (is (= 4 (.invokePrim primitive-unvalidated-defn 3)))
-  (is (= 5 (primitive-unvalidated-defn 4))))
 
 ;;; Benchmarks
 
@@ -483,11 +431,9 @@
 (require '[plumbing.timing :as timing])
 (defn validated-fn-benchmark []
   (timing/microbenchmark
-   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
-   (binding [s/*use-fn-validation* false]
+   (s/with-fn-validation
      (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
-   (reduce #(when (simple-unvalidated-defn %2) %1) (range 1 1000001 2))
+   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
    (reduce #(when (simple-defn %2) %1) (range 1 1000001 2))))
 
 
-(reset! s/compile-fn-validation true)

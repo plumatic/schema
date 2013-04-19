@@ -518,10 +518,10 @@
 ;; For fns we're stuck with this 2x slowdown for now, and 
 ;; no primitives, unless we can figure out how to pull a similar trick
 
-;; When compile-fn-validation is on, checking *use-fn-validation* 
-;; has about the same cost as the fn call itself.  On top of that,
+;; The overhead for checking if run-time validation should be used
+;; is very small -- about 5% of a very small fn call.  On top of that,
 ;; actual validation costs what it costs.
-  
+
 
 ;; Clojure has a bug that makes it impossible to extend a protocol and define
 ;; your own fn in the same namespace [1], so we have to be sneaky about 
@@ -584,17 +584,26 @@
     (assert (= 1 (count arities)))
     (.output-schema ^Arity (first arities))))
 
+(definterface PSimpleCell
+  (get_cell ^boolean [])
+  (set_cell [^boolean x]))
 
-(def compile-fn-validation
-  "At compile-time, should we generate code for fns and defns that allows schema
-   validation to be turned on at run-time?"
-  (atom false))
+;; adds ~5% overhead compared to no check
+(deftype SimpleVCell [^:volatile-mutable ^boolean q]
+  PSimpleCell
+  (get-cell [this] q)
+  (set-cell [this x] (set! q x)))
 
-(def ^:dynamic *use-fn-validation* 
+(def ^plumbing.schema.PSimpleCell use-fn-validation
   "Turn on run-time function validation for functions compiled when
    *copmile-function-validation* was true -- has no effect for functions compiled
    when it is false."
-  true)
+   (SimpleVCell. false))
+
+(defmacro with-fn-validation [& body]
+  `(do (.set_cell use-fn-validation true)
+       ~@body
+       (.set_cell use-fn-validation false)))
 
 ;; Helpers for the macro magic
 
@@ -628,9 +637,9 @@
 
 (defn- process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
-   and arity-form which may have asserts for validation purposes added if 
-   compile-fn-validation is true. tag? is a prospective tag for the fn symbol
-   based on the output schema.
+   and arity-form which has asserts for validation purposes added that are
+   executed when turned on, and have very low overhead otherwise. 
+   tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
   [env [bind & body]]
@@ -647,7 +656,7 @@
      :schema-bindings [input-schema-sym input-schema
                        output-schema-sym output-schema]
      :schema-form `(->Arity ~input-schema-sym ~output-schema-sym)
-     :arity-form (if @compile-fn-validation
+     :arity-form (if true 
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
                      (list
@@ -655,7 +664,7 @@
                         (-> metad-bind-syms (conj '&) (conj rest-arg))
                         metad-bind-syms)
                       `(let ~(vec (interleave (map #(with-meta % {}) bind) bind-syms))
-                            (let [validate# *use-fn-validation*]
+                            (let [validate# (.get_cell ~'ufv)]
                               (when validate#
                                 (validate 
                                  ~input-schema-sym
@@ -680,8 +689,9 @@
              (first tags))
      :schema-bindings (vec (apply concat schema-bindings))
      :schema-form `(make-fn-schema ~(vec schema-forms))
-     :fn-form `(clojure.core/fn ~@(when name? [name?])
-                 ~@fn-forms)}))
+     :fn-form `(let [^plumbing.schema.PSimpleCell ~'ufv use-fn-validation]
+                (clojure.core/fn ~@(when name? [name?])
+                  ~@fn-forms))}))
 
 ;; Finally we get to the prize
 
