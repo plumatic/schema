@@ -376,17 +376,20 @@
 
 ;;; defn 
 
+(def OddLongString
+  (s/both String #(odd? (Long/parseLong %))))
+
 (s/defn simple-validated-defn
   "I am a simple schema fn"
   {:metadata :bla}
-  ^String [^OddLong x]
+  ^OddLongString [^OddLong x]
   (str x))
 
 (def +simple-validated-defn-schema+
   (s/make-fn-schema 
    [(s/->Arity 
      [(s/one OddLong "x")] 
-     String)]))
+     OddLongString)]))
 
 (deftest simple-validated-defn-test 
   (let [{:keys [tag schema doc metadata]} (meta #'simple-validated-defn)]

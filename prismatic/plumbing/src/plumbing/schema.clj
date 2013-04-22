@@ -432,19 +432,19 @@
       tag))
 
 (defn- fixup-tag-metadata
-  "Allow type hints on symbols to include symbols that reference protocols
+  "Allow type hints on symbols/arglists to include symbols that reference protocols
    or schemas, as well as literal tags. In such cases, the schema
    must be moved from :tag to :schema so that Clojure doesn't get upset, since
    it's not a literal primitive or Class."
-  [env symbol]
-  (if-let [tag (:tag (meta symbol))]
+  [env imeta]
+  (if-let [tag (:tag (meta imeta))]
     (if (or (primitive-sym? tag) (class? (resolve env tag)))
-      symbol
-      (with-meta symbol
-        (-> (meta symbol)
+      imeta
+      (with-meta imeta
+        (-> (meta imeta)
             (dissoc :tag)
             (assoc :schema (fix-protocol-tag env tag)))))
-    symbol))
+    imeta))
 
 (clojure.core/defn extract-schema-form 
   "Extract the schema metadata from a symbol.  Schema can be a primitive/class
@@ -644,7 +644,8 @@
    every time we do the validation."
   [env [bind & body]]
   (assert (vector? bind))
-  (let [bind-meta (meta bind)
+  (let [bind (fixup-tag-metadata env bind)
+        bind-meta (meta bind)
         bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg bind)
         input-schema (input-schema-form regular-args rest-arg)
@@ -685,6 +686,9 @@
                                  fn-body))
         [tags schema-bindings schema-forms fn-forms] 
         (map #(map % processed-arities) [:tag? :schema-bindings :schema-form :arity-form])]
+    (when name?
+      (when-let [bad-meta (seq (filter (or (meta name?) {}) [:tag :s? :s :schema]))]
+        (throw (RuntimeException. (str "Meta not supported on name, use arglist meta: " (vec bad-meta))))))
     {:tag? (when (and (seq tags) (apply = tags))
              (first tags))
      :schema-bindings (vec (apply concat schema-bindings))
