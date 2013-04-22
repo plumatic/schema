@@ -40,12 +40,10 @@
 
 (set! *warn-on-reflection* true)
 
-;; TODO: convert asserts into something nicer
-;; TODO: #{} notation for sets #{schema} and maybe vec.
+;; TODO: #{} notation for sets #{schema} and maybe vec?
 ;; TODO: schemas for names in namespace?
 
 ;; TODO: schema intersection
-;; TODO: reduce uses of both so that we can better intersect?
 ;; TODO: schema satisfaction
 ;; TODO: schema diff
 ;;  (diff plus union can solve everything?)
