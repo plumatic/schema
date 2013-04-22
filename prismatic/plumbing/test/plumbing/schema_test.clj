@@ -215,7 +215,7 @@
     (correct! {:s []} [])
     (correct! {:s? []} `(s/maybe []))
     (correct! {:tag 'long :s? []} `(s/maybe []))
-    (is (thrown? Throwable (s/extract-schema-form (with-meta 'foo {:s [] :schema []}))))))
+    (is (thrown? Exception (s/extract-schema-form (with-meta 'foo {:s [] :schema []}))))))
 
 
 

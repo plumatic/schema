@@ -54,6 +54,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
+(defmacro assert-iae 
+  "Like assert, but throws an IllegalArgumentException not an Error (and also takes args to format)"
+  [form & format-args]
+  `(when-not ~form (throw (IllegalArgumentException. (format ~@format-args)))))
+
 (defn- context-str
   "Produce a human-readable representation of the current validation context"
   [context]
@@ -114,7 +119,7 @@
    schema only applies to instances of the concrete type passed, i.e., 
    (= (class x) klass), not (instance? klass x)."
   [klass schema]
-  (assert (class? klass))
+  (assert-iae (class? klass) "Cannot declare class schema for non-class %s" (class klass))
   (.put +class-schemata+ klass schema))
 
 (clojure.core/defn class-schema
@@ -207,7 +212,7 @@
   (explain [this] (cons 'protocol (safe-get p :var))))
 
 (clojure.core/defn protocol [p]
-  (assert (:on p))
+  (assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
 
@@ -308,7 +313,9 @@
 
 (defn- find-more-keys [ks]
   (let [key-schemata (remove specific-key? ks)]
-    (assert (< (count key-schemata) 2))
+    (assert-iae (< (count key-schemata) 2)                
+                "More than one non-optional/required key schemata: %s" 
+                (vec key-schemata))
     (first key-schemata)))
 
 (defn- validate-key 
@@ -405,8 +412,8 @@
 (clojure.core/defn record 
   "A schema for record with class klass and map schema schema"
   [klass schema]
-  (assert (class? klass))
-  (assert (map? schema))
+  (assert-iae (class? klass) "Expected record class, got %s" (class klass))
+  (assert-iae (map? schema) "Expected map, got %s" (class schema))
   (Record. klass schema))
 
 
@@ -453,7 +460,8 @@
    Public only because of its use in a public macro."
   [symbol]
   (let [{:keys [tag s s? schema]} (meta symbol)]
-    (assert (< (count (remove nil? [s s? schema])) 2))
+    (assert-iae (< (count (remove nil? [s s? schema])) 2)
+                "Expected single schema, got meta %s" (meta symbol))
     (if-let [schema (or s schema (when s? `(maybe ~s?)) tag)]
       schema
       +anything+)))
@@ -494,13 +502,13 @@
        (when-let [bad-keys# (seq (filter #(instance? RequiredKey %) (keys ~extra-key-schema?)))]
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
        (when ~extra-validator-fn?
-         (assert (fn? ~extra-validator-fn?)))
+         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s" (class ~extra-validator-fn?)))
        (clojure.core/defrecord ~name ~field-schema ~@more-args)
        (declare-class-schema! 
         ~name
         (assoc-when (record ~name (merge ~(for-map [k field-schema]
                                             (required-key (keyword (clojure.core/name k)))
-                                            (do (assert (symbol? k))
+                                            (do (assert-iae (symbol? k) "Non-symbol in record binding form: %s" k)
                                                 (extract-schema-form k)))
                                          ~extra-key-schema?)) 
                     :extra-validator-fn ~extra-validator-fn?)))))
@@ -566,7 +574,7 @@
    overhead, we store the schema on the class when we can (for defns)
    and on metadata otherwise (for fns)."
   [f]
-  (assert (fn? f))
+  (assert-iae (fn? f) "Non-function %s" (class f))
   (or (class-schema (class f))
       (safe-get (meta f) :schema)))
 
@@ -574,14 +582,14 @@
   "Convenience method for fns with single arity"
   [f]
   (let [arities (.arities (fn-schema f))]
-    (assert (= 1 (count arities)))
+    (assert-iae (= 1 (count arities)) "Expected single arity fn, got %s" (count arities))
     (.input-schema ^Arity (first arities))))
 
 (clojure.core/defn output-schema 
   "Convenience method for fns with single arity"
   [f]
   (let [arities (.arities (fn-schema f))]
-    (assert (= 1 (count arities)))
+    (assert-iae (= 1 (count arities)) "Expected single arity fn, got %s" (count arities))
     (.output-schema ^Arity (first arities))))
 
 (definterface PSimpleCell
@@ -618,7 +626,7 @@
   (let [s (extract-schema-form arg)]
     (if (= s Top)
       [Top]
-      (do (assert (vector? s))
+      (do (assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 
 (defn- input-schema-form [regular-args rest-arg]
@@ -630,8 +638,8 @@
 (defn- split-rest-arg [bind]
   (let [[pre-& post-&] (split-with #(not= % '&) bind)]
     (if (seq post-&)
-      (do (assert (= (count post-&) 2))
-          (assert (symbol? (second post-&)))
+      (do (assert-iae (= (count post-&) 2) "Got more than 1 symbol after &: %s" (vec post-&))
+          (assert-iae (symbol? (second post-&)) "Got non-symbol after & (currently unsupported): %s" (vec post-&))
           [(vec pre-&) (last post-&)])
       [bind nil])))
 
@@ -643,7 +651,7 @@
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
   [env [bind & body]]
-  (assert (vector? bind))
+  (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (let [bind (fixup-tag-metadata env bind)
         bind-meta (meta bind)
         bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
