@@ -43,12 +43,6 @@
 ;; TODO: #{} notation for sets #{schema} and maybe vec?
 ;; TODO: schemas for names in namespace?
 
-;; TODO: schema intersection
-;; TODO: schema satisfaction
-;; TODO: schema diff
-;;  (diff plus union can solve everything?)
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
