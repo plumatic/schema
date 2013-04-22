@@ -42,6 +42,7 @@
 
 ;; TODO: #{} notation for sets #{schema} and maybe vec?
 ;; TODO: schemas for names in namespace?
+;; TODO: allow raw keywords as required keys?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
