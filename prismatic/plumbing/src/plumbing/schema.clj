@@ -36,7 +36,8 @@
   (:refer-clojure :exclude [defrecord defn])
   (:use plumbing.core)
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   potemkin))
 
 (set! *warn-on-reflection* true)
 
@@ -496,7 +497,7 @@
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
        (when ~extra-validator-fn?
          (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s" (class ~extra-validator-fn?)))
-       (clojure.core/defrecord ~name ~field-schema ~@more-args)
+       (potemkin/defrecord+ ~name ~field-schema ~@more-args)
        (declare-class-schema!
         ~name
         (assoc-when (record ~name (merge ~(for-map [k field-schema]
