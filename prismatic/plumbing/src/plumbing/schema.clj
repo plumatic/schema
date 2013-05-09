@@ -291,7 +291,7 @@
 (clojure.core/defrecord RequiredKey [k])
 
 (clojure.core/defn required-key
-  "An optional key in a map"
+  "An required key in a map"
   [k]
   (RequiredKey. k))
 
