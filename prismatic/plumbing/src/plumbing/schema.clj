@@ -510,20 +510,20 @@
           `(clojure.core/defn ~(symbol (str 'map-> name))
              ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
                    " slower than ->x like the clojure.core version")
-             [~map-sym] 
-             (let [base# (new ~(symbol (str name)) 
-                             ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
+             [~map-sym]
+             (let [base# (new ~(symbol (str name))
+                              ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
                    remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
                (if (seq remaining#)
                  (merge base# remaining#)
                  base#))))
-       ~(let [map-sym (gensym "m")]          
+       ~(let [map-sym (gensym "m")]
           `(clojure.core/defn ~(symbol (str 'strict-map-> name))
              ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym] 
+             [~map-sym]
              (assert (= (count ~map-sym) ~(count field-schema)))
-             (new ~(symbol (str name)) 
+             (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
