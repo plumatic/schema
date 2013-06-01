@@ -317,7 +317,7 @@
   [context m [schema-k schema-v]]
   (let [optional? (instance? OptionalKey schema-k)
         k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
-    (when-not optional? (check (contains? m k) "Map is missing key %s" k))
+    (when-not optional? (check (contains? m k) context "Map is missing key %s" k))
     (when-not (and optional? (not (contains? m k)))
       (validate* schema-v (get m k) (conj context k)))
     (dissoc m k)))
@@ -325,7 +325,7 @@
 (extend-protocol Schema
   clojure.lang.APersistentMap
   (validate* [this x c]
-    (check (instance? clojure.lang.APersistentMap x) "Expected a map, got a %s" (class x))
+    (check (instance? clojure.lang.APersistentMap x) c "Expected a map, got a %s" (class x))
     (let [more-keys (find-more-keys (keys this))]
       (let [remaining (reduce (partial validate-key c) x (dissoc this more-keys))]
         (if more-keys
@@ -365,8 +365,8 @@
 (extend-protocol Schema
   clojure.lang.APersistentVector
   (validate* [this x c]
-    (check (not (instance? java.util.Map x)) "Expected a seq, got a map %s" (class x))
-    (check (do (seq x) true) "Expected a seq, got non-seqable %s" (class x))
+    (check (not (instance? java.util.Map x)) c "Expected a seq, got a map %s" (class x))
+    (check (do (seq x) true) c "Expected a seq, got non-seqable %s" (class x))
     (let [[singles multi] (split-singles this)]
       (loop [i 0 singles singles x x]
         (if-let [[^One first-single & more-singles] (seq singles)]
@@ -396,7 +396,7 @@
 (clojure.core/defrecord Record [klass schema]
   Schema
   (validate* [this r c]
-             (check (instance? klass r) "Expected record %s, got class %s" klass (class r))
+             (check (instance? klass r) c "Expected record %s, got class %s" klass (class r))
              (validate* schema (into {} r) c)
              (when-let [f (:extra-validator-fn this)]
                (check (f r) c "Record %s did not satisfy extra validation fn." klass)))
