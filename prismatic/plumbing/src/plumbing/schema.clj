@@ -43,7 +43,6 @@
 
 ;; TODO: #{} notation for sets #{schema} and maybe vec?
 ;; TODO: schemas for names in namespace?
-;; TODO: allow raw keywords as required keys?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -291,9 +290,18 @@
 (clojure.core/defrecord RequiredKey [k])
 
 (clojure.core/defn required-key
-  "An required key in a map"
+  "A required key in a map"
   [k]
   (RequiredKey. k))
+
+(clojure.core/defn required-key? [ks]
+  (or (keyword? ks)
+      (instance? RequiredKey ks)))
+
+(defn- required-key-value [ks]
+  (cond (keyword? ks) ks
+        (instance? RequiredKey ks) (.k ^RequiredKey ks)
+        :else (throw (RuntimeException. (format "Bad required key: %s" ks)))))
 
 (clojure.core/defrecord OptionalKey [k])
 
@@ -303,7 +311,8 @@
   (OptionalKey. k))
 
 (defn- specific-key? [ks]
-  (or (instance? RequiredKey ks) (instance? OptionalKey ks)))
+  (or (required-key? ks)
+      (instance? OptionalKey ks)))
 
 (defn- find-more-keys [ks]
   (let [key-schemata (remove specific-key? ks)]
@@ -316,7 +325,7 @@
   "Validate a single schema key and dissoc the value from m"
   [context m [schema-k schema-v]]
   (let [optional? (instance? OptionalKey schema-k)
-        k (if optional? (.k ^OptionalKey schema-k) (.k ^RequiredKey schema-k))]
+        k (if optional? (.k ^OptionalKey schema-k) (required-key-value schema-k))]
     (when-not optional? (check (contains? m k) context "Map is missing key %s" k))
     (when-not (and optional? (not (contains? m k)))
       (validate* schema-v (get m k) (conj context k)))
@@ -337,9 +346,11 @@
   (explain [this]
     (for-map [[k v] this]
       (if (specific-key? k)
-        (list (cond (instance? RequiredKey k) 'required-key
-                    (instance? OptionalKey k) 'optional-key)
-              (safe-get k :k))
+        (if (keyword? k)
+          k
+          (list (cond (instance? RequiredKey k) 'required-key
+                      (instance? OptionalKey k) 'optional-key)
+                (safe-get k :k)))
         (explain k))
       (explain v))))
 
@@ -493,19 +504,24 @@
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
         field-schema (mapv (partial fixup-tag-metadata &env) field-schema)]
     `(do
-       (when-let [bad-keys# (seq (filter #(instance? RequiredKey %) (keys ~extra-key-schema?)))]
-         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: " (vec bad-keys#)))))
+       (when-let [bad-keys# (seq (filter #(required-key? %)
+                                         (keys ~extra-key-schema?)))]
+         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
+                                        (vec bad-keys#)))))
        (when ~extra-validator-fn?
-         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s" (class ~extra-validator-fn?)))
+         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                     (class ~extra-validator-fn?)))
        (potemkin/defrecord+ ~name ~field-schema ~@more-args)
        (declare-class-schema!
         ~name
-        (assoc-when (record ~name (merge ~(for-map [k field-schema]
-                                            (required-key (keyword (clojure.core/name k)))
-                                            (do (assert-iae (symbol? k) "Non-symbol in record binding form: %s" k)
-                                                (extract-schema-form k)))
-                                         ~extra-key-schema?))
-                    :extra-validator-fn ~extra-validator-fn?))
+        (assoc-when
+         (record ~name (merge ~(for-map [k field-schema]
+                                 (keyword (clojure.core/name k))
+                                 (do (assert-iae (symbol? k)
+                                                 "Non-symbol in record binding form: %s" k)
+                                     (extract-schema-form k)))
+                              ~extra-key-schema?))
+         :extra-validator-fn ~extra-validator-fn?))
        ~(let [map-sym (gensym "m")]
           `(clojure.core/defn ~(symbol (str 'map-> name))
              ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"

@@ -1,6 +1,8 @@
 (ns plumbing.schema-test
   (:use clojure.test)
-  (:require [plumbing.schema :as s]))
+  (:require
+   potemkin
+   [plumbing.schema :as s]))
 
 
 (s/defrecord Explainer
@@ -8,15 +10,15 @@
   {(s/optional-key :baz) clojure.lang.Keyword})
 
 (deftest explain-test
-  (is (= (s/explain {(s/required-key :x) long
+  (is (= (s/explain {(s/required-key 'x) long
                      String [(s/one int "foo") (s/maybe Explainer)]})
-         '{(required-key :x) long
+         '{(required-key x) long
            java.lang.String [("foo" int)
                              &
                              (maybe
                               (plumbing.schema_test.Explainer
-                               {(required-key :foo) long
-                                (required-key :bar) java.lang.String
+                               {:foo long
+                                :bar java.lang.String
                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -219,7 +221,7 @@
 
 
 
-(defprotocol PProtocol
+(potemkin/defprotocol+ PProtocol
   (do-something [this]))
 
 ;; exercies some different arities
@@ -245,8 +247,8 @@
 
 (deftest defrecord-schema-test
   (is (= (s/class-schema Bar)
-         (s/record Bar {(s/required-key :foo) long
-                        (s/required-key :bar) String
+         (s/record Bar {:foo long
+                        :bar String
                         (s/optional-key :baz) clojure.lang.Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
@@ -281,9 +283,9 @@
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
     (is (= (s/class-schema Nested)
-           (s/record Nested {(s/required-key :b) Bar4
-                             (s/required-key :c) LongOrString
-                             (s/required-key :p) (s/protocol PProtocol)})))
+           (s/record Nested {:b Bar4
+                             :c LongOrString
+                             :p (s/protocol PProtocol)})))
     (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
     (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
     (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))
