@@ -36,6 +36,7 @@
   (:refer-clojure :exclude [defrecord defn])
   (:use plumbing.core)
   (:require
+   [clojure.data :as data]
    [clojure.string :as str]
    potemkin))
 
@@ -538,7 +539,10 @@
              ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
              [~map-sym]
-             (assert (= (count ~map-sym) ~(count field-schema)))
+             (when-not (= (count ~map-sym) ~(count field-schema))
+               (throw (RuntimeException. (format "Record has wrong set of keys: %s"
+                                                 (data/diff (set (keys ~map-sym))
+                                                            ~(set (map keyword field-schema)))))))
              (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
