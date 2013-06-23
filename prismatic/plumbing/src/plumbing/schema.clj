@@ -402,7 +402,20 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Set schematas
+;;; Set schemas
+
+;; The semantic on set schemas as I've set them up is just that given
+;; such a schema S, for some value set X to validate, every element of
+;; X must validate under some member of S. Concretely,
+
+;; -- the empty set schema #{} validates only on the empty set #{}
+
+;; -- a homogenous set schema has one element e.g. #{ long } and a set
+;;    like #{2 200 43} will validate against it
+
+;; -- a set schema with multiple elements like #{ [long] double} will
+;;    validate against anything like #{ [1 2] [3]}, #{2.001 0.287} or
+;;    #{ 0.32 [1] [982 11] 0.2}
 
 (extend-protocol Schema
   clojure.lang.APersistentSet
