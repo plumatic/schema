@@ -174,6 +174,31 @@
     (invalid! schema [1.0 2.0 3.0])
     (invalid! schema [])))
 
+
+;; sets
+
+(deftest simple-set-test
+  (let [schema #{clojure.lang.Keyword}]
+    (valid! schema #{:a :b :c})
+    (invalid! schema [:a :b :c])
+    (invalid! schema {:a :a :b :b})))
+
+(deftest homogenous-set-test
+  (let [schema #{ long }]
+    (valid! schema #{})
+    (valid! schema #{ 1 2 3})
+    (invalid! schema #{ 1 0.5 :a})
+    (invalid! schema #{ 3 4 "a"})))
+
+(deftest mixed-set-test
+  (let [schema #{ [long] #{long}}]
+    (valid! schema #{})
+    (valid! schema #{ [3 4] [56 1] [-11 3]})
+    (valid! schema #{ #{3 4} #{ 56 1} #{ -11 3}})
+    (valid! schema #{ [3 4] #{56 1} #{-11 3}})
+    (invalid! schema #{ #{ [3 4]}})
+    (invalid! schema #{ [ [3 4]]})))
+
 ;;; records
 
 (defrecord Foo [x ^long y])

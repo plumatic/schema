@@ -363,7 +363,6 @@
 ;; followed by an optional (implicit) repeated.
 
 (clojure.core/defrecord One [schema name])
-
 (clojure.core/defn one
   "A single element of a sequence (not repeated, the implicit default)"
   [schema name]
@@ -400,6 +399,32 @@
           (list (.name s) (explain (.schema s))))
         (when multi
           ['& (explain multi)]))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Set schematas
+
+(extend-protocol Schema
+  clojure.lang.APersistentSet
+  (validate* [this x context]
+    ;; x must be a set
+    (check  (instance? clojure.lang.IPersistentSet x) context
+            "Expected a set, got a %s instead." (class x))
+    ;; every elem in x must validate against some member of this schema
+    (doseq [elem (seq x)]
+      (->> (seq this)
+           (keep (fn [schema-elem]
+                   (try (validate* schema-elem elem context)
+                        true
+                        (catch Exception e
+                          nil))))
+           ((fn [matching]
+              (when-not (seq matching)
+                (check-throw context "Elem %s did not match any component of set schema %s" elem this)))))))
+
+  (explain [this]
+    (for [schema-elem this]
+      (explain schema-elem))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
