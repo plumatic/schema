@@ -181,17 +181,20 @@
   (let [schema #{clojure.lang.Keyword}]
     (valid! schema #{:a :b :c})
     (invalid! schema [:a :b :c])
-    (invalid! schema {:a :a :b :b})))
-
-(deftest homogenous-set-test
+    (invalid! schema {:a :a :b :b}))
   (let [schema #{ long }]
     (valid! schema #{})
     (valid! schema #{ 1 2 3})
     (invalid! schema #{ 1 0.5 :a})
-    (invalid! schema #{ 3 4 "a"})))
+    (invalid! schema #{ 3 4 "a"}))
+  (let [schema #{ [long]}]
+    (valid! schema #{})
+    (valid! schema #{ [2 4]})
+    (invalid! schema #{ 2})
+    (invalid! schema #{ [[ 2 3]]})))
 
 (deftest mixed-set-test
-  (let [schema #{ [long] #{long}}]
+  (let [schema #{ (s/either [long] #{long})}]
     (valid! schema #{})
     (valid! schema #{ [3 4] [56 1] [-11 3]})
     (valid! schema #{ #{3 4} #{ 56 1} #{ -11 3}})

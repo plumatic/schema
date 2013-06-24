@@ -404,36 +404,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set schemas
 
-;; The semantic on set schemas as I've set them up is just that given
-;; such a schema S, for some value set X to validate, every element of
-;; X must validate under some member of S. Concretely,
+;; Set schemas should look like the key half of map schemas
+;; with the exception that required entires don't really make sense
 
-;; -- the empty set schema #{} validates only on the empty set #{}
-
-;; -- a homogenous set schema has one element e.g. #{ long } and a set
-;;    like #{2 200 43} will validate against it
-
-;; -- a set schema with multiple elements like #{ [long] double} will
-;;    validate against anything like #{ [1 2] [3]}, #{2.001 0.287} or
-;;    #{ 0.32 [1] [982 11] 0.2}
 
 (extend-protocol Schema
   clojure.lang.APersistentSet
   (validate* [this x context]
     ;; x must be a set
-    (check  (instance? clojure.lang.IPersistentSet x) context
-            "Expected a set, got a %s instead." (class x))
-    ;; every elem in x must validate against some member of this schema
-    (doseq [elem (seq x)]
-      (->> (seq this)
-           (keep (fn [schema-elem]
-                   (try (validate* schema-elem elem context)
-                        true
-                        (catch Exception e
-                          nil))))
-           ((fn [matching]
-              (when-not (seq matching)
-                (check-throw context "Elem %s did not match any component of set schema %s" elem this)))))))
+    (check (instance? clojure.lang.IPersistentSet x) context
+           "Expected a set, got a %s instead." (class x))
+    (let [more-entries (find-more-keys (seq this))]
+      ;; when there's a generic entry schema, all entries must validate it
+      (doseq [elem (seq x)]
+        (validate* more-entries elem context))))
 
   (explain [this]
     (for [schema-elem this]
