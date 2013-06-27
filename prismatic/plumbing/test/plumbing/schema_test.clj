@@ -178,15 +178,28 @@
 ;; sets
 
 (deftest simple-set-test
+  ;; basic set identification
   (let [schema #{clojure.lang.Keyword}]
     (valid! schema #{:a :b :c})
     (invalid! schema [:a :b :c])
     (invalid! schema {:a :a :b :b}))
+  ;; empty schema should only validate against empty set
+  (let [schema #{}]
+    (valid! schema #{})
+    (invalid! schema #{ 1 }))
+  ;; enforces matching with single simple entry
   (let [schema #{ long }]
     (valid! schema #{})
     (valid! schema #{ 1 2 3})
     (invalid! schema #{ 1 0.5 :a})
     (invalid! schema #{ 3 4 "a"}))
+  ;; not allowed to have multiple entries
+  (let [schema #{ long double}]
+    (invalid! schema #{})
+    (invalid! schema #{ 1 })
+    (invalid! schema #{ 0.2})
+    (invalid! schema #{1 0.2}))
+  ;; slightly more complicated elem-schema
   (let [schema #{ [long]}]
     (valid! schema #{})
     (valid! schema #{ [2 4]})

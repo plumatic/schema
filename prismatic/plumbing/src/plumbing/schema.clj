@@ -406,7 +406,8 @@
 
 ;; Set schemas should look like the key half of map schemas
 ;; with the exception that required entires don't really make sense
-
+;; as a result, they can have at most *one* schema for elements
+;; which roughly corresponds to the 'more-keys' part of map schemas
 
 (extend-protocol Schema
   clojure.lang.APersistentSet
@@ -414,14 +415,14 @@
     ;; x must be a set
     (check (instance? clojure.lang.IPersistentSet x) context
            "Expected a set, got a %s instead." (class x))
-    (let [more-entries (find-more-keys (seq this))]
+    (check (<= (count this) 1) context "This set schema attempts to provide multiple elem-schemas : %s" (pr-str this))
+    (let [entry-schema (first (seq this))] ;; if no elem-schema provided, will die on any value
       ;; when there's a generic entry schema, all entries must validate it
       (doseq [elem (seq x)]
-        (validate* more-entries elem context))))
+        (validate* entry-schema elem context))))
 
   (explain [this]
-    (for [schema-elem this]
-      (explain schema-elem))))
+    (set (map explain this))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
