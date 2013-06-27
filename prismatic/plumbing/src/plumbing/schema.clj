@@ -416,9 +416,9 @@
     (check (instance? clojure.lang.IPersistentSet x) context
            "Expected a set, got a %s instead." (class x))
     (check (<= (count this) 1) context "This set schema attempts to provide multiple elem-schemas : %s" (pr-str this))
-    (let [entry-schema (first (seq this))] ;; if no elem-schema provided, will die on any value
+    (let [entry-schema (first this)] ;; if no elem-schema provided, will die on any value
       ;; when there's a generic entry schema, all entries must validate it
-      (doseq [elem (seq x)]
+      (doseq [elem x]
         (validate* entry-schema elem context))))
 
   (explain [this]
