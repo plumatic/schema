@@ -660,7 +660,7 @@
 
 (def ^plumbing.schema.PSimpleCell use-fn-validation
   "Turn on run-time function validation for functions compiled when
-   *copmile-function-validation* was true -- has no effect for functions compiled
+   *compile-function-validation* was true -- has no effect for functions compiled
    when it is false."
   (SimpleVCell. false))
 
