@@ -102,8 +102,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
 
+;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))
+;; is too slow in practice, so for now we leak classes.  Figure out a concurrent, fast,
+;; weak alternative.
 (def ^java.util.Map +class-schemata+
-  (java.util.Collections/synchronizedMap (java.util.WeakHashMap.)))
+  (java.util.concurrent.ConcurrentHashMap.))
 
 ;; Can we do this in a way that respects hierarchy?
 ;; can do it with defmethods,
@@ -119,7 +122,7 @@
 (clojure.core/defn class-schema
   "The last schema for a class set by declare-class-schema!, or nil."
   [klass]
-  (get +class-schemata+ klass))
+  (.get +class-schemata+ klass))
 
 (extend-protocol Schema
   Class
