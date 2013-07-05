@@ -57,6 +57,11 @@
   (valid! "[Ljava.lang.Double;" (into-array Double [1.0]))
   (valid! "[D" (double-array [1.0])))
 
+(deftest eq-test
+  (let [schema (s/eq 10)]
+    (valid! schema 10)
+    (invalid! schema 9)))
+
 (deftest enum-test
   (let [schema (s/enum :a :b 1)]
     (valid! schema :a)
@@ -114,6 +119,17 @@
   (let [schema [(s/one String "topic") (s/one (s/named double "score") "asdf")]]
     (valid! schema ["foo" 1.0])
     (invalid! schema [1 2])))
+
+(deftest named-test
+  (let [schema (s/union :type {:foo {:type (s/eq :foo) :baz Long}
+                               :bar {:type (s/eq :bar) :baz String}})]
+    (valid! schema {:type :foo :baz 10})
+    (valid! schema {:type :bar :baz "10"})
+    (invalid! schema {:type :foo :baz "10"})
+    (invalid! schema {:type :bar :baz 10})
+    (invalid! schema {:type :zzz :baz 10})))
+
+
 
 ;;; maps
 

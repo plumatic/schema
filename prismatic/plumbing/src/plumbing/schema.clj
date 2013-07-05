@@ -187,6 +187,17 @@
   (explain [this] this))
 
 
+(clojure.core/defrecord EqSchema [v]
+  Schema
+  (validate* [this x c]
+             (check (= v x) c "Got unexpected item"))
+  (explain [this] (cons '= v)))
+
+(clojure.core/defn eq
+  "A value that must be = to one element of v."
+  [v]
+  (EqSchema. v))
+
 ;; enum
 
 (clojure.core/defrecord EnumSchema [vs]
@@ -286,6 +297,22 @@
   "Provide an explicit name for this schema element, useful for seqs."
   [schema name]
   (NamedSchema. name schema))
+
+;; subtyped
+
+(clojure.core/defrecord UnionSchema [extract-tag type-schemata]
+  Schema
+  (validate* [this x c]
+             (let [tag (extract-tag x)]
+               (check (contains? type-schemata tag) c "Unknown union tag: %s" tag)
+               (validate* (type-schemata tag) x c)))
+  (explain [this] (list 'union extract-tag (map-vals explain type-schemata))))
+
+(clojure.core/defn union
+  "Define a schema for a union type.
+   extract-tag extracts the tag, and type-schemata is a map from tags to schemas."
+  [extract-tag type-schemata]
+  (UnionSchema. extract-tag type-schemata))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
