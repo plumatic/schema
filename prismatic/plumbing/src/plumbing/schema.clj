@@ -42,8 +42,11 @@
 
 (set! *warn-on-reflection* true)
 
+;; TODO: better error messages for fn schema validation
+;; TODO: return error objects showing diff, rather than throwing?
 ;; TODO: #{} notation for sets #{schema} and maybe vec?
 ;; TODO: schemas for names in namespace?
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
