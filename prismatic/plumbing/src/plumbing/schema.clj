@@ -43,10 +43,6 @@
 (set! *warn-on-reflection* true)
 
 ;; TODO: better error messages for fn schema validation
-;; TODO: return error objects showing diff, rather than throwing?
-;; TODO: #{} notation for sets #{schema} and maybe vec?
-;; TODO: schemas for names in namespace?
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -56,51 +52,34 @@
   [form & format-args]
   `(when-not ~form (throw (IllegalArgumentException. (format ~@format-args)))))
 
-(defn- context-str
-  "Produce a human-readable representation of the current validation context"
-  [context]
-  (str/join
-   ","
-   (for [c context]
-     (let [c (if (fn? c) (c) c) ;; allow laziness
-           s (pr-str c)]
-       (if (< (count s) 20)
-         s
-         (subs s 0 20))))))
-
-(clojure.core/defn check-throw
-  "Throw an exception for a failed validation.  Public only so check
-   can be called from other namespaces, due to macroexpansion rules."
-  [context & format-args]
-  (throw (ex-info
-          (str (when (seq context)
-                 (format "In context %s: " (context-str context)))
-               (apply format format-args))
-          {:type ::schema-mismatch})))
-
-(defmacro check*
-  "Check that condition is true; if not (or it thows an exception), throw an
-   exception describing the failure (via format-args) as well as the current
-   validation context."
-  [condition context & format-args]
-  `(try (when-not ~condition
-          (check-throw ~context ~@format-args))
-        (catch Throwable t#
-          (if (= (:type (ex-data t#)) ::schema-mismatch)
-            (throw t#)
-            (check-throw ~context "Condition %s threw exception %s" '~condition t#)))))
-
 (defprotocol Schema
-  (validate* [this x context]
-    "Validate that x satisfies this schema by calling 'check'.  Context is a vec
-     of the path to x from the root object being validated, used to present
-     useful error messages.")
+  (check [this x]
+    "Validate that x satisfies this schema, returning an description of the validation
+     failure(s) or nil for success.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
 
-(clojure.core/defn validate [this x]
-  (validate* this x []))
+(deftype ValidationError [schema value expectation-delay]
+  Object
+  (toString [this] (str @expectation-delay)))
+
+(defmacro validation-error [schema value expectation]
+  `(ValidationError. ~schema ~value (delay ~expectation)))
+
+(defn- value-name
+  "Provide a descriptive short name for a value."
+  [value]
+  (let [s (str value)]
+    (if (< (count s) 20) s (symbol (str "a-" (class value))))))
+
+;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
+;; check and produces the validation-error automatically somehow.
+
+(clojure.core/defn validate [schema value]
+  (let [error (check schema value)]
+    (when error ;; TODO: pretty print
+      (throw (IllegalArgumentException. (format "Value does not match schema: %s" error))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
@@ -127,73 +106,55 @@
   [klass]
   (.get +class-schemata+ klass))
 
+
+(defn- check-class [schema class value]
+  (when-not (instance? class value)
+    (validation-error schema value (list 'instance? class (value-name value)))))
+
 (extend-protocol Schema
   Class
-  (validate* [this x c]
-    (check* (instance? this x) c "Wanted instance of %s, got %s" this (class x))
-    (when-let [more-schema (class-schema this)]
-      (validate* more-schema x c)))
+  (check [this x]
+    (or (check-class this this x)
+        (when-let [more-schema (class-schema this)]
+          (check more-schema x))))
   (explain [this]
     (if-let [more-schema (class-schema this)]
       (explain more-schema)
       (symbol (.getName ^Class this))))
 
-  String
-  (validate* [this x c]
-    (check* (= this (.getName (class x))) c "Wanted instance of %s, got %s" this (class x)))
-  (explain [this] this)
-
-  ;; prevent coersion, so you have to be exactly the given type.
-  clojure.core$float
-  (validate* [this x c]
-    (check* (instance? Float x) c "Wanted float, got %s" (class x)))
-  (explain [this] 'float)
-
-  clojure.core$double
-  (validate* [this x c]
-    (check* (instance? Double x) c "Wanted double, got %s" (class x)))
-  (explain [this] 'double)
-
-  clojure.core$boolean
-  (validate* [this x c]
-    (check* (instance? Boolean x) c "Wanted boolean, got %s" (class x)))
-  (explain [this] 'boolean)
-
-  clojure.core$byte
-  (validate* [this x c]
-    (check* (instance? Byte x) c "Wanted byte, got %s" (class x)))
-  (explain [this] 'byte)
-
-  clojure.core$char
-  (validate* [this x c]
-    (check* (instance? Character x) c "Wanted char, got %s" (class x)))
-  (explain [this] 'char)
-
-  clojure.core$short
-  (validate* [this x c]
-    (check* (instance? Short x) c "Wanted short, got %s" (class x)))
-  (explain [this] 'short)
-
-  clojure.core$int
-  (validate* [this x c]
-    (check* (instance? Integer x) c "Wanted int, got %s" (class x)))
-  (explain [this] 'int)
-
-  clojure.core$long
-  (validate* [this x c]
-    (check* (instance? Long x) c "Wanted long, got %s" (class x)))
-  (explain [this] 'long)
-
   clojure.lang.AFn
-  (validate* [this x c]
-    (check* (this x) c "Value did not satisfy %s" this))
+  (check [this x]
+    (try (when-not (this x)
+           (validation-error this x (list this (value-name x))))
+         (catch Throwable t
+           (validation-error this x (list 'thrown? t (list this (value-name x)))))))
   (explain [this] this))
 
+;; prevent coersion, so you have to be exactly the given type.
+(defmacro extend-primitive [cast-sym class-sym]
+  `(extend-protocol Schema
+     ~cast-sym
+     (check [this# x#]
+       (check-class ~cast-sym ~class-sym x#))
+     (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
+
+(extend-primitive clojure.core$double Double)
+(extend-primitive clojure.core$float Float)
+(extend-primitive clojure.core$long Long)
+(extend-primitive clojure.core$int Integer)
+(extend-primitive clojure.core$short Short)
+(extend-primitive clojure.core$char Character)
+(extend-primitive clojure.core$byte Byte)
+(extend-primitive clojure.core$boolean Boolean)
+
+;; TODO: abstract these into predicates?
+;; single required value
 
 (clojure.core/defrecord EqSchema [v]
   Schema
-  (validate* [this x c]
-             (check* (= v x) c "Got unexpected item"))
+  (check [this x]
+         (when-not (= v x)
+           (validation-error this x (list '= v (value-name x)))))
   (explain [this] (cons '= v)))
 
 (clojure.core/defn eq
@@ -205,8 +166,9 @@
 
 (clojure.core/defrecord EnumSchema [vs]
   Schema
-  (validate* [this x c]
-             (check* (contains? vs x) c "Got an invalid enum element"))
+  (check [this x]
+         (when-not (contains? vs x)
+           (validation-error this x (list vs (value-name x)))))
   (explain [this] (cons 'enum vs)))
 
 (clojure.core/defn enum
@@ -218,8 +180,9 @@
 
 (clojure.core/defrecord Protocol [p]
   Schema
-  (validate* [this x c]
-             (check* (satisfies? p x) c "Element does not satisfy protocol %s" (safe-get p :var)))
+  (check [this x]
+         (when-not (satisfies? p x)
+           (validation-error this x (list 'satisfies? p (value-name x)))))
   (explain [this] (cons 'protocol (safe-get p :var))))
 
 (clojure.core/defn protocol [p]
@@ -237,7 +200,7 @@
 ;; http://dev.clojure.org/jira/browse/CLJ-1196
 (clojure.core/defrecord Anything [_]
   Schema
-  (validate* [this x c])
+  (check [this x])
   (explain [this] 'anything))
 
 (def +anything+ (Anything. nil))
@@ -247,9 +210,9 @@
 
 (clojure.core/defrecord Either [schemas]
   Schema
-  (validate* [this x c]
-             (let [fails (map #(try (validate* % x c) nil (catch Exception e e)) schemas)]
-               (check* (some not fails) c "Did not match any schema: %s" (vec fails))))
+  (check [this x]
+         (when (every? #(check % x) schemas)
+           (validation-error this x 'TODO-union)))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -261,9 +224,9 @@
 
 (clojure.core/defrecord Both [schemas]
   Schema
-  (validate* [this x c]
-             (doseq [schema schemas]
-               (validate* schema x c)))
+  (check [this x]
+         (when-let [errors (seq (keep #(check % x) schemas))]
+           (validation-error this x (cons 'TODO-both errors))))
   (explain [this] (cons 'both (map explain schemas))))
 
 (clojure.core/defn both
@@ -276,9 +239,9 @@
 
 (clojure.core/defrecord Maybe [schema]
   Schema
-  (validate* [this x c]
-             (when-not (nil? x)
-               (validate* schema x c)))
+  (check [this x]
+         (when-not (nil? x)
+           (check schema x)))
   (explain [this] (list 'maybe (explain schema))))
 
 (clojure.core/defn maybe
@@ -292,8 +255,7 @@
 
 (clojure.core/defrecord NamedSchema [name schema]
   Schema
-  (validate* [this x c]
-             (validate* schema x (conj c #(format "<%s>" name))))
+  (check [this x] (check schema x)) ;; TODO: something more?
   (explain [this] (list 'named name (explain schema))))
 
 (clojure.core/defn named
@@ -305,10 +267,11 @@
 
 (clojure.core/defrecord UnionSchema [extract-tag type-schemata]
   Schema
-  (validate* [this x c]
-             (let [tag (extract-tag x)]
-               (check* (contains? type-schemata tag) c "Unknown union tag: %s" tag)
-               (validate* (type-schemata tag) x c)))
+  (check [this x]
+         (let [tag (extract-tag x)]
+           (or (when-not (contains? type-schemata tag)
+                 (validation-error this x (list 'TODO-bad-dag tag)))
+               (check (type-schemata tag) x))))
   (explain [this] (list 'union extract-tag (map-vals explain type-schemata))))
 
 (clojure.core/defn union
@@ -332,11 +295,6 @@
   (or (keyword? ks)
       (instance? RequiredKey ks)))
 
-(defn- required-key-value [ks]
-  (cond (keyword? ks) ks
-        (instance? RequiredKey ks) (.k ^RequiredKey ks)
-        :else (throw (RuntimeException. (format "Bad required key: %s" ks)))))
-
 (clojure.core/defrecord OptionalKey [k])
 
 (clojure.core/defn optional-key
@@ -344,39 +302,64 @@
   [k]
   (OptionalKey. k))
 
+(defn- explicit-schema-key [ks]
+  (cond (keyword? ks) ks
+        (instance? RequiredKey ks) (.k ^RequiredKey ks)
+        (instance? OptionalKey ks) (.k ^OptionalKey ks)
+        :else (throw (RuntimeException. (format "Bad explicit key: %s" ks)))))
+
 (defn- specific-key? [ks]
   (or (required-key? ks)
       (instance? OptionalKey ks)))
 
-(defn- find-more-keys [ks]
-  (let [key-schemata (remove specific-key? ks)]
+(defn- find-extra-keys-schema [map-schema]
+  (let [key-schemata (remove specific-key? (keys map-schema))]
     (assert-iae (< (count key-schemata) 2)
                 "More than one non-optional/required key schemata: %s"
                 (vec key-schemata))
     (first key-schemata)))
 
-(defn- validate-key
+(defn- check-explicit-key
   "Validate a single schema key and dissoc the value from m"
-  [context m [schema-k schema-v]]
-  (let [optional? (instance? OptionalKey schema-k)
-        k (if optional? (.k ^OptionalKey schema-k) (required-key-value schema-k))]
-    (when-not optional? (check* (contains? m k) context "Map is missing key %s" k))
-    (when-not (and optional? (not (contains? m k)))
-      (validate* schema-v (get m k) (conj context k)))
-    (dissoc m k)))
+  [value [key-schema val-schema]]
+  (let [optional? (instance? OptionalKey key-schema)
+        k (explicit-schema-key key-schema)
+        present? (contains? value k)]
+    (cond (and (not optional?) (not present?))
+          [k (validation-error val-schema value 'TODO-not-present)]
+
+          present?
+          (when-let [error (check val-schema (get value k))]
+            [k error]))))
+
+(defn- check-extra-key
+  "Validate a single schema key and dissoc the value from m"
+  [key-schema val-schema [value-k value-v]]
+  (if-not key-schema
+    [value-k 'TODO-extra-keys-not-allowed]
+    (if-let [error (check key-schema value-k)]
+      [error 'TODO-just-nil?]
+      (when-let [error (check val-schema value-v)]
+        [value-k error]))))
+
+(defn- check-map [map-schema value]
+  (let [extra-keys-schema (find-extra-keys-schema map-schema)
+        extra-vals-schema (get map-schema extra-keys-schema)
+        explicit-schema (dissoc map-schema extra-keys-schema)
+        errors (concat
+                (keep #(check-explicit-key value %)
+                      explicit-schema)
+                (keep #(check-extra-key extra-keys-schema extra-vals-schema %)
+                      (apply dissoc value (map explicit-schema-key (keys explicit-schema)))))]
+    (when (seq errors)
+      (into {} errors))))
 
 (extend-protocol Schema
   clojure.lang.APersistentMap
-  (validate* [this x c]
-    (check* (instance? clojure.lang.APersistentMap x) c "Expected a map, got a %s" (class x))
-    (let [more-keys (find-more-keys (keys this))]
-      (let [remaining (reduce (partial validate-key c) x (dissoc this more-keys))]
-        (if more-keys
-          (let [value-schema (safe-get this more-keys)]
-            (doseq [[k v] remaining]
-              (validate* more-keys k c)
-              (validate* value-schema v (conj c k))))
-          (check* (empty? remaining) c "Got extra map keys %s" (vec (keys remaining)))))))
+  (check [this x]
+    (if-not (map? x)
+      (validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
+      (check-map this x)))
   (explain [this]
     (for-map [[k v] this]
       (if (specific-key? k)
@@ -387,6 +370,7 @@
                 (safe-get k :k)))
         (explain k))
       (explain v))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence schemata
@@ -408,22 +392,31 @@
 
 (extend-protocol Schema
   clojure.lang.APersistentVector
-  (validate* [this x c]
-    (check* (not (instance? java.util.Map x)) c "Expected a seq, got a map %s" (class x))
-    (check* (do (seq x) true) c "Expected a seq, got non-seqable %s" (class x))
-    (let [[singles multi] (split-singles this)]
-      (loop [i 0 singles singles x x]
-        (if-let [[^One first-single & more-singles] (seq singles)]
-          (do (check* (seq x) c "Seq too short: missing (at least) %s elements"
-                      (count singles))
-              (validate* (.schema first-single) (first x)
-                         (conj c #(format "%d <%s>" i (.name first-single))))
-              (recur (inc i) more-singles (rest x)))
-          (if multi
-            (doseq [[offset item] (indexed x)]
-              (validate* multi item (conj c (+ offset i))))
-            (check* (empty? x) c "Seq too long: extra elements with classes %s"
-                    (mapv class x)))))))
+  (check [this x]
+    (or (when (instance? java.util.Map x)
+          (validation-error this x (list 'instance? 'java.util.Map (value-name x))))
+        (when (try (seq x) true
+                   (catch Exception e
+                     (validation-error this x (list 'throws (list 'seq (value-name x)))))))
+        (let [[singles multi] (split-singles this)]
+          (loop [singles singles x x out []]
+            (if-let [[^One first-single & more-singles] (seq singles)]
+              (if (empty? x)
+                (conj out
+                      (validation-error (vec singles) nil (list 'TODO-short (count singles))))
+                (recur more-singles
+                       (rest x)
+                       (conj out (check (.schema first-single) (first x)))))
+              (let [out (cond multi
+                              (concat out (map #(check multi %) x))
+
+                              (seq x)
+                              (conj out (validation-error nil x (list 'TODO-long (count x))))
+
+                              :else
+                              out)]
+                (when (some identity out)
+                  out)))))))
   (explain [this]
     (let [[singles multi] (split-singles this)]
       (vec
@@ -432,7 +425,6 @@
           (list (.name s) (explain (.schema s))))
         (when multi
           ['& (explain multi)]))))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set schemas
@@ -444,15 +436,12 @@
 
 (extend-protocol Schema
   clojure.lang.APersistentSet
-  (validate* [this x context]
-    ;; x must be a set
-    (check* (instance? clojure.lang.IPersistentSet x) context
-            "Expected a set, got a %s instead." (class x))
-    (check* (<= (count this) 1) context "This set schema attempts to provide multiple elem-schemas : %s" (pr-str this))
-    (let [entry-schema (first this)] ;; if no elem-schema provided, will die on any value
-      ;; when there's a generic entry schema, all entries must validate it
-      (doseq [elem x]
-        (validate* entry-schema elem context))))
+  (check [this x]
+    (assert-iae (= (count this) 1) "Set schema must have exactly one element")
+    (or (when-not (set? x)
+          (validation-error this x (list 'set? (value-name x))))
+        (when-let [out (seq (keep #(check (first this) %) x))]
+          (validation-error this x (set out)))))
 
   (explain [this]
     (set (map explain this))))
@@ -463,11 +452,12 @@
 
 (clojure.core/defrecord Record [klass schema]
   Schema
-  (validate* [this r c]
-             (check* (instance? klass r) c "Expected record %s, got class %s" klass (class r))
-             (validate* schema (into {} r) c)
+  (check [this r]
+         (or (when-not (instance? klass r)
+               (validation-error this r (list 'instance? klass (value-name r))))
+             (check-map schema r)
              (when-let [f (:extra-validator-fn this)]
-               (check* (f r) c "Record %s did not satisfy extra validation fn." klass)))
+               (check f r))))
   (explain [this]
            (list (symbol (.getName ^Class klass)) (explain schema))))
 
@@ -477,6 +467,7 @@
   (assert-iae (class? klass) "Expected record class, got %s" (class klass))
   (assert-iae (map? schema) "Expected map, got %s" (class schema))
   (Record. klass schema))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -602,6 +593,7 @@
              (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
 
@@ -625,14 +617,15 @@
 ;; defining fn -- we can't :exclude it above, but we can unmap and then def
 ;; it at the last minute down here, once we've already done our extending
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
+
+
 (ns-unmap *ns* 'fn)
 
 ;;These are deliberately schematized records -- why not, now that we've bootstrapped?
 
 (defrecord Arity [^Schema input-schema ^Schema output-schema]
   Schema
-  (validate* [this x c]
-    :TODO)
+  (check [this x] nil) ;; TODO?
   (explain [this]
     (list (explain input-schema) (explain output-schema))))
 
@@ -647,8 +640,7 @@
 
 (defrecord Fn [^{:s [Arity]} arities] ;; sorted by arity
   Schema
-  (validate* [this x c]
-    :TODO)
+  (check [this x] nil) ;; TODO?
   (explain [this]
     (list 'fn (list* (map explain arities)))))
 

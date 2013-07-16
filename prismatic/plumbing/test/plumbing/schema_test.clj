@@ -4,7 +4,6 @@
    potemkin
    [plumbing.schema :as s]))
 
-
 (s/defrecord Explainer
     [^long foo ^String bar]
   {(s/optional-key :baz) clojure.lang.Keyword})
@@ -36,6 +35,7 @@
 (deftest fn-test
   (valid! odd? 1)
   (invalid! odd? 2)
+  (invalid! #(/ % 0) 2)
   (invalid! odd? :foo))
 
 (deftest primitive-test
@@ -52,10 +52,10 @@
   (invalid! long (byte 1)))
 
 (deftest array-test
-  (valid! "[Ljava.lang.String;" (into-array String ["a"]))
-  (invalid! "[Ljava.lang.Object;" (into-array String ["a"]))
-  (valid! "[Ljava.lang.Double;" (into-array Double [1.0]))
-  (valid! "[D" (double-array [1.0])))
+  (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
+  (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+  (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
+  (valid! (Class/forName "[D") (double-array [1.0])))
 
 (deftest eq-test
   (let [schema (s/eq 10)]
@@ -101,7 +101,7 @@
 
 (deftest both-test
   (let [schema (s/both
-                (fn equal-keys? [m] (doseq [[k v] m] (s/check (= k v) "Got non-equal key-value pair: %s %s" k v)) true)
+                (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m))
                 {clojure.lang.Keyword clojure.lang.Keyword})]
     (valid! schema {})
     (valid! schema {:foo :foo :bar :bar})
@@ -120,7 +120,7 @@
     (valid! schema ["foo" 1.0])
     (invalid! schema [1 2])))
 
-(deftest named-test
+(deftest union-test
   (let [schema (s/union :type {:foo {:type (s/eq :foo) :baz Long}
                                :bar {:type (s/eq :bar) :baz String}})]
     (valid! schema {:type :foo :baz 10})
@@ -191,7 +191,7 @@
     (invalid! schema [])))
 
 
-;; sets
+  ;;; sets
 
 (deftest simple-set-test
   ;; basic set identification
@@ -199,28 +199,23 @@
     (valid! schema #{:a :b :c})
     (invalid! schema [:a :b :c])
     (invalid! schema {:a :a :b :b}))
-  ;; empty schema should only validate against empty set
-  (let [schema #{}]
-    (valid! schema #{})
-    (invalid! schema #{ 1 }))
+
   ;; enforces matching with single simple entry
-  (let [schema #{ long }]
+  (let [schema #{long}]
     (valid! schema #{})
-    (valid! schema #{ 1 2 3})
-    (invalid! schema #{ 1 0.5 :a})
-    (invalid! schema #{ 3 4 "a"}))
-  ;; not allowed to have multiple entries
-  (let [schema #{ long double}]
-    (invalid! schema #{})
-    (invalid! schema #{ 1 })
-    (invalid! schema #{ 0.2})
-    (invalid! schema #{1 0.2}))
+    (valid! schema #{1 2 3})
+    (invalid! schema #{1 0.5 :a})
+    (invalid! schema #{3 4 "a"}))
+  ;; not allowed to have zero or multiple entries
+  (is (thrown? Exception (s/check #{long double} #{})))
+  (is (thrown? Exception (s/check #{} #{})))
+
   ;; slightly more complicated elem-schema
-  (let [schema #{ [long]}]
+  (let [schema #{[long]}]
     (valid! schema #{})
-    (valid! schema #{ [2 4]})
-    (invalid! schema #{ 2})
-    (invalid! schema #{ [[ 2 3]]})))
+    (valid! schema #{[2 4]})
+    (invalid! schema #{2})
+    (invalid! schema #{[[2 3]]})))
 
 (deftest mixed-set-test
   (let [schema #{ (s/either [long] #{long})}]
@@ -230,6 +225,7 @@
     (valid! schema #{ [3 4] #{56 1} #{-11 3}})
     (invalid! schema #{ #{ [3 4]}})
     (invalid! schema #{ [ [3 4]]})))
+
 
 ;;; records
 
