@@ -60,9 +60,10 @@
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
 
-(deftype ValidationError [schema value expectation-delay]
-  Object
-  (toString [this] (str @expectation-delay)))
+(deftype ValidationError [schema value expectation-delay])
+
+(defmethod print-method ValidationError [^ValidationError err writer]
+  (print-method (list 'not @(.expectation-delay err)) writer))
 
 (defmacro validation-error [schema value expectation]
   `(ValidationError. ~schema ~value (delay ~expectation)))
@@ -70,8 +71,7 @@
 (defn- value-name
   "Provide a descriptive short name for a value."
   [value]
-  (let [s (str value)]
-    (if (< (count s) 20) s (symbol (str "a-" (class value))))))
+  (if (< (count (str value)) 20) value (symbol (str "a-" (.getName (class value))))))
 
 ;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
 ;; check and produces the validation-error automatically somehow.
@@ -407,7 +407,7 @@
   clojure.lang.APersistentVector
   (check [this x]
     (or (when (instance? java.util.Map x)
-          (validation-error this x (list 'instance? 'java.util.Map (value-name x))))
+          (validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
         (when (try (seq x) true
                    (catch Exception e
                      (validation-error this x (list 'throws (list 'seq (value-name x)))))))
@@ -421,7 +421,7 @@
                        (rest x)
                        (conj out (check (.schema first-single) (first x)))))
               (let [out (cond multi
-                              (concat out (map #(check multi %) x))
+                              (into out (map #(check multi %) x))
 
                               (seq x)
                               (conj out (validation-error nil x (list 'TODO-long (count x))))
