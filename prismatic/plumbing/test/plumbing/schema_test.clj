@@ -120,9 +120,9 @@
     (valid! schema ["foo" 1.0])
     (invalid! schema [1 2])))
 
-(deftest union-test
-  (let [schema (s/union :type {:foo {:type (s/eq :foo) :baz Long}
-                               :bar {:type (s/eq :bar) :baz String}})]
+(deftest conditional-test
+  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz Long}
+                              #(= (:type %) :bar) {:type (s/eq :bar) :baz String})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})

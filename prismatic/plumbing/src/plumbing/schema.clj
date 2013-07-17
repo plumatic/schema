@@ -206,19 +206,21 @@
 (def +anything+ (Anything. nil))
 (def Top "in case you like type theory" +anything+)
 
+
 ;; either
 
 (clojure.core/defrecord Either [schemas]
   Schema
   (check [this x]
          (when (every? #(check % x) schemas)
-           (validation-error this x 'TODO-union)))
+           (validation-error this x 'TODO-either)))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
   "The disjunction of multiple schemas."
   [& schemas]
   (Either. schemas))
+
 
 ;; both
 
@@ -234,6 +236,7 @@
    purpose function validator with a normal map schema."
   [& schemas]
   (Both. schemas))
+
 
 ;; maybe
 
@@ -251,6 +254,7 @@
 
 (def ? maybe)
 
+
 ;; named
 
 (clojure.core/defrecord NamedSchema [name schema]
@@ -263,22 +267,31 @@
   [schema name]
   (NamedSchema. name schema))
 
-;; subtyped
 
-(clojure.core/defrecord UnionSchema [extract-tag type-schemata]
+;; conditional
+
+(clojure.core/defrecord ConditionalSchema [preds-and-schemas]
   Schema
   (check [this x]
-         (let [tag (extract-tag x)]
-           (or (when-not (contains? type-schemata tag)
-                 (validation-error this x (list 'TODO-bad-dag tag)))
-               (check (type-schemata tag) x))))
-  (explain [this] (list 'union extract-tag (map-vals explain type-schemata))))
+         (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
+           (check match x)
+           (validation-error this x (list 'not-any? (list 'matches-pred? (value-name x))
+                                          (map first preds-and-schemas)))))
+  (explain [this]
+           (list 'conditional (for [[pred schema] preds-and-schemas]
+                                [pred (explain schema)]))))
 
-(clojure.core/defn union
-  "Define a schema for a union type.
-   extract-tag extracts the tag, and type-schemata is a map from tags to schemas."
-  [extract-tag type-schemata]
-  (UnionSchema. extract-tag type-schemata))
+(clojure.core/defn conditional
+  "Define a conditional schema.  Takes args like cond,
+   (conditional pred1 schema1 pred2 schema2 ...),
+   and checks the first schema where pred is true on the value.
+   Unlike cond, throws if the value does not match any condition.
+   :else may be used as a final condition in the place of (constantly true)."
+  [& preds-and-schemas]
+  (assert-iae (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
+              "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
+  (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
+                        [(if (= pred :else) (constantly true) pred) schema])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
