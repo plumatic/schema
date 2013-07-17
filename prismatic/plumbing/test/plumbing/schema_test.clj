@@ -190,8 +190,21 @@
     (invalid! schema [1.0 2.0 3.0])
     (invalid! schema [])))
 
+;; TODO: most of the invalid! cases above should be replaced with
+;; explicit checks on the error returned by check?
+(deftest nice-error-test
+  (is (= (str (s/check
+               {:a long
+                :b [(s/one double "d") long]}
+               {:a "test"
+                :b [1 2 2]
+                :c "foo"}))
+         (str (array-map
+               :a '(not (instance? java.lang.Long "test"))
+               :b '[(not (instance? java.lang.Double 1)) nil nil]
+               :c ::s/no-extra-keys-allowed)))))
 
-  ;;; sets
+;;; sets
 
 (deftest simple-set-test
   ;; basic set identification

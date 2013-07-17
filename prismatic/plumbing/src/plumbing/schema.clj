@@ -349,9 +349,9 @@
   "Validate a single schema key and dissoc the value from m"
   [key-schema val-schema [value-k value-v]]
   (if-not key-schema
-    [value-k 'extra-keys-allowed?]
+    [value-k ::no-extra-keys-allowed]
     (if-let [error (check key-schema value-k)]
-      [error 'key-validates?]
+      [error ::key-validation-error]
       (when-let [error (check val-schema value-v)]
         [value-k error]))))
 
