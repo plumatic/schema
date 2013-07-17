@@ -78,7 +78,7 @@
 
 (clojure.core/defn validate [schema value]
   (let [error (check schema value)]
-    (when error ;; TODO: pretty print
+    (when error
       (throw (IllegalArgumentException. (format "Value does not match schema: %s" error))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -213,7 +213,7 @@
   Schema
   (check [this x]
          (when (every? #(check % x) schemas)
-           (validation-error this x 'TODO-either)))
+           (validation-error this x (list 'every? (list 'check '% (value-name x)) 'schemas))))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -228,7 +228,7 @@
   Schema
   (check [this x]
          (when-let [errors (seq (keep #(check % x) schemas))]
-           (validation-error this x (cons 'TODO-both errors))))
+           (validation-error this x (cons 'empty? [errors]))))
   (explain [this] (cons 'both (map explain schemas))))
 
 (clojure.core/defn both
@@ -339,7 +339,7 @@
         k (explicit-schema-key key-schema)
         present? (contains? value k)]
     (cond (and (not optional?) (not present?))
-          [k (validation-error val-schema value 'TODO-not-present)]
+          [k (validation-error val-schema value 'missing-key?)]
 
           present?
           (when-let [error (check val-schema (get value k))]
@@ -349,9 +349,9 @@
   "Validate a single schema key and dissoc the value from m"
   [key-schema val-schema [value-k value-v]]
   (if-not key-schema
-    [value-k 'TODO-extra-keys-not-allowed]
+    [value-k 'extra-keys-allowed?]
     (if-let [error (check key-schema value-k)]
-      [error 'TODO-just-nil?]
+      [error 'key-validates?]
       (when-let [error (check val-schema value-v)]
         [value-k error]))))
 
@@ -416,7 +416,7 @@
             (if-let [[^One first-single & more-singles] (seq singles)]
               (if (empty? x)
                 (conj out
-                      (validation-error (vec singles) nil (list 'TODO-short (count singles))))
+                      (validation-error (vec singles) nil (list 'has-enough-elts? (count singles))))
                 (recur more-singles
                        (rest x)
                        (conj out (check (.schema first-single) (first x)))))
@@ -424,7 +424,7 @@
                               (into out (map #(check multi %) x))
 
                               (seq x)
-                              (conj out (validation-error nil x (list 'TODO-long (count x))))
+                              (conj out (validation-error nil x (list 'has-extra-elts? (count x))))
 
                               :else
                               out)]
