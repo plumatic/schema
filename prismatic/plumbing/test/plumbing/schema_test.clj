@@ -208,7 +208,7 @@
     (invalid! schema #{3 4 "a"}))
   ;; not allowed to have zero or multiple entries
   (is (thrown? Exception (s/check #{long double} #{})))
-  (is (thrown? Exception (s/check #{} #{})))
+
 
   ;; slightly more complicated elem-schema
   (let [schema #{[long]}]
@@ -218,13 +218,13 @@
     (invalid! schema #{[[2 3]]})))
 
 (deftest mixed-set-test
-  (let [schema #{ (s/either [long] #{long})}]
+  (let [schema #{(s/either [long] #{long})}]
     (valid! schema #{})
-    (valid! schema #{ [3 4] [56 1] [-11 3]})
-    (valid! schema #{ #{3 4} #{ 56 1} #{ -11 3}})
-    (valid! schema #{ [3 4] #{56 1} #{-11 3}})
-    (invalid! schema #{ #{ [3 4]}})
-    (invalid! schema #{ [ [3 4]]})))
+    (valid! schema #{[3 4] [56 1] [-11 3]})
+    (valid! schema #{#{3 4} #{56 1} #{-11 3}})
+    (valid! schema #{[3 4] #{56 1} #{-11 3}})
+    (invalid! schema #{#{[3 4]}})
+    (invalid! schema #{[[3 4]]})))
 
 
 ;;; records
@@ -241,7 +241,7 @@
   (let [schema (s/record Foo {(s/required-key :x) s/+anything+
                               (s/required-key :y) long
                               clojure.lang.Keyword s/+anything+})]
-    (valid! schema  (Foo. :foo 1))
+    (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
 
