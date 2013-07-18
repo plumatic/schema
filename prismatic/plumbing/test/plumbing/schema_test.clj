@@ -262,19 +262,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
+(defmacro test-normalized-meta [symbol ex-schema desired-meta]
+  (let [normalized (#'s/normalized-metadata &env symbol ex-schema)]
+    `(do (is (= '~symbol '~normalized))
+         (is (= ~(select-keys desired-meta [:schema :tag])
+                ~(select-keys (meta normalized) [:schema :tag]))))))
+
+(def ASchema [long])
 
 (deftest normalized-metadata-test
-  (let [correct! (fn [symbol ex-schema desired-meta]
-                   (let [fix (@#'s/normalized-metadata {} symbol ex-schema)]
-                     (is (= symbol fix))
-                     (is (= desired-meta (or (meta fix) {})))))]
-    (testing "empty" (correct! 'foo nil {:schema s/Top}))
-    (testing "protocol" (correct! (with-meta 'foo {:tag 'ATestProtocol}) nil {:schema `(s/protocol @~#'ATestProtocol)}))
-    (testing "primitive" (correct! (with-meta 'foo {:tag 'long}) nil {:tag 'long :schema 'long}))
-    (testing "class" (correct! (with-meta 'foo {:tag 'String}) nil {:tag 'String :schema 'String}))
-    (testing "non-tag" (correct! (with-meta 'foo {:tag 'asdf}) nil {:schema 'asdf}))
-    (testing "both" (correct! (with-meta 'foo {:tag 'Object :schema 'String}) nil {:tag 'Object :schema 'String}))
-    (testing "explicit" (correct! (with-meta 'foo {:tag 'Object}) 'String {:tag 'Object :schema 'String}))))
+  (testing "empty" (test-normalized-meta 'foo nil {:schema s/Top}))
+  (testing "protocol" (test-normalized-meta ^ATestProtocol foo nil {:schema (s/protocol ATestProtocol)}))
+  (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
+  (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
+  (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
+  (testing "both" (test-normalized-meta ^{:tag Object :schema String} foo nil {:tag Object :schema String}))
+  (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
 
 (defmacro test-meta-extraction [meta-form arrow-form]
   (let [meta-ized (#'s/process-arrow-schematized-args {} arrow-form)]
