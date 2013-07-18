@@ -563,33 +563,54 @@
             `(protocol (deref ~v)))))
       tag))
 
-(defn- fixup-tag-metadata
-  "Allow type hints on symbols/arglists to include symbols that reference protocols
-   or schemas, as well as literal tags. In such cases, the schema
-   must be moved from :tag to :schema so that Clojure doesn't get upset, since
-   it's not a literal primitive or Class."
-  [env imeta]
-  (if-let [tag (:tag (meta imeta))]
-    (if (or (primitive-sym? tag) (class? (resolve env tag)))
-      imeta
+(defn- valid-tag? [env tag]
+  (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
+
+(defn- normalized-metadata
+  "Take an object with optional metadata, which may include a :tag and/or explicit
+   :schema/:s/:s?/:tag data, plus an optional explicit schema, and normalize the
+   object to have a valid Clojure :tag plus a :schema field."
+  [env imeta explicit-schema]
+  (let [{:keys [tag s s? schema]} (meta imeta)]
+    (assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
+                "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
+    (let [schema (fix-protocol-tag
+                  env
+                  (or s schema (when s? `(maybe ~s?)) explicit-schema tag Top))]
       (with-meta imeta
-        (-> (meta imeta)
-            (dissoc :tag)
-            (assoc :schema (fix-protocol-tag env tag)))))
-    imeta))
+        (-> (or (meta imeta) {})
+            (dissoc :tag :s :s? :schema)
+            (assoc-when :schema schema
+                        :tag (let [t (or tag schema)]
+                               (when (valid-tag? env t)
+                                 t))))))))
+
+(defn- extract-arrow-schematized-element
+  "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
+   a list of [first-element-with-schema-attached rest-elements]"
+  [env s]
+  (assert (seq s))
+  (let [[f & more] s]
+    (if (= :- (first more))
+      [(normalized-metadata env f (second more)) (drop 2 more)]
+      [(normalized-metadata env f nil) more])))
+
+(defn- process-arrow-schematized-args
+  "Take an arg vector, in which each argument is followed by an optional :- schema,
+   and transform into an ordinary arg vector where the schemas are metadata on the args."
+  [env args]
+  (loop [in args out []]
+    (if (empty? in)
+      out
+      (let [[arg more] (extract-arrow-schematized-element env in)]
+        (recur more (conj out arg))))))
 
 (clojure.core/defn extract-schema-form
-  "Extract the schema metadata from a symbol.  Schema can be a primitive/class
-   hint in :tag, any schema in :schema or :s, or a 'maybe' schema in :s?.
-   If both a tag and an explicit schema are present, the explicit schema wins.
-   Public only because of its use in a public macro."
+  "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
   [symbol]
-  (let [{:keys [tag s s? schema]} (meta symbol)]
-    (assert-iae (< (count (remove nil? [s s? schema])) 2)
-                "Expected single schema, got meta %s" (meta symbol))
-    (if-let [schema (or s schema (when s? `(maybe ~s?)) tag)]
-      schema
-      Top)))
+  (let [s (:schema (meta symbol))]
+    (assert-iae s "%s is missing a schema" symbol)
+    s))
 
 (defn- maybe-split-first [pred s]
   (if (pred (first s))
@@ -622,7 +643,7 @@
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (mapv (partial fixup-tag-metadata &env) field-schema)]
+        field-schema (process-arrow-schematized-args &env field-schema)]
     `(do
        (when-let [bad-keys# (seq (filter #(required-key? %)
                                          (keys ~extra-key-schema?)))]
@@ -778,7 +799,7 @@
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
     (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
-  (let [bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
+  (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg bind)
         input-schema-sym (gensym "input-schema")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
@@ -805,8 +826,7 @@
 (defn- process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name fn-body]
-  (let [name (fixup-tag-metadata env name)
-        output-schema (extract-schema-form name)
+  (let [output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
         bind-meta (or (when-let [t (:tag (meta name))]
                         (when (primitive-sym? t)
@@ -818,8 +838,7 @@
                                  fn-body))
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
-    {:tag? (:tag name)
-     :schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
+    {:schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
      :schema-form `(make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-form `(let [^plumbing.schema.PSimpleCell ~'ufv use-fn-validation]
                  (clojure.core/fn ~name
@@ -843,9 +862,10 @@
    generates pre- and post-conditions on each arity that validate the input and output
    schemata whenever *use-fn-validation* is true (at run-time)."
   [& fn-args]
-  (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
-        {:keys [schema-bindings schema-form fn-form]}
-        (process-fn- &env (or name? "fn") more-fn-args)]
+  (let [[name more-fn-args] (if (symbol? (first fn-args))
+                              (extract-arrow-schematized-element &env fn-args)
+                              ["fn" fn-args])
+        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-fn-args)]
     `(let ~schema-bindings
        (with-meta ~fn-form ~{:schema schema-form}))))
 
@@ -859,17 +879,19 @@
       is no overhead, unlike with 'fn' above
     - Output metadata always goes on the argument vector.  If you use the same bare
       class on every arity, this will automatically propagate to the tag on the name."
-  [name & more-defn-args]
-  (let [[doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
+  [& defn-args]
+  (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
+        [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [tag? schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
+        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
     `(let ~schema-bindings
        (def ~(with-meta name
                (assoc-when (or attr-map? {})
                            :doc doc-string?
                            :schema schema-form
-                           :tag (or (:tag (meta name))
-                                    tag?)))
+                           :tag (let [t (:tag (meta name))]
+                                  (when-not (primitive-sym? t)
+                                    t))))
          ~fn-form)
        (declare-class-schema! (class ~name) ~schema-form))))
 

@@ -263,29 +263,31 @@
 ;;; Schematized defrecord
 
 
-(deftest fixup-tag-metadata-test
-  (let [correct! (fn [symbol desired-meta]
-                   (let [fix (@#'s/fixup-tag-metadata {} symbol)]
+(deftest normalized-metadata-test
+  (let [correct! (fn [symbol ex-schema desired-meta]
+                   (let [fix (@#'s/normalized-metadata {} symbol ex-schema)]
                      (is (= symbol fix))
                      (is (= desired-meta (or (meta fix) {})))))]
-    (correct! 'foo {})
-    (correct! (with-meta 'foo {:tag 'long}) {:tag 'long})
-    (correct! (with-meta 'foo {:tag 'String}) {:tag 'String})
-    (correct! (with-meta 'foo {:tag 'asdf}) {:schema 'asdf})))
+    (testing "empty" (correct! 'foo nil {:schema s/Top}))
+    (testing "protocol" (correct! (with-meta 'foo {:tag 'ATestProtocol}) nil {:schema `(s/protocol @~#'ATestProtocol)}))
+    (testing "primitive" (correct! (with-meta 'foo {:tag 'long}) nil {:tag 'long :schema 'long}))
+    (testing "class" (correct! (with-meta 'foo {:tag 'String}) nil {:tag 'String :schema 'String}))
+    (testing "non-tag" (correct! (with-meta 'foo {:tag 'asdf}) nil {:schema 'asdf}))
+    (testing "both" (correct! (with-meta 'foo {:tag 'Object :schema 'String}) nil {:tag 'Object :schema 'String}))
+    (testing "explicit" (correct! (with-meta 'foo {:tag 'Object}) 'String {:tag 'Object :schema 'String}))))
 
-(deftest extract-schema-form-test
-  (let [correct! (fn [m out]
-                   (is (= out (s/extract-schema-form (with-meta 'foo m)))))]
-    (correct! {} s/+anything+)
-    (correct! {:asdf :foo} s/+anything+)
-    (correct! {:tag 'long} 'long)
-    (correct! {:schema []} [])
-    (correct! {:s []} [])
-    (correct! {:s? []} `(s/maybe []))
-    (correct! {:tag 'long :s? []} `(s/maybe []))
-    (is (thrown? Exception (s/extract-schema-form (with-meta 'foo {:s [] :schema []}))))))
+(defmacro test-meta-extraction [meta-form arrow-form]
+  (let [meta-ized (#'s/process-arrow-schematized-args {} arrow-form)]
+    `(do (is (= '~meta-form '~meta-ized))
+         (is (= ~(mapv #(select-keys (meta (#'s/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
+                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
 
-
+(deftest extract-arrow-schematized-args-test
+  (testing "empty" (test-meta-extraction [] []))
+  (testing "no-tag" (test-meta-extraction [x] [x]))
+  (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
+  (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
+  (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
 
 (potemkin/defprotocol+ PProtocol
   (do-something [this]))
@@ -337,6 +339,25 @@
   (valid! Bar4 (Bar4. [1] nil))
   (invalid! Bar4 (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
+
+(s/defrecord BarNewStyle
+    [foo :- long
+     bar :- String]
+  {(s/optional-key :baz) clojure.lang.Keyword})
+
+(deftest defrecord-new-style-schema-test
+  (is (= (s/class-schema BarNewStyle)
+         (s/record BarNewStyle {:foo long
+                                :bar String
+                                (s/optional-key :baz) clojure.lang.Keyword})))
+  (is (BarNewStyle. 1 :foo))
+  (is (= #{:foo :bar} (set (keys (map->BarNewStyle {:foo 1})))))
+  (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
+  (valid! BarNewStyle (BarNewStyle. 1 "test"))
+  (invalid! BarNewStyle (BarNewStyle. 1 :foo))
+  (valid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baz :foo))
+  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baaaz :foo))
+  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baz "foo")))
 
 
 ;; Now test that schemata and protocols work as type hints.
@@ -442,53 +463,68 @@
   [^OddLong arg0]
   (str arg0))
 
+(s/defn ^String simple-validated-defn-new :- OddLongString
+  "I am a simple schema fn"
+  {:metadata :bla}
+  [arg0 :- OddLong]
+  (str arg0))
+
 (def +simple-validated-defn-schema+
   (s/=> OddLongString OddLong))
 
 (deftest simple-validated-defn-test
-  (let [{:keys [tag schema doc metadata]} (meta #'simple-validated-defn)]
-    (is (= tag String))
-    (is (= +simple-validated-defn-schema+ schema))
-    (is (= doc "I am a simple schema fn"))
-    (is (= metadata :bla)))
-  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
+  (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
+    (testing label
+      (let [{:keys [tag schema doc metadata]} (meta v)]
+        (is (= tag String))
+        (is (= +simple-validated-defn-schema+ schema))
+        (is (= doc "I am a simple schema fn"))
+        (is (= metadata :bla)))
+      (is (= +simple-validated-defn-schema+ (s/fn-schema @v)))
 
-  (s/with-fn-validation
-    (is (= "3" (simple-validated-defn 3)))
-    (is (thrown? Exception (simple-validated-defn 4)))
-    (is (thrown? Exception (simple-validated-defn "a"))))
+      (s/with-fn-validation
+        (is (= "3" (@v 3)))
+        (is (thrown? Exception (@v 4)))
+        (is (thrown? Exception (@v "a"))))
 
-  (is (= "4" (simple-validated-defn 4))))
+      (is (= "4" (@v 4))))))
 
 
 (def +primitive-validated-defn-schema+
   (s/=> long OddLong))
 
 (s/defn ^long primitive-validated-defn
-  [^long ^{:s OddLong} x]
-  (inc x))
-(comment
-  (deftest simple-validated-defn-test
-    (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
+  [^long ^{:s OddLong} arg0]
+  (inc arg0))
 
-    (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
-    (s/with-fn-validation
-      (is (= 4 (primitive-validated-defn 3)))
-      (is (= 4 (.invokePrim primitive-validated-defn 3)))
-      (is (thrown? Exception (primitive-validated-defn 4))))
+(s/defn ^long primitive-validated-defn-new :- long
+  [^long arg0 :- OddLong]
+  (inc arg0))
 
-    (is (= 5 (primitive-validated-defn 4))))
 
-  ;; TODO: multi-arity defn tests.
+(deftest simple-primitive-validated-defn-test
+  (doseq [[label f] {"old" primitive-validated-defn "new" primitive-validated-defn-new}]
+    (testing label
+      (is (= +primitive-validated-defn-schema+ (s/fn-schema f)))
+
+      (is ((ancestors (class f)) clojure.lang.IFn$LL))
+      (s/with-fn-validation
+        (is (= 4 (f 3)))
+        (is (= 4 (.invokePrim f 3)))
+        (is (thrown? Exception (f 4))))
+
+      (is (= 5 (f 4))))))
+
+;; TODO: multi-arity defn tests.
 
 ;;; Benchmarks
 
-  (defn ^String simple-defn [x] (str x))
+(defn ^String simple-defn [x] (str x))
 
-  (require '[plumbing.timing :as timing])
-  (defn validated-fn-benchmark []
-    (timing/microbenchmark
-     (s/with-fn-validation
-       (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
-     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
-     (reduce #(when (simple-defn %2) %1) (range 1 1000001 2)))))
+(require '[plumbing.timing :as timing])
+(defn validated-fn-benchmark []
+  (timing/microbenchmark
+   (s/with-fn-validation
+     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
+   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
+   (reduce #(when (simple-defn %2) %1) (range 1 1000001 2))))
