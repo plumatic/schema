@@ -517,7 +517,7 @@
 (defn- parse-arity-spec [spec]
   (assert-iae (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
-        fixed (mapv (fn [i s] (one s (str "arg" i))) (range) init)]
+        fixed (mapv (fn [i s] `(one ~s ~(str "arg" i))) (range) init)]
     (if (empty? more)
       fixed
       (do (assert-iae (and (= (count more) 2) (vector? (second more)))

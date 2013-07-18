@@ -380,7 +380,7 @@
   (s/=> String OddLong s/Top))
 
 (deftest simple-validated-meta-test
-  (let [f (s/fn ^String foo [^OddLong x y])]
+  (let [f (s/fn ^String foo [^OddLong arg0 arg1])]
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
