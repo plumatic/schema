@@ -377,17 +377,14 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (s/make-fn-schema
-   [(s/->Arity
-     [(s/one OddLong "x") (s/one s/+anything+ "y")]
-     String)]))
+  (s/=> String OddLong s/Top))
 
 (deftest simple-validated-meta-test
-  (let [f (s/fn ^String [^OddLong x y])]
+  (let [f (s/fn ^String foo [^OddLong x y])]
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
-  (let [f (s/fn test-fn ^{:s even?} [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
+  (let [f (s/fn ^{:s even?} test-fn [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
             (+ x (:foo y -100)))]
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
@@ -402,12 +399,9 @@
 
 (deftest destructured-validated-fn-test
   (let [LongPair [(s/one long "a") (s/one long "b")]
-        f (s/fn ^long [^{:s LongPair} [a b] ^long y]
+        f (s/fn ^long foo [^{:s LongPair} [a b] ^long y]
             (+ a b y))]
-    (is (= (s/make-fn-schema
-            [(s/->Arity
-              [(s/one LongPair "gensym") (s/one long "y")]
-              long)])
+    (is (= (s/=> long LongPair long)
            (assoc-in (s/fn-schema f)
                      [:arities 0 :input-schema 0 :name] ;; ugh
                      "gensym")))
@@ -416,24 +410,20 @@
       (is (thrown? Exception (f [(Integer. 1) 2] 3))))))
 
 (deftest two-arity-fn-test
-  (let [f (s/fn foo
-            (^long [^String x ^long y] (+ y (foo x)))
-            (^long [^String x] (Long/parseLong x)))]
-    (is (= (s/make-fn-schema
-            [(s/->Arity [(s/one String "x")] long)
-             (s/->Arity [(s/one String "x") (s/one long "y")] long)])
+  (let [f (s/fn ^long foo
+            ([^String x ^long y] (+ y (foo x)))
+            ([^String x] (Long/parseLong x)))]
+    (is (= (s/=>* long [String] [String long])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
     (is (= 10 (f "3" 7)))))
 
 (deftest infinite-arity-fn-test
-  (let [f (s/fn foo
-            (^Long [^Long x] (inc x))
-            (^Long [^Long x & ^{:s [String]} strs]
-                   (reduce + (foo x) (map count strs))))]
-    (is (= (s/make-fn-schema
-            [(s/->Arity [(s/one Long "x")] Long)
-             (s/->Arity [(s/one Long "x") String] Long)])
+  (let [f (s/fn ^Long foo
+            ([^Long x] (inc x))
+            ([^Long x & ^{:s [String]} strs]
+               (reduce + (foo x) (map count strs))))]
+    (is (= (s/=>* Long [Long] [Long & [String]])
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 5 (f 4)))
@@ -447,17 +437,14 @@
 (def OddLongString
   (s/both String #(odd? (Long/parseLong %))))
 
-(s/defn simple-validated-defn
+(s/defn ^OddLongString simple-validated-defn
   "I am a simple schema fn"
   {:metadata :bla}
-  ^OddLongString [^OddLong x]
+  [^OddLong x]
   (str x))
 
 (def +simple-validated-defn-schema+
-  (s/make-fn-schema
-   [(s/->Arity
-     [(s/one OddLong "x")]
-     OddLongString)]))
+  (s/=> OddLongString OddLong))
 
 (deftest simple-validated-defn-test
   (let [{:keys [tag schema doc metadata]} (meta #'simple-validated-defn)]
@@ -476,33 +463,33 @@
 
 
 (def +primitive-validated-defn-schema+
-  (s/make-fn-schema [(s/->Arity [(s/one OddLong "x")] long)]))
+  (s/=> long OddLong))
 
-(s/defn primitive-validated-defn
-  ^long [^long ^{:s OddLong} x]
+(s/defn ^long primitive-validated-defn
+  [^long ^{:s OddLong} x]
   (inc x))
+(comment
+  (deftest simple-validated-defn-test
+    (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
 
-(deftest simple-validated-defn-test
-  (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
+    (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
+    (s/with-fn-validation
+      (is (= 4 (primitive-validated-defn 3)))
+      (is (= 4 (.invokePrim primitive-validated-defn 3)))
+      (is (thrown? Exception (primitive-validated-defn 4))))
 
-  (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
-  (s/with-fn-validation
-    (is (= 4 (primitive-validated-defn 3)))
-    (is (= 4 (.invokePrim primitive-validated-defn 3)))
-    (is (thrown? Exception (primitive-validated-defn 4))))
+    (is (= 5 (primitive-validated-defn 4))))
 
-  (is (= 5 (primitive-validated-defn 4))))
-
-;; TODO: multi-arity defn tests.
+  ;; TODO: multi-arity defn tests.
 
 ;;; Benchmarks
 
-(defn ^String simple-defn [x] (str x))
+  (defn ^String simple-defn [x] (str x))
 
-(require '[plumbing.timing :as timing])
-(defn validated-fn-benchmark []
-  (timing/microbenchmark
-   (s/with-fn-validation
-     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
-   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
-   (reduce #(when (simple-defn %2) %1) (range 1 1000001 2))))
+  (require '[plumbing.timing :as timing])
+  (defn validated-fn-benchmark []
+    (timing/microbenchmark
+     (s/with-fn-validation
+       (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
+     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
+     (reduce #(when (simple-defn %2) %1) (range 1 1000001 2)))))

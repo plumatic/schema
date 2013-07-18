@@ -43,6 +43,8 @@
 (set! *warn-on-reflection* true)
 
 ;; TODO: better error messages for fn schema validation
+;; TODO: sequences have to support optional args before final to handle
+;; (defn foo [x & [y]]) type things.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -482,6 +484,63 @@
   (Record. klass schema))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Function schemata
+
+;; These are purely descriptive at this point, and carry no validation.
+;; We make the assumption that for sanity, a function can only have a single output schema,
+;; over all arities.
+
+(def +infinite-arity+ Long/MAX_VALUE)
+
+(clojure.core/defrecord Fn [output-schema input-schemas] ;; input-schemas sorted by arity
+  Schema
+  (check [this x] nil) ;; TODO?
+  (explain [this]
+           (if (> (count input-schemas) 1)
+             (list* '=>* (explain output-schema) (map explain input-schemas))
+             (list* '=> (explain output-schema) (explain (first input-schemas))))))
+
+(clojure.core/defn arity [input-schema]
+  (if (seq input-schema)
+    (if (instance? One (last input-schema))
+      (count input-schema)
+      +infinite-arity+)
+    0))
+
+(clojure.core/defn make-fn-schema [output-schema input-schemas]
+  (assert-iae (seq input-schemas) "Function must have at least one input schema")
+  (assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
+  (assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
+  (Fn. output-schema (sort-by arity input-schemas)))
+
+(defn- parse-arity-spec [spec]
+  (assert-iae (vector? spec) "An arity spec must be a vector")
+  (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
+        fixed (mapv (fn [i s] (one s (str "arg" i))) (range) init)]
+    (if (empty? more)
+      fixed
+      (do (assert-iae (and (= (count more) 2) (vector? (second more)))
+                      "An arity with & must be followed by a single sequence schema")
+          (into fixed (second more))))))
+
+(clojure.core/defmacro =>*
+  "Produce a function schema from an output schema and a list of arity input schema specs,
+   each of which is a vector of argument schemas, ending with an optional '& more-schema'
+   specification where more-schema must be a sequence schema.
+
+   Currently function schemas are purely descriptive; there is no validation except for
+   functions defined directly by s/fn or s/defn"
+  [output-schema & arity-schema-specs]
+  `(make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
+
+(clojure.core/defmacro =>
+  "Convenience function for defining functions with a single arity; like =>*, but
+   there is no vector around the argument schemas for this arity."
+  [output-schema & arg-schemas]
+  `(=>* ~output-schema ~(vec arg-schemas)))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
@@ -634,34 +693,6 @@
 
 (ns-unmap *ns* 'fn)
 
-;;These are deliberately schematized records -- why not, now that we've bootstrapped?
-
-(defrecord Arity [^Schema input-schema ^Schema output-schema]
-  Schema
-  (check [this x] nil) ;; TODO?
-  (explain [this]
-    (list (explain input-schema) (explain output-schema))))
-
-(def +infinite-arity+ Long/MAX_VALUE)
-
-(clojure.core/defn arity [^Arity fas]
-  (if-let [input-schema (seq (.input-schema fas))]
-    (if (instance? One (last input-schema))
-      (count input-schema)
-      +infinite-arity+)
-    0))
-
-(defrecord Fn [^{:s [Arity]} arities] ;; sorted by arity
-  Schema
-  (check [this x] nil) ;; TODO?
-  (explain [this]
-    (list 'fn (list* (map explain arities)))))
-
-(clojure.core/defn make-fn-schema
-  "Can't follow naming convention here, since we already have a fn and fn-schema..."
-  [arities]
-  (Fn. (vec (sort-by arity arities))))
-
 (clojure.core/defn ^Fn fn-schema
   "Produce the schema for a fn.  Since storing metadata on fns currently
    destroys their primitive-ness, and also adds an extra layer of fn call
@@ -675,16 +706,15 @@
 (clojure.core/defn input-schema
   "Convenience method for fns with single arity"
   [f]
-  (let [arities (.arities (fn-schema f))]
-    (assert-iae (= 1 (count arities)) "Expected single arity fn, got %s" (count arities))
-    (.input-schema ^Arity (first arities))))
+  (let [input-schemas (.input-schemas (fn-schema f))]
+    (assert-iae (= 1 (count input-schemas))
+                "Expected single arity fn, got %s" (count input-schemas))
+    (first input-schemas)))
 
 (clojure.core/defn output-schema
   "Convenience method for fns with single arity"
   [f]
-  (let [arities (.arities (fn-schema f))]
-    (assert-iae (= 1 (count arities)) "Expected single arity fn, got %s" (count arities))
-    (.output-schema ^Arity (first arities))))
+  (.output-schema (fn-schema f)))
 
 (definterface PSimpleCell
   (get_cell ^boolean [])
@@ -744,21 +774,14 @@
    tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
-  [env [bind & body]]
+  [env output-schema-sym bind-meta [bind & body]]
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
-  (let [bind (fixup-tag-metadata env bind)
-        bind-meta (meta bind)
-        bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
+  (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
+    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
+  (let [bind (with-meta (mapv #(fixup-tag-metadata env %) bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg bind)
-        input-schema (input-schema-form regular-args rest-arg)
-        output-schema (extract-schema-form bind)
-        input-schema-sym (gensym "input-schema")
-        output-schema-sym (gensym "output-schema")]
-    {:tag? (when (and (symbol? output-schema) (class? (resolve env output-schema)))
-             output-schema)
-     :schema-bindings [input-schema-sym input-schema
-                       output-schema-sym output-schema]
-     :schema-form `(->Arity ~input-schema-sym ~output-schema-sym)
+        input-schema-sym (gensym "input-schema")]
+    {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
      :arity-form (if true
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
@@ -781,22 +804,25 @@
 
 (defn- process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
-  [env name? fn-body]
-  (let [processed-arities (map (partial process-fn-arity env)
+  [env name fn-body]
+  (let [name (fixup-tag-metadata env name)
+        output-schema (extract-schema-form name)
+        output-schema-sym (gensym "output-schema")
+        bind-meta (or (when-let [t (:tag (meta name))]
+                        (when (primitive-sym? t)
+                          {:tag t}))
+                      {})
+        processed-arities (map (partial process-fn-arity env output-schema-sym bind-meta)
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
-        [tags schema-bindings schema-forms fn-forms]
-        (map #(map % processed-arities) [:tag? :schema-bindings :schema-form :arity-form])]
-    (when name?
-      (when-let [bad-meta (seq (filter (or (meta name?) {}) [:tag :s? :s :schema]))]
-        (throw (RuntimeException. (str "Meta not supported on name, use arglist meta: " (vec bad-meta))))))
-    {:tag? (when (and (seq tags) (apply = tags))
-             (first tags))
-     :schema-bindings (vec (apply concat schema-bindings))
-     :schema-form `(make-fn-schema ~(vec schema-forms))
+        schema-bindings (map :schema-binding processed-arities)
+        fn-forms (map :arity-form processed-arities)]
+    {:tag? (:tag name)
+     :schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
+     :schema-form `(make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-form `(let [^plumbing.schema.PSimpleCell ~'ufv use-fn-validation]
-                 (clojure.core/fn ~@(when name? [name?])
+                 (clojure.core/fn ~name
                    ~@fn-forms))}))
 
 ;; Finally we get to the prize
@@ -818,7 +844,8 @@
    schemata whenever *use-fn-validation* is true (at run-time)."
   [& fn-args]
   (let [[name? more-fn-args] (maybe-split-first symbol? fn-args)
-        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name? more-fn-args)]
+        {:keys [schema-bindings schema-form fn-form]}
+        (process-fn- &env (or name? "fn") more-fn-args)]
     `(let ~schema-bindings
        (with-meta ~fn-form ~{:schema schema-form}))))
 
