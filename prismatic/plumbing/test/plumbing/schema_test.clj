@@ -381,6 +381,7 @@
 
 (deftest simple-validated-meta-test
   (let [f (s/fn ^String foo [^OddLong arg0 arg1])]
+    (def s2 (s/fn-schema f))
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
@@ -398,21 +399,19 @@
     ))
 
 (deftest destructured-validated-fn-test
-  (let [LongPair [(s/one long "a") (s/one long "b")]
-        f (s/fn ^long foo [^{:s LongPair} [a b] ^long y]
-            (+ a b y))]
+  (let [LongPair [(s/one long "x") (s/one long "y")]
+        f (s/fn ^long foo [^{:s LongPair} [x y] ^long arg1]
+            (+ x y arg1))]
     (is (= (s/=> long LongPair long)
-           (assoc-in (s/fn-schema f)
-                     [:arities 0 :input-schema 0 :name] ;; ugh
-                     "gensym")))
+           (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 6 (f [1 2] 3)))
       (is (thrown? Exception (f [(Integer. 1) 2] 3))))))
 
 (deftest two-arity-fn-test
   (let [f (s/fn ^long foo
-            ([^String x ^long y] (+ y (foo x)))
-            ([^String x] (Long/parseLong x)))]
+            ([^String arg0 ^long arg1] (+ arg1 (foo arg0)))
+            ([^String arg0] (Long/parseLong arg0)))]
     (is (= (s/=>* long [String] [String long])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
@@ -420,9 +419,9 @@
 
 (deftest infinite-arity-fn-test
   (let [f (s/fn ^Long foo
-            ([^Long x] (inc x))
-            ([^Long x & ^{:s [String]} strs]
-               (reduce + (foo x) (map count strs))))]
+            ([^Long arg0] (inc arg0))
+            ([^Long arg0 & ^{:s [String]} strs]
+               (reduce + (foo arg0) (map count strs))))]
     (is (= (s/=>* Long [Long] [Long & [String]])
            (s/fn-schema f)))
     (s/with-fn-validation
@@ -437,11 +436,11 @@
 (def OddLongString
   (s/both String #(odd? (Long/parseLong %))))
 
-(s/defn ^OddLongString simple-validated-defn
+(s/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
   {:metadata :bla}
-  [^OddLong x]
-  (str x))
+  [^OddLong arg0]
+  (str arg0))
 
 (def +simple-validated-defn-schema+
   (s/=> OddLongString OddLong))

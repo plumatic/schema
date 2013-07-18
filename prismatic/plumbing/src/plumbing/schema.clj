@@ -589,7 +589,7 @@
                 "Expected single schema, got meta %s" (meta symbol))
     (if-let [schema (or s schema (when s? `(maybe ~s?)) tag)]
       schema
-      +anything+)))
+      Top)))
 
 (defn- maybe-split-first [pred s]
   (if (pred (first s))
@@ -744,7 +744,7 @@
     ~(extract-schema-form arg)
     ~(if (symbol? arg)
        (name arg)
-       (name (gensym (str "arg" index))))))
+       (str "arg" index))))
 
 (defn- rest-arg-schema-form [arg]
   (let [s (extract-schema-form arg)]
