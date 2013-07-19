@@ -3,17 +3,20 @@
 
    For example,
 
-   (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0]})
+   (check {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0]})
 
-   returns true but
+   returns nil (for successful validation) but the following all return
+   truthy objects that look like the bad portions of the input object,
+   with leaf values replaced by descriptions of the validation failure:
 
-   (validate {:foo long :bar [double]} {:bar [1.0 2.0 3.0]})
+   (check {:foo long :bar [double]} {:bar [1.0 2.0 3.0]})
+   ==> {:foo missing-required-key}
 
-   (validate {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
+   (check {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
+   ==> {:foo (not (instance? java.lang.Long \"1\"))}
 
-   (validate {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
-
-   all throw exceptions.
+   (check {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
+   ==> {:baz disallowed-key}
 
    Schemas are also supported as field/argument metadata in special
    defrecord/fn/defn replacements, using standard ^long ^Class ^Record
@@ -29,10 +32,20 @@
 
    The new forms are also able to directly accept hints of the form
    ^+a-schema+ where +a-schema+ is a symbol referencing a schema,
-   and ^AProtocol where AProtocol is a protocol (for realz),
-   but these hints are not backwards compatible with ordinary
-   defrecord/ defn/etc."
+   and ^AProtocol where AProtocol is a protocol but these hints are
+   not backwards compatible with ordinary
+   defrecord/ defn/etc.
 
+   As an alternative, you can also provide schemas in s/defrecord
+    and s/defn using the following syntax:
+
+   (s/defn foo :- return-schema
+     [a :- a-schema
+      b :- b-schema] ...)
+
+   These forms are all compatible and can be mixed and matched
+   within a single s/defn (although we wouldn't recommend that for
+   readability's sake)."
   (:refer-clojure :exclude [defrecord defn])
   (:use plumbing.core)
   (:require
@@ -56,7 +69,7 @@
 
 (defprotocol Schema
   (check [this x]
-    "Validate that x satisfies this schema, returning an description of the validation
+    "Validate that x satisfies this schema, returning a description of the validation
      failure(s) or nil for success.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
@@ -341,7 +354,7 @@
         k (explicit-schema-key key-schema)
         present? (contains? value k)]
     (cond (and (not optional?) (not present?))
-          [k (validation-error val-schema value 'missing-key?)]
+          [k 'missing-required-key]
 
           present?
           (when-let [error (check val-schema (get value k))]
@@ -351,9 +364,9 @@
   "Validate a single schema key and dissoc the value from m"
   [key-schema val-schema [value-k value-v]]
   (if-not key-schema
-    [value-k ::no-extra-keys-allowed]
+    [value-k 'disallowed-key]
     (if-let [error (check key-schema value-k)]
-      [error ::key-validation-error]
+      [error 'invalid-key]
       (when-let [error (check val-schema value-v)]
         [value-k error]))))
 
