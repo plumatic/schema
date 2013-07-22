@@ -1,8 +1,8 @@
-(ns plumbing.schema-test
+(ns schema.core-test
   (:use clojure.test)
   (:require
    potemkin
-   [plumbing.schema :as s]))
+   [schema.core :as s]))
 
 (s/defrecord Explainer
     [^long foo ^String bar]
@@ -15,7 +15,7 @@
            java.lang.String [("foo" int)
                              &
                              (maybe
-                              (plumbing.schema_test.Explainer
+                              (schema.core_test.Explainer
                                {:foo long
                                 :bar java.lang.String
                                 (optional-key :baz) clojure.lang.Keyword}))]})))
@@ -517,17 +517,3 @@
         (is (thrown? Exception (f 4))))
 
       (is (= 5 (f 4))))))
-
-;; TODO: multi-arity defn tests.
-
-;;; Benchmarks
-
-(defn ^String simple-defn [x] (str x))
-
-(require '[plumbing.timing :as timing])
-(defn validated-fn-benchmark []
-  (timing/microbenchmark
-   (s/with-fn-validation
-     (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2)))
-   (reduce #(when (simple-validated-defn %2) %1) (range 1 1000001 2))
-   (reduce #(when (simple-defn %2) %1) (range 1 1000001 2))))

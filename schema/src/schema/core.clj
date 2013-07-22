@@ -1,4 +1,4 @@
-(ns plumbing.schema
+(ns schema.core
   "A library for data structure schema definition and validation.
 
    For example,
@@ -47,7 +47,6 @@
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
   (:refer-clojure :exclude [defrecord defn])
-  (:use plumbing.core)
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -760,7 +759,7 @@
   (get-cell [this] q)
   (set-cell [this x] (set! q x)))
 
-(def ^plumbing.schema.PSimpleCell use-fn-validation
+(def ^schema.core.PSimpleCell use-fn-validation
   "Turn on run-time function validation for functions compiled when
    *compile-function-validation* was true -- has no effect for functions compiled
    when it is false."
@@ -853,7 +852,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
      :schema-form `(make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
-     :fn-form `(let [^plumbing.schema.PSimpleCell ~'ufv use-fn-validation]
+     :fn-form `(let [^schema.core.PSimpleCell ~'ufv use-fn-validation]
                  (clojure.core/fn ~name
                    ~@fn-forms))}))
 
