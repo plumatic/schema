@@ -18,6 +18,14 @@
                    :output-path "target/generated/clj/src"
                    :rules :clj}
 
+                  {:source-paths ["schema/src/cljx"]
+                   :output-path "target/generated/cljs/src"
+                   :rules :cljs}
+
                   {:source-paths ["schema/test/cljx"]
                    :output-path "target/generated/clj/test"
-                   :rules :clj}]})
+                   :rules :clj}
+
+                  {:source-paths ["schema/test/cljx"]
+                   :output-path "target/generated/cljs/test"
+                   :rules :cljs}]})
