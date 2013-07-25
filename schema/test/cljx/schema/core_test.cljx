@@ -202,7 +202,7 @@
          (str (array-map
                :a '(not (instance? java.lang.Long "test"))
                :b '[(not (instance? java.lang.Double 1)) nil nil]
-               :c ::s/no-extra-keys-allowed)))))
+               :c 'disallowed-key)))))
 
 ;;; sets
 

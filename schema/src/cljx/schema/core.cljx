@@ -50,6 +50,7 @@
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
+   [plumbing.core :as plumbing]
    potemkin))
 
 (set! *warn-on-reflection* true)
@@ -197,7 +198,7 @@
   (check [this x]
          (when-not (satisfies? p x)
            (validation-error this x (list 'satisfies? p (value-name x)))))
-  (explain [this] (cons 'protocol (safe-get p :var))))
+  (explain [this] (cons 'protocol (plumbing/safe-get p :var))))
 
 (clojure.core/defn protocol [p]
   (assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
@@ -388,13 +389,13 @@
       (validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
       (check-map this x)))
   (explain [this]
-    (for-map [[k v] this]
+    (plumbing/for-map [[k v] this]
       (if (specific-key? k)
         (if (keyword? k)
           k
           (list (cond (instance? RequiredKey k) 'required-key
                       (instance? OptionalKey k) 'optional-key)
-                (safe-get k :k)))
+                (plumbing/safe-get k :k)))
         (explain k))
       (explain v))))
 
@@ -592,10 +593,10 @@
       (with-meta imeta
         (-> (or (meta imeta) {})
             (dissoc :tag :s :s? :schema)
-            (assoc-when :schema schema
-                        :tag (let [t (or tag schema)]
-                               (when (valid-tag? env t)
-                                 t))))))))
+            (plumbing/assoc-when :schema schema
+                                 :tag (let [t (or tag schema)]
+                                        (when (valid-tag? env t)
+                                          t))))))))
 
 (defn- extract-arrow-schematized-element
   "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
@@ -667,8 +668,8 @@
        (potemkin/defrecord+ ~name ~field-schema ~@more-args)
        (declare-class-schema!
         ~name
-        (assoc-when
-         (record ~name (merge ~(for-map [k field-schema]
+        (plumbing/assoc-when
+         (record ~name (merge ~(plumbing/for-map [k field-schema]
                                  (keyword (clojure.core/name k))
                                  (do (assert-iae (symbol? k)
                                                  "Non-symbol in record binding form: %s" k)
@@ -696,7 +697,7 @@
                                                  (data/diff (set (keys ~map-sym))
                                                             ~(set (map keyword field-schema)))))))
              (new ~(symbol (str name))
-                  ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
+                  ~@(map (fn [s] `(plumbing/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -734,7 +735,7 @@
   [f]
   (assert-iae (fn? f) "Non-function %s" (class f))
   (or (class-schema (class f))
-      (safe-get (meta f) :schema)))
+      (plumbing/safe-get (meta f) :schema)))
 
 (clojure.core/defn input-schema
   "Convenience method for fns with single arity"
@@ -787,7 +788,7 @@
           s))))
 
 (defn- input-schema-form [regular-args rest-arg]
-  (let [base (mapv single-arg-schema-form (indexed regular-args))]
+  (let [base (mapv single-arg-schema-form (plumbing/indexed regular-args))]
     (if rest-arg
       (vec (concat base (rest-arg-schema-form rest-arg)))
       base)))
@@ -898,12 +899,12 @@
         {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
     `(let ~schema-bindings
        (def ~(with-meta name
-               (assoc-when (or attr-map? {})
-                           :doc doc-string?
-                           :schema schema-form
-                           :tag (let [t (:tag (meta name))]
-                                  (when-not (primitive-sym? t)
-                                    t))))
+               (plumbing/assoc-when (or attr-map? {})
+                                    :doc doc-string?
+                                    :schema schema-form
+                                    :tag (let [t (:tag (meta name))]
+                                           (when-not (primitive-sym? t)
+                                             t))))
          ~fn-form)
        (declare-class-schema! (class ~name) ~schema-form))))
 
