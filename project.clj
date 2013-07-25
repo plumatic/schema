@@ -14,6 +14,9 @@
                  [prismatic/plumbing "0.1.0"]
                  [potemkin "0.3.0-SNAPSHOT"]]
 
+  :source-paths ["target/generated/clj/src"]
+  :test-paths ["target/generated/clj/test"]
+
   :cljx {:builds [{:source-paths ["schema/src/cljx"]
                    :output-path "target/generated/clj/src"
                    :rules :clj}
@@ -22,10 +25,22 @@
                    :output-path "target/generated/cljs/src"
                    :rules :cljs}
 
+                  {:source-paths ["schema/macros/cljx"]
+                   :output-path "target/generated/clj/src"
+                   :rules :clj}
+
+                  {:source-paths ["schema/macros/cljx"]
+                   :output-path "target/generated/cljs/src"
+                   :rules {:filetype "clj"
+                           :features #{"cljs"}
+                           :transforms [(partial cljx.rules/elide-form "defmacro")]}}
+
                   {:source-paths ["schema/test/cljx"]
                    :output-path "target/generated/clj/test"
                    :rules :clj}
 
                   {:source-paths ["schema/test/cljx"]
                    :output-path "target/generated/cljs/test"
-                   :rules :cljs}]})
+                   :rules :cljs}]}
+
+  :prep-tasks ["cljx" "javac" "compile"])
