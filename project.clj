@@ -43,4 +43,11 @@
                    :output-path "target/generated/cljs/test"
                    :rules :cljs}]}
 
+  :hooks [leiningen.cljsbuild]
+
+  :cljsbuild {:builds [{:source-paths ["target/generated/cljs/src"]
+                        :compiler {:output-to "target/main.js"
+                                   :optimizations :whitespace
+                                   :pretty-print true}}]}
+
   :prep-tasks ["cljx" "javac" "compile"])
