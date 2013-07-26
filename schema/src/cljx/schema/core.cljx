@@ -157,16 +157,18 @@
                 (macros/validation-error this x (list 'thrown? t (list this (value-name x)))))))
   (explain [this] this))
 
-;; prevent coersion, so you have to be exactly the given type.
-(defmacro extend-primitive [cast-sym class-sym]
-  `(extend-protocol Schema
-     ~cast-sym
-     (check [this# x#]
-       (check-class ~cast-sym ~class-sym x#))
-     (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
 
 #+clj
 (do
+
+  ;; prevent coersion, so you have to be exactly the given type.
+  (defmacro extend-primitive [cast-sym class-sym]
+    `(extend-protocol Schema
+       ~cast-sym
+       (check [this# x#]
+         (check-class ~cast-sym ~class-sym x#))
+       (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
+
   (extend-primitive clojure.core$double Double)
   (extend-primitive clojure.core$float Float)
   (extend-primitive clojure.core$long Long)
