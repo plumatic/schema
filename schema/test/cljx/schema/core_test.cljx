@@ -1,10 +1,17 @@
 (ns schema.core-test
-  (:use clojure.test)
+  #+cljs
+  (:use-macros
+   [cljs-test.macros :only [is is= deftest]])
+  #+cljs
+  (:require-macros
+   [schema.macros :as sm])
+  #+clj (:use clojure.test)
   (:require
    potemkin
-   [schema.core :as s]))
+   [schema.core :as s]
+   #+clj [schema.macros :as sm]))
 
-(s/defrecord Explainer
+(sm/defrecord Explainer
     [^long foo ^String bar]
   {(s/optional-key :baz) clojure.lang.Keyword})
 
@@ -296,22 +303,22 @@
   (do-something [this]))
 
 ;; exercies some different arities
-(s/defrecord Bar
+(sm/defrecord Bar
     [^long foo ^String bar]
   {(s/optional-key :baz) clojure.lang.Keyword})
 
-(s/defrecord Bar2
+(sm/defrecord Bar2
     [^long foo ^String bar]
   {(s/optional-key :baz) clojure.lang.Keyword}
   PProtocol
   (do-something [this] 2))
 
-(s/defrecord Bar3
+(sm/defrecord Bar3
     [^long foo ^String bar]
   PProtocol
   (do-something [this] 3))
 
-(s/defrecord Bar4
+(sm/defrecord Bar4
     [^{:s [long]} foo ^{:s? {String String}} bar]
   PProtocol
   (do-something [this] 4))
@@ -343,7 +350,7 @@
   (invalid! Bar4 (Bar4. ["a"] {"test" "test"}))
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
-(s/defrecord BarNewStyle
+(sm/defrecord BarNewStyle
     [foo :- long
      bar :- String]
   {(s/optional-key :baz) clojure.lang.Keyword})
@@ -367,7 +374,7 @@
 
 (def LongOrString (s/either long String))
 
-(s/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
+(sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
 
 (deftest fancier-defrecord-schema-test
   (let [bar1 (Bar. 1 "a")
@@ -460,13 +467,13 @@
 (def OddLongString
   (s/both String #(odd? (Long/parseLong %))))
 
-(s/defn ^{:s OddLongString :tag String} simple-validated-defn
+(sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
   {:metadata :bla}
   [^OddLong arg0]
   (str arg0))
 
-(s/defn ^String simple-validated-defn-new :- OddLongString
+(sm/defn ^String simple-validated-defn-new :- OddLongString
   "I am a simple schema fn"
   {:metadata :bla}
   [arg0 :- OddLong]
@@ -496,11 +503,11 @@
 (def +primitive-validated-defn-schema+
   (s/=> long OddLong))
 
-(s/defn ^long primitive-validated-defn
+(sm/defn ^long primitive-validated-defn
   [^long ^{:s OddLong} arg0]
   (inc arg0))
 
-(s/defn ^long primitive-validated-defn-new :- long
+(sm/defn ^long primitive-validated-defn-new :- long
   [^long arg0 :- OddLong]
   (inc arg0))
 

@@ -45,10 +45,15 @@
 
   ;; :hooks [leiningen.cljsbuild]
 
-  :cljsbuild {:builds [{:source-paths ["target/generated/cljs/src"]
-                        :compiler {:output-to "target/main.js"
-                                   :optimizations :whitespace
-                                   :pretty-print true}}]}
+  :cljsbuild {:builds
+              {:dev {:source-paths ["target/generated/cljs/src"]
+                     :compiler {:output-to "target/main.js"
+                                :optimizations :whitespace
+                                :pretty-print true}}
+               :test {:source-paths ["target/generated/cljs/src" "target/generated/cljs/test"]
+                      :compiler {:output-to "target/unit-test.js"
+                                 :optimizations :whitespace
+                                 :pretty-print true}}}}
 
   :prep-tasks ["cljx" "javac" "compile"]
 
