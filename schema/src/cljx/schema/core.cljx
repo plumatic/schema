@@ -46,20 +46,28 @@
    These forms are all compatible and can be mixed and matched
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
-  (:refer-clojure :exclude [defrecord defn])
+  #+clj (:refer-clojure :exclude [defrecord defn])
   (:require
-   [clojure.data :as data]
    [clojure.string :as str]
    [plumbing.core :as plumbing]
+   #+clj
    potemkin
-   #+clj [schema.macros :as macros])
-  #+cljs (:require-macros [schema.macros :as macros]))
+   #+clj
+   [schema.macros :as macros])
+  #+cljs
+  (:require-macros [schema.macros :as macros]))
 
 #+clj (set! *warn-on-reflection* true)
 
 ;; TODO: better error messages for fn schema validation
 ;; TODO: sequences have to support optional args before final to handle
 ;; (defn foo [x & [y]]) type things.
+
+(deftype ValidationError [schema value expectation-delay])
+
+(defmethod print-method ValidationError [^ValidationError err writer]
+  (print-method (list 'not @(.expectation-delay err)) writer))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
@@ -221,6 +229,7 @@
   (explain [this] 'anything))
 
 (def +anything+ (Anything. nil))
+
 (def Top "in case you like type theory" +anything+)
 
 
@@ -290,7 +299,7 @@
 (clojure.core/defrecord ConditionalSchema [preds-and-schemas]
   Schema
   (check [this x]
-         (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
+         (if-let [[_ match] (first (filter (clojure.core/fn [[pred]] (pred x)) preds-and-schemas))]
            (check match x)
            (macros/validation-error this x (list 'not-any? (list 'matches-pred? (value-name x))
                                                  (map first preds-and-schemas)))))
@@ -529,178 +538,6 @@
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (Fn. output-schema (sort-by arity input-schemas)))
 
-(defn- parse-arity-spec [spec]
-  (macros/assert-iae (vector? spec) "An arity spec must be a vector")
-  (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
-        fixed (mapv (fn [i s] `(one ~s ~(str "arg" i))) (range) init)]
-    (if (empty? more)
-      fixed
-      (do (macros/assert-iae (and (= (count more) 2) (vector? (second more)))
-                             "An arity with & must be followed by a single sequence schema")
-          (into fixed (second more))))))
-
-(clojure.core/defmacro =>*
-  "Produce a function schema from an output schema and a list of arity input schema specs,
-   each of which is a vector of argument schemas, ending with an optional '& more-schema'
-   specification where more-schema must be a sequence schema.
-
-   Currently function schemas are purely descriptive; there is no validation except for
-   functions defined directly by s/fn or s/defn"
-  [output-schema & arity-schema-specs]
-  `(make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
-
-(clojure.core/defmacro =>
-  "Convenience function for defining functions with a single arity; like =>*, but
-   there is no vector around the argument schemas for this arity."
-  [output-schema & arg-schemas]
-  `(=>* ~output-schema ~(vec arg-schemas)))
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized defrecord
-
-(def primitive-sym? '#{float double boolean byte char short int long
-                       floats doubles booleans bytes chars shorts ints longs objects})
-
-(defn- looks-like-a-protocol-var?
-  "There is no 'protocol?'in Clojure, so here's a half-assed attempt."
-  [v]
-  (and (var? v)
-       (map? @v)
-       (= (:var @v) v)
-       (:on @v)))
-
-(defn- fix-protocol-tag [env tag]
-  (or (when (symbol? tag)
-        (when-let [v (resolve env tag)]
-          (when (looks-like-a-protocol-var? v)
-            `(protocol (deref ~v)))))
-      tag))
-
-(defn- valid-tag? [env tag]
-  (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
-
-(defn- normalized-metadata
-  "Take an object with optional metadata, which may include a :tag and/or explicit
-   :schema/:s/:s?/:tag data, plus an optional explicit schema, and normalize the
-   object to have a valid Clojure :tag plus a :schema field."
-  [env imeta explicit-schema]
-  (let [{:keys [tag s s? schema]} (meta imeta)]
-    (macros/assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
-                       "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
-    (let [schema (fix-protocol-tag
-                  env
-                  (or s schema (when s? `(maybe ~s?)) explicit-schema tag Top))]
-      (with-meta imeta
-        (-> (or (meta imeta) {})
-            (dissoc :tag :s :s? :schema)
-            (plumbing/assoc-when :schema schema
-                                 :tag (let [t (or tag schema)]
-                                        (when (valid-tag? env t)
-                                          t))))))))
-
-(defn- extract-arrow-schematized-element
-  "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
-   a list of [first-element-with-schema-attached rest-elements]"
-  [env s]
-  (assert (seq s))
-  (let [[f & more] s]
-    (if (= :- (first more))
-      [(normalized-metadata env f (second more)) (drop 2 more)]
-      [(normalized-metadata env f nil) more])))
-
-(defn- process-arrow-schematized-args
-  "Take an arg vector, in which each argument is followed by an optional :- schema,
-   and transform into an ordinary arg vector where the schemas are metadata on the args."
-  [env args]
-  (loop [in args out []]
-    (if (empty? in)
-      out
-      (let [[arg more] (extract-arrow-schematized-element env in)]
-        (recur more (conj out arg))))))
-
-(clojure.core/defn extract-schema-form
-  "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
-  [symbol]
-  (let [s (:schema (meta symbol))]
-    (macros/assert-iae s "%s is missing a schema" symbol)
-    s))
-
-(defn- maybe-split-first [pred s]
-  (if (pred (first s))
-    [(first s) (next s)]
-    [nil s]))
-
-
-(defmacro defrecord
-  "Define a defrecord 'name' using a modified map schema format.
-
-   field-schema looks just like an ordinary defrecord field binding, except that you
-   can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints
-   to fields.
-   e.g., [^long foo  ^{:schema {:a double}} bar]
-   defines a record with two base keys foo and bar.
-   You can also use ^{:s? schema} as shorthand for {:s (maybe schema)},
-   or ^+schema+ to refer to a var/local defining a schema (note that this form
-   is not legal on an ordinary defrecord, however, unlike all the others).
-
-   extra-key-schema? is an optional map schema that defines additional optional
-   keys (and/or a key-schemas) -- without it, the schema specifies that extra
-   keys are not allowed in the record.
-
-   extra-validator-fn? is an optional additional function that validates the record
-   value.
-
-   and opts+specs is passed through to defrecord, i.e., protocol/interface
-   definitions, etc."
-  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
-  [name field-schema & more-args]
-  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
-        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (process-arrow-schematized-args &env field-schema)]
-    `(do
-       (when-let [bad-keys# (seq (filter #(required-key? %)
-                                         (keys ~extra-key-schema?)))]
-         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
-                                        (vec bad-keys#)))))
-       (when ~extra-validator-fn?
-         (macros/assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                            (class ~extra-validator-fn?)))
-       (potemkin/defrecord+ ~name ~field-schema ~@more-args)
-       (declare-class-schema!
-        ~name
-        (plumbing/assoc-when
-         (record ~name (merge ~(plumbing/for-map [k field-schema]
-                                 (keyword (clojure.core/name k))
-                                 (do (macros/assert-iae (symbol? k)
-                                                        "Non-symbol in record binding form: %s" k)
-                                     (extract-schema-form k)))
-                              ~extra-key-schema?))
-         :extra-validator-fn ~extra-validator-fn?))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
-                   " slower than ->x like the clojure.core version")
-             [~map-sym]
-             (let [base# (new ~(symbol (str name))
-                              ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
-                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
-               (if (seq remaining#)
-                 (merge base# remaining#)
-                 base#))))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
-                   " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym]
-             (when-not (= (count ~map-sym) ~(count field-schema))
-               (throw (RuntimeException. (format "Record has wrong set of keys: %s"
-                                                 (data/diff (set (keys ~map-sym))
-                                                            ~(set (map keyword field-schema)))))))
-             (new ~(symbol (str name))
-                  ~@(map (fn [s] `(plumbing/safe-get ~map-sym ~(keyword s))) field-schema)))))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
@@ -727,8 +564,6 @@
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
 
 
-(ns-unmap *ns* 'fn)
-
 (clojure.core/defn ^Fn fn-schema
   "Produce the schema for a fn.  Since storing metadata on fns currently
    destroys their primitive-ness, and also adds an extra layer of fn call
@@ -752,9 +587,11 @@
   [f]
   (.output-schema (fn-schema f)))
 
-(definterface PSimpleCell
-  (get_cell ^boolean [])
-  (set_cell [^boolean x]))
+(#+clj definterface
+       #+cljs defprotocol
+       PSimpleCell
+       (get_cell ^boolean [])
+       (set_cell [^boolean x]))
 
 ;; adds ~5% overhead compared to no check
 (deftype SimpleVCell [^:volatile-mutable ^boolean q]
@@ -768,149 +605,17 @@
    when it is false."
   (SimpleVCell. false))
 
-(defmacro with-fn-validation [& body]
-  `(do (.set_cell use-fn-validation true)
-       ~@body
-       (.set_cell use-fn-validation false)))
-
-;; Helpers for the macro magic
-
-(defn- single-arg-schema-form [[index arg]]
-  `(one
-    ~(extract-schema-form arg)
-    ~(if (symbol? arg)
-       (name arg)
-       (str "arg" index))))
-
-(defn- rest-arg-schema-form [arg]
-  (let [s (extract-schema-form arg)]
-    (if (= s Top)
-      [Top]
-      (do (macros/assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
-          s))))
-
-(defn- input-schema-form [regular-args rest-arg]
-  (let [base (mapv single-arg-schema-form (plumbing/indexed regular-args))]
-    (if rest-arg
-      (vec (concat base (rest-arg-schema-form rest-arg)))
-      base)))
-
-(defn- split-rest-arg [bind]
-  (let [[pre-& post-&] (split-with #(not= % '&) bind)]
-    (if (seq post-&)
-      (do (macros/assert-iae (= (count post-&) 2) "Got more than 1 symbol after &: %s" (vec post-&))
-          (macros/assert-iae (symbol? (second post-&)) "Got non-symbol after & (currently unsupported): %s" (vec post-&))
-          [(vec pre-&) (last post-&)])
-      [bind nil])))
-
-(defn- process-fn-arity
-  "Process a single (bind & body) form, producing an output tag, schema-form,
-   and arity-form which has asserts for validation purposes added that are
-   executed when turned on, and have very low overhead otherwise.
-   tag? is a prospective tag for the fn symbol based on the output schema.
-   schema-bindings are bindings to lift eval outwards, so we don't build the schema
-   every time we do the validation."
-  [env output-schema-sym bind-meta [bind & body]]
-  (macros/assert-iae (vector? bind) "Got non-vector binding form %s" bind)
-  (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
-  (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
-        [regular-args rest-arg] (split-rest-arg bind)
-        input-schema-sym (gensym "input-schema")]
-    {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
-     :arity-form (if true
-                   (let [bind-syms (vec (repeatedly (count regular-args) gensym))
-                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
-                     (list
-                      (if rest-arg
-                        (-> metad-bind-syms (conj '&) (conj rest-arg))
-                        metad-bind-syms)
-                      `(let ~(vec (interleave (map #(with-meta % {}) bind) bind-syms))
-                         (let [validate# (.get_cell ~'ufv)]
-                           (when validate#
-                             (validate
-                              ~input-schema-sym
-                              ~(if rest-arg
-                                 `(list* ~@bind-syms ~rest-arg)
-                                 bind-syms)))
-                           (let [o# (do ~@body)]
-                             (when validate# (validate ~output-schema-sym o#))
-                             o#)))))
-                   (cons bind body))}))
-
-(defn- process-fn-
-  "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
-  [env name fn-body]
-  (let [output-schema (extract-schema-form name)
-        output-schema-sym (gensym "output-schema")
-        bind-meta (or (when-let [t (:tag (meta name))]
-                        (when (primitive-sym? t)
-                          {:tag t}))
-                      {})
-        processed-arities (map (partial process-fn-arity env output-schema-sym bind-meta)
-                               (if (vector? (first fn-body))
-                                 [fn-body]
-                                 fn-body))
-        schema-bindings (map :schema-binding processed-arities)
-        fn-forms (map :arity-form processed-arities)]
-    {:schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
-     :schema-form `(make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
-     :fn-form `(let [^schema.core.PSimpleCell ~'ufv use-fn-validation]
-                 (clojure.core/fn ~name
-                   ~@fn-forms))}))
+(ns-unmap *ns* 'fn)
 
 ;; Finally we get to the prize
-
-(defmacro fn
-  "Like clojure.core/fn, except that schema-style typehints can be given on the argument
-   symbols and on the arguemnt vector (for the return value), and (for now)
-   schema metadata is only processed at the top-level.  i.e., you can use destructuring,
-   but you must put schema metadata on the top level arguments and not on the destructured
-   shit.  The only unsupported form is the '& {}' map destructuring.
-
-   This produces a fn that you can call fn-schema on to get a schema back.
-   This is currently done using metadata for fns, which currently causes
-   clojure to wrap the fn in an outer non-primitive layer, so you may pay double
-   function call cost and lose the benefits of primitive type hints.
-
-   When compile-fn-validation is true (at compile-time), also automatically
-   generates pre- and post-conditions on each arity that validate the input and output
-   schemata whenever *use-fn-validation* is true (at run-time)."
-  [& fn-args]
-  (let [[name more-fn-args] (if (symbol? (first fn-args))
-                              (extract-arrow-schematized-element &env fn-args)
-                              ["fn" fn-args])
-        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-fn-args)]
-    `(let ~schema-bindings
-       (with-meta ~fn-form ~{:schema schema-form}))))
-
-(defmacro defn
-  "defn : clojure.core/defn :: fn : clojure.core/fn.
-
-   Things of note:
-    - Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions
-    - The '& {}' map destructing form is not supported
-    - fn-schema works on the class of the fn, so primitive hints are supported and there
-      is no overhead, unlike with 'fn' above
-    - Output metadata always goes on the argument vector.  If you use the same bare
-      class on every arity, this will automatically propagate to the tag on the name."
-  [& defn-args]
-  (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
-        [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
-        [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
-    `(let ~schema-bindings
-       (def ~(with-meta name
-               (plumbing/assoc-when (or attr-map? {})
-                                    :doc doc-string?
-                                    :schema schema-form
-                                    :tag (let [t (:tag (meta name))]
-                                           (when-not (primitive-sym? t)
-                                             t))))
-         ~fn-form)
-       (declare-class-schema! (class ~name) ~schema-form))))
-
-
-
+;; In Clojure, we can keep the macros in this file
+#+clj
+(potemkin/import-vars
+ macros/with-fn-validation
+ macros/=>
+ macros/=>*
+ macros/defrecord
+ macros/fn
+ macros/defn)
 
 #+clj (set! *warn-on-reflection* false)

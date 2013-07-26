@@ -43,7 +43,7 @@
                    :output-path "target/generated/cljs/test"
                    :rules :cljs}]}
 
-  :hooks [leiningen.cljsbuild]
+  ;; :hooks [leiningen.cljsbuild]
 
   :cljsbuild {:builds [{:source-paths ["target/generated/cljs/src"]
                         :compiler {:output-to "target/main.js"

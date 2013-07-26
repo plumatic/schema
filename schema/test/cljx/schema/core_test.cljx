@@ -263,7 +263,7 @@
 ;;; Schematized defrecord
 
 (defmacro test-normalized-meta [symbol ex-schema desired-meta]
-  (let [normalized (#'s/normalized-metadata &env symbol ex-schema)]
+  (let [normalized (schema.macros/normalized-metadata &env symbol ex-schema)]
     `(do (is (= '~symbol '~normalized))
          (is (= ~(select-keys desired-meta [:schema :tag])
                 ~(select-keys (meta normalized) [:schema :tag]))))))
@@ -280,9 +280,9 @@
   (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
 
 (defmacro test-meta-extraction [meta-form arrow-form]
-  (let [meta-ized (#'s/process-arrow-schematized-args {} arrow-form)]
+  (let [meta-ized (schema.macros/process-arrow-schematized-args {} arrow-form)]
     `(do (is (= '~meta-form '~meta-ized))
-         (is (= ~(mapv #(select-keys (meta (#'s/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
+         (is (= ~(mapv #(select-keys (meta (schema.macros/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
                 ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
 
 (deftest extract-arrow-schematized-args-test
@@ -390,9 +390,9 @@
 ;; helpers
 
 (deftest split-rest-arg-test
-  (is (= (@#'s/split-rest-arg ['a '& 'b])
+  (is (= (schema.macros/split-rest-arg ['a '& 'b])
          '[[a] b]))
-  (is (= (@#'s/split-rest-arg ['a 'b])
+  (is (= (schema.macros/split-rest-arg ['a 'b])
          '[[a b] nil])))
 
 ;;; fn
