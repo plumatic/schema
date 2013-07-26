@@ -49,7 +49,6 @@
   #+clj (:refer-clojure :exclude [defrecord defn])
   (:require
    [clojure.string :as str]
-   [plumbing.core :as plumbing]
    #+clj
    potemkin
    #+clj
@@ -65,6 +64,7 @@
 
 (deftype ValidationError [schema value expectation-delay])
 
+#+clj
 (defmethod print-method ValidationError [^ValidationError err writer]
   (print-method (list 'not @(.expectation-delay err)) writer))
 
