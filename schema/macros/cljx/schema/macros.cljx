@@ -7,9 +7,10 @@
 ;; TODO: rename to be more platform agnostic
 
 (defmacro error! [& format-args]
-  #+clj `(throw (IllegalArgumentException. (format ~@format-args)))
+  #+clj  `(throw (RuntimeException. (format ~@format-args)))
   #+cljs `(throw js/Error (format ~@format-args)))
 
+;; TODO(ah) make assert!
 (defmacro assert-iae
   "Like assert, but throws an IllegalArgumentException and takes args to format"
   [form & format-args]
@@ -40,7 +41,8 @@
       tag))
 
 
-;; TODO(ah) copy from plumbing
+;; TODO(ah) copied from plumbing. explain why
+
 (clojure.core/defn assoc-when
   "Like assoc but only assocs when value is truthy"
   [m & kvs]
@@ -50,17 +52,6 @@
               :when v]
           [k v])))
 
-(defmacro lazy-get
-  "Like get but lazy about default"
-  [m k d]
-  `(if-let [pair# (find ~m ~k)]
-     (val pair#)
-     ~d))
-
-(clojure.core/defn safe-get
-  "Like get but throw an exception if not found"
-  [m k]
-  (lazy-get m k (error! "Key %s not found in %s" k m)))
 
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
@@ -78,7 +69,7 @@
                 "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
     (let [schema (fix-protocol-tag
                   env
-                  (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Top))]
+                  (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Anything))]
       (with-meta imeta
         (-> (or (meta imeta) {})
             (dissoc :tag :s :s? :schema)
@@ -188,7 +179,7 @@
                                                  (data/diff (set (keys ~map-sym))
                                                             ~(set (map keyword field-schema)))))))
              (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
+                  ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 (defmacro with-fn-validation [& body]
   `(do (.set_cell schema.core/use-fn-validation true)
@@ -212,8 +203,8 @@
 
 (clojure.core/defn rest-arg-schema-form [arg]
   (let [s (extract-schema-form arg)]
-    (if (= s `schema.core/Top)
-      [`schema.core/Top]
+    (if (= s `schema.core/Anything)
+      [`schema.core/Anything]
       (do (assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 

@@ -203,12 +203,19 @@
 
 ;; protocol
 
+(clojure.core/defn safe-get
+  "Like get but throw an exception if not found"
+  [m k]
+  (if-let [pair (find m k)]
+    (val pair)
+    (macros/error! "Key %s not found in %s" k m)))
+
 (clojure.core/defrecord Protocol [p]
   Schema
   (check [this x]
          (when-not (satisfies? p x)
            (macros/validation-error this x (list 'satisfies? p (value-name x)))))
-  (explain [this] (cons 'protocol (plumbing/safe-get p :var))))
+  (explain [this] (cons 'protocol (safe-get p :var))))
 
 (clojure.core/defn protocol [p]
   (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
@@ -223,15 +230,13 @@
 ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
 ;; loses type info, which makes this unusable in schema-fn.
 ;; http://dev.clojure.org/jira/browse/CLJ-1196
-(clojure.core/defrecord Anything [_]
+(clojure.core/defrecord AnythingSchema [_]
   Schema
   (check [this x])
   (explain [this] 'anything))
 
-(def +anything+ (Anything. nil))
 
-(def Top "in case you like type theory" +anything+)
-
+(def Anything (AnythingSchema. nil))
 
 ;; either
 
@@ -345,7 +350,7 @@
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.k ^RequiredKey ks)
         (instance? OptionalKey ks) (.k ^OptionalKey ks)
-        :else (throw (RuntimeException. (format "Bad explicit key: %s" ks)))))
+        :else (macros/error! "Bad explicit key: %s" ks)))
 
 (defn- specific-key? [ks]
   (or (required-key? ks)
@@ -406,7 +411,7 @@
           k
           (list (cond (instance? RequiredKey k) 'required-key
                       (instance? OptionalKey k) 'optional-key)
-                (plumbing/safe-get k :k)))
+                (safe-get k :k)))
         (explain k))
       (explain v))))
 
@@ -572,7 +577,7 @@
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (class f))
   (or (class-schema (class f))
-      (plumbing/safe-get (meta f) :schema)))
+      (safe-get (meta f) :schema)))
 
 (clojure.core/defn input-schema
   "Convenience method for fns with single arity"
