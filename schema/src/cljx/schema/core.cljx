@@ -80,12 +80,18 @@
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
 
-(defn- value-name
+
+(clojure.core/defn type-of [x]
+  #+clj (class x)
+  #+cljs (js* "typeof ~{}" x))
+
+(clojure.core/defn- value-name
   "Provide a descriptive short name for a value."
   [value]
-  (if (< (count (str value)) 20) value (symbol (str "a-"
-                                                    #+clj (.getName (class value))
-                                                    #+cljs (js* "typeof ~{}" value)))))
+  (let [t (type-of value)]
+    (if (< (count (str value)) 20)
+      value
+      (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
 ;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
 ;; check and produces the validation-error automatically somehow.
@@ -149,8 +155,9 @@
   (check [this x]
     (try (when-not (this x)
            (macros/validation-error this x (list this (value-name x))))
-         (catch Throwable t
-           (macros/validation-error this x (list 'thrown? t (list this (value-name x)))))))
+         (catch #+clj Throwable #+cljs js/Error
+                t
+                (macros/validation-error this x (list 'thrown? t (list this (value-name x)))))))
   (explain [this] this))
 
 ;; prevent coersion, so you have to be exactly the given type.
@@ -405,15 +412,16 @@
       (macros/validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
       (check-map this x)))
   (explain [this]
-    (plumbing/for-map [[k v] this]
-      (if (specific-key? k)
-        (if (keyword? k)
-          k
-          (list (cond (instance? RequiredKey k) 'required-key
-                      (instance? OptionalKey k) 'optional-key)
-                (safe-get k :k)))
-        (explain k))
-      (explain v))))
+    (into {}
+          (for [[k v] this]
+            [ (if (specific-key? k)
+                (if (keyword? k)
+                  k
+                  (list (cond (instance? RequiredKey k) 'required-key
+                              (instance? OptionalKey k) 'optional-key)
+                        (safe-get k :k)))
+                (explain k))
+              (explain v)]))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -440,8 +448,8 @@
     (or (when (instance? java.util.Map x)
           (macros/validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
         (when (try (seq x) true
-                   (catch Exception e
-                     (macros/validation-error this x (list 'throws (list 'seq (value-name x)))))))
+                   (catch #+clj Exception #+cljs js/Error e
+                          (macros/validation-error this x (list 'throws (list 'seq (value-name x)))))))
         (let [[singles multi] (split-singles this)]
           (loop [singles singles x x out []]
             (if-let [[^One first-single & more-singles] (seq singles)]
@@ -508,8 +516,8 @@
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
   [klass schema]
-  (macros/assert-iae (class? klass) "Expected record class, got %s" (class klass))
-  (macros/assert-iae (map? schema) "Expected map, got %s" (class schema))
+  #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (type-of klass))
+  (macros/assert-iae (map? schema) "Expected map, got %s" (type-of schema))
   (Record. klass schema))
 
 
@@ -575,8 +583,8 @@
    overhead, we store the schema on the class when we can (for defns)
    and on metadata otherwise (for fns)."
   [f]
-  (macros/assert-iae (fn? f) "Non-function %s" (class f))
-  (or (class-schema (class f))
+  (macros/assert-iae (fn? f) "Non-function %s" (type-of f))
+  (or (class-schema (type-of f))
       (safe-get (meta f) :schema)))
 
 (clojure.core/defn input-schema
@@ -592,11 +600,15 @@
   [f]
   (.output-schema (fn-schema f)))
 
-(#+clj definterface
-       #+cljs defprotocol
-       PSimpleCell
-       (get_cell ^boolean [])
-       (set_cell [^boolean x]))
+#+clj
+(definterface PSimpleCell
+  (get_cell ^boolean [])
+  (set_cell [^boolean x]))
+
+#+cljs
+(defprotocol PSimpleCell
+  (get-cell [this])
+  (set-cell [this x]))
 
 ;; adds ~5% overhead compared to no check
 (deftype SimpleVCell [^:volatile-mutable ^boolean q]
@@ -610,6 +622,7 @@
    when it is false."
   (SimpleVCell. false))
 
+#+clj
 (ns-unmap *ns* 'fn)
 
 ;; Finally we get to the prize
