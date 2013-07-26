@@ -51,9 +51,11 @@
    [clojure.data :as data]
    [clojure.string :as str]
    [plumbing.core :as plumbing]
-   potemkin))
+   potemkin
+   #+clj [schema.macros :as macros])
+  #+cljs (:require-macros [schema.macros :as macros]))
 
-(set! *warn-on-reflection* true)
+#+clj (set! *warn-on-reflection* true)
 
 ;; TODO: better error messages for fn schema validation
 ;; TODO: sequences have to support optional args before final to handle
@@ -61,11 +63,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
-
-(defmacro assert-iae
-  "Like assert, but throws an IllegalArgumentException and takes args to format"
-  [form & format-args]
-  `(when-not ~form (throw (IllegalArgumentException. (format ~@format-args)))))
 
 (defprotocol Schema
   (check [this x]
@@ -75,18 +72,12 @@
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
 
-(deftype ValidationError [schema value expectation-delay])
-
-(defmethod print-method ValidationError [^ValidationError err writer]
-  (print-method (list 'not @(.expectation-delay err)) writer))
-
-(defmacro validation-error [schema value expectation]
-  `(ValidationError. ~schema ~value (delay ~expectation)))
-
 (defn- value-name
   "Provide a descriptive short name for a value."
   [value]
-  (if (< (count (str value)) 20) value (symbol (str "a-" (.getName (class value))))))
+  (if (< (count (str value)) 20) value (symbol (str "a-"
+                                                    #+clj (.getName (class value))
+                                                    #+cljs (js* "typeof ~{}" value)))))
 
 ;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
 ;; check and produces the validation-error automatically somehow.
@@ -94,38 +85,43 @@
 (clojure.core/defn validate [schema value]
   (let [error (check schema value)]
     (when error
-      (throw (IllegalArgumentException. (format "Value does not match schema: %s" error))))))
+      (let [error-msg (format "Value does not match schema: %s" error)]
+        #+clj (throw (IllegalArgumentException. error-msg))
+        #+cljs (throw js/Error error-msg)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
 
-;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))
-;; is too slow in practice, so for now we leak classes.  Figure out a concurrent, fast,
-;; weak alternative.
-(def ^java.util.Map +class-schemata+
-  (java.util.concurrent.ConcurrentHashMap.))
-
-;; Can we do this in a way that respects hierarchy?
-;; can do it with defmethods,
-(clojure.core/defn declare-class-schema!
-  "Globally set the schema for a class (above and beyond a simple instance? check).
+#+clj
+(let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
+  ;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))
+  ;; is too slow in practice, so for now we leak classes.  Figure out a concurrent, fast,
+  ;; weak alternative.
+  (clojure.core/defn declare-class-schema! [klass schema]
+    "Globally set the schema for a class (above and beyond a simple instance? check).
    Use with care, i.e., only on classes that you control.  Also note that this
    schema only applies to instances of the concrete type passed, i.e.,
    (= (class x) klass), not (instance? klass x)."
-  [klass schema]
-  (assert-iae (class? klass) "Cannot declare class schema for non-class %s" (class klass))
-  (.put +class-schemata+ klass schema))
+    (macros/assert-iae (class? klass) "Cannot declare class schema for non-class %s" (class klass))
+    (.put +class-schemata+ klass schema))
 
-(clojure.core/defn class-schema
-  "The last schema for a class set by declare-class-schema!, or nil."
-  [klass]
-  (.get +class-schemata+ klass))
+  (clojure.core/defn class-schema [klass]
+    "The last schema for a class set by declare-class-schema!, or nil."
+    (.get +class-schemata+ klass)))
 
+#+cljs
+(let [+class-schemata+ (js-obj)]
+  (clojure.core/defn declare-class-schema! [klass schema]
+    (aset +class-schemata+ klass schema))
+
+  (clojure.core/defn class-schema [klass]
+    (aget +class-schemata+ klass)))
 
 (defn- check-class [schema class value]
   (when-not (instance? class value)
-    (validation-error schema value (list 'instance? class (value-name value)))))
+    (macros/validation-error schema value (list 'instance? class (value-name value)))))
 
+#+clj
 (extend-protocol Schema
   Class
   (check [this x]
@@ -135,14 +131,18 @@
   (explain [this]
     (if-let [more-schema (class-schema this)]
       (explain more-schema)
-      (symbol (.getName ^Class this))))
+      (symbol (.getName ^Class this)))))
 
+(extend-protocol Schema
+  #+clj
   clojure.lang.AFn
+  #+cljs
+  js/Function
   (check [this x]
     (try (when-not (this x)
-           (validation-error this x (list this (value-name x))))
+           (macros/validation-error this x (list this (value-name x))))
          (catch Throwable t
-           (validation-error this x (list 'thrown? t (list this (value-name x)))))))
+           (macros/validation-error this x (list 'thrown? t (list this (value-name x)))))))
   (explain [this] this))
 
 ;; prevent coersion, so you have to be exactly the given type.
@@ -153,14 +153,16 @@
        (check-class ~cast-sym ~class-sym x#))
      (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
 
-(extend-primitive clojure.core$double Double)
-(extend-primitive clojure.core$float Float)
-(extend-primitive clojure.core$long Long)
-(extend-primitive clojure.core$int Integer)
-(extend-primitive clojure.core$short Short)
-(extend-primitive clojure.core$char Character)
-(extend-primitive clojure.core$byte Byte)
-(extend-primitive clojure.core$boolean Boolean)
+#+clj
+(do
+  (extend-primitive clojure.core$double Double)
+  (extend-primitive clojure.core$float Float)
+  (extend-primitive clojure.core$long Long)
+  (extend-primitive clojure.core$int Integer)
+  (extend-primitive clojure.core$short Short)
+  (extend-primitive clojure.core$char Character)
+  (extend-primitive clojure.core$byte Byte)
+  (extend-primitive clojure.core$boolean Boolean))
 
 ;; TODO: abstract these into predicates?
 ;; single required value
@@ -169,7 +171,7 @@
   Schema
   (check [this x]
          (when-not (= v x)
-           (validation-error this x (list '= v (value-name x)))))
+           (macros/validation-error this x (list '= v (value-name x)))))
   (explain [this] (cons '= v)))
 
 (clojure.core/defn eq
@@ -183,7 +185,7 @@
   Schema
   (check [this x]
          (when-not (contains? vs x)
-           (validation-error this x (list vs (value-name x)))))
+           (macros/validation-error this x (list vs (value-name x)))))
   (explain [this] (cons 'enum vs)))
 
 (clojure.core/defn enum
@@ -197,11 +199,11 @@
   Schema
   (check [this x]
          (when-not (satisfies? p x)
-           (validation-error this x (list 'satisfies? p (value-name x)))))
+           (macros/validation-error this x (list 'satisfies? p (value-name x)))))
   (explain [this] (cons 'protocol (plumbing/safe-get p :var))))
 
 (clojure.core/defn protocol [p]
-  (assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
+  (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
 
@@ -228,7 +230,7 @@
   Schema
   (check [this x]
          (when (every? #(check % x) schemas)
-           (validation-error this x (list 'every? (list 'check '% (value-name x)) 'schemas))))
+           (macros/validation-error this x (list 'every? (list 'check '% (value-name x)) 'schemas))))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -243,7 +245,7 @@
   Schema
   (check [this x]
          (when-let [errors (seq (keep #(check % x) schemas))]
-           (validation-error this x (cons 'empty? [errors]))))
+           (macros/validation-error this x (cons 'empty? [errors]))))
   (explain [this] (cons 'both (map explain schemas))))
 
 (clojure.core/defn both
@@ -290,8 +292,8 @@
   (check [this x]
          (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
            (check match x)
-           (validation-error this x (list 'not-any? (list 'matches-pred? (value-name x))
-                                          (map first preds-and-schemas)))))
+           (macros/validation-error this x (list 'not-any? (list 'matches-pred? (value-name x))
+                                                 (map first preds-and-schemas)))))
   (explain [this]
            (list 'conditional (for [[pred schema] preds-and-schemas]
                                 [pred (explain schema)]))))
@@ -303,8 +305,8 @@
    Unlike cond, throws if the value does not match any condition.
    :else may be used as a final condition in the place of (constantly true)."
   [& preds-and-schemas]
-  (assert-iae (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
-              "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
+  (macros/assert-iae (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
+                     "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
   (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
                         [(if (= pred :else) (constantly true) pred) schema])))
 
@@ -342,9 +344,9 @@
 
 (defn- find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
-    (assert-iae (< (count key-schemata) 2)
-                "More than one non-optional/required key schemata: %s"
-                (vec key-schemata))
+    (macros/assert-iae (< (count key-schemata) 2)
+                       "More than one non-optional/required key schemata: %s"
+                       (vec key-schemata))
     (first key-schemata)))
 
 (defn- check-explicit-key
@@ -386,7 +388,7 @@
   clojure.lang.APersistentMap
   (check [this x]
     (if-not (map? x)
-      (validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
+      (macros/validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
       (check-map this x)))
   (explain [this]
     (plumbing/for-map [[k v] this]
@@ -422,16 +424,16 @@
   clojure.lang.APersistentVector
   (check [this x]
     (or (when (instance? java.util.Map x)
-          (validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
+          (macros/validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
         (when (try (seq x) true
                    (catch Exception e
-                     (validation-error this x (list 'throws (list 'seq (value-name x)))))))
+                     (macros/validation-error this x (list 'throws (list 'seq (value-name x)))))))
         (let [[singles multi] (split-singles this)]
           (loop [singles singles x x out []]
             (if-let [[^One first-single & more-singles] (seq singles)]
               (if (empty? x)
                 (conj out
-                      (validation-error (vec singles) nil (list 'has-enough-elts? (count singles))))
+                      (macros/validation-error (vec singles) nil (list 'has-enough-elts? (count singles))))
                 (recur more-singles
                        (rest x)
                        (conj out (check (.schema first-single) (first x)))))
@@ -439,7 +441,7 @@
                               (into out (map #(check multi %) x))
 
                               (seq x)
-                              (conj out (validation-error nil x (list 'has-extra-elts? (count x))))
+                              (conj out (macros/validation-error nil x (list 'has-extra-elts? (count x))))
 
                               :else
                               out)]
@@ -465,11 +467,11 @@
 (extend-protocol Schema
   clojure.lang.APersistentSet
   (check [this x]
-    (assert-iae (= (count this) 1) "Set schema must have exactly one element")
+    (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
     (or (when-not (set? x)
-          (validation-error this x (list 'set? (value-name x))))
+          (macros/validation-error this x (list 'set? (value-name x))))
         (when-let [out (seq (keep #(check (first this) %) x))]
-          (validation-error this x (set out)))))
+          (macros/validation-error this x (set out)))))
 
   (explain [this]
     (set (map explain this))))
@@ -482,7 +484,7 @@
   Schema
   (check [this r]
          (or (when-not (instance? klass r)
-               (validation-error this r (list 'instance? klass (value-name r))))
+               (macros/validation-error this r (list 'instance? klass (value-name r))))
              (check-map schema r)
              (when-let [f (:extra-validator-fn this)]
                (check f r))))
@@ -492,8 +494,8 @@
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
   [klass schema]
-  (assert-iae (class? klass) "Expected record class, got %s" (class klass))
-  (assert-iae (map? schema) "Expected map, got %s" (class schema))
+  (macros/assert-iae (class? klass) "Expected record class, got %s" (class klass))
+  (macros/assert-iae (map? schema) "Expected map, got %s" (class schema))
   (Record. klass schema))
 
 
@@ -522,19 +524,19 @@
     0))
 
 (clojure.core/defn make-fn-schema [output-schema input-schemas]
-  (assert-iae (seq input-schemas) "Function must have at least one input schema")
-  (assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
-  (assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
+  (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
+  (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
+  (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (Fn. output-schema (sort-by arity input-schemas)))
 
 (defn- parse-arity-spec [spec]
-  (assert-iae (vector? spec) "An arity spec must be a vector")
+  (macros/assert-iae (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
         fixed (mapv (fn [i s] `(one ~s ~(str "arg" i))) (range) init)]
     (if (empty? more)
       fixed
-      (do (assert-iae (and (= (count more) 2) (vector? (second more)))
-                      "An arity with & must be followed by a single sequence schema")
+      (do (macros/assert-iae (and (= (count more) 2) (vector? (second more)))
+                             "An arity with & must be followed by a single sequence schema")
           (into fixed (second more))))))
 
 (clojure.core/defmacro =>*
@@ -585,8 +587,8 @@
    object to have a valid Clojure :tag plus a :schema field."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
-    (assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
-                "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
+    (macros/assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
+                       "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
     (let [schema (fix-protocol-tag
                   env
                   (or s schema (when s? `(maybe ~s?)) explicit-schema tag Top))]
@@ -622,7 +624,7 @@
   "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
   [symbol]
   (let [s (:schema (meta symbol))]
-    (assert-iae s "%s is missing a schema" symbol)
+    (macros/assert-iae s "%s is missing a schema" symbol)
     s))
 
 (defn- maybe-split-first [pred s]
@@ -663,16 +665,16 @@
          (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
                                         (vec bad-keys#)))))
        (when ~extra-validator-fn?
-         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                     (class ~extra-validator-fn?)))
+         (macros/assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                            (class ~extra-validator-fn?)))
        (potemkin/defrecord+ ~name ~field-schema ~@more-args)
        (declare-class-schema!
         ~name
         (plumbing/assoc-when
          (record ~name (merge ~(plumbing/for-map [k field-schema]
                                  (keyword (clojure.core/name k))
-                                 (do (assert-iae (symbol? k)
-                                                 "Non-symbol in record binding form: %s" k)
+                                 (do (macros/assert-iae (symbol? k)
+                                                        "Non-symbol in record binding form: %s" k)
                                      (extract-schema-form k)))
                               ~extra-key-schema?))
          :extra-validator-fn ~extra-validator-fn?))
@@ -733,7 +735,7 @@
    overhead, we store the schema on the class when we can (for defns)
    and on metadata otherwise (for fns)."
   [f]
-  (assert-iae (fn? f) "Non-function %s" (class f))
+  (macros/assert-iae (fn? f) "Non-function %s" (class f))
   (or (class-schema (class f))
       (plumbing/safe-get (meta f) :schema)))
 
@@ -741,8 +743,8 @@
   "Convenience method for fns with single arity"
   [f]
   (let [input-schemas (.input-schemas (fn-schema f))]
-    (assert-iae (= 1 (count input-schemas))
-                "Expected single arity fn, got %s" (count input-schemas))
+    (macros/assert-iae (= 1 (count input-schemas))
+                       "Expected single arity fn, got %s" (count input-schemas))
     (first input-schemas)))
 
 (clojure.core/defn output-schema
@@ -784,7 +786,7 @@
   (let [s (extract-schema-form arg)]
     (if (= s Top)
       [Top]
-      (do (assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
+      (do (macros/assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 
 (defn- input-schema-form [regular-args rest-arg]
@@ -796,8 +798,8 @@
 (defn- split-rest-arg [bind]
   (let [[pre-& post-&] (split-with #(not= % '&) bind)]
     (if (seq post-&)
-      (do (assert-iae (= (count post-&) 2) "Got more than 1 symbol after &: %s" (vec post-&))
-          (assert-iae (symbol? (second post-&)) "Got non-symbol after & (currently unsupported): %s" (vec post-&))
+      (do (macros/assert-iae (= (count post-&) 2) "Got more than 1 symbol after &: %s" (vec post-&))
+          (macros/assert-iae (symbol? (second post-&)) "Got non-symbol after & (currently unsupported): %s" (vec post-&))
           [(vec pre-&) (last post-&)])
       [bind nil])))
 
@@ -809,7 +811,7 @@
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
   [env output-schema-sym bind-meta [bind & body]]
-  (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
+  (macros/assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
     (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
   (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
@@ -911,4 +913,4 @@
 
 
 
-(set! *warn-on-reflection* false)
+#+clj (set! *warn-on-reflection* false)

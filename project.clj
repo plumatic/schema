@@ -50,4 +50,8 @@
                                    :optimizations :whitespace
                                    :pretty-print true}}]}
 
-  :prep-tasks ["cljx" "javac" "compile"])
+  :prep-tasks ["cljx" "javac" "compile"]
+
+  :profiles {:dev {:dependencies [[com.keminglabs/cljx "0.3.0"]]
+                   :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
+                                                     cljx.repl-middleware/wrap-cljx]}}})
