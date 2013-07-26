@@ -97,11 +97,8 @@
 ;; check and produces the validation-error automatically somehow.
 
 (clojure.core/defn validate [schema value]
-  (let [error (check schema value)]
-    (when error
-      (let [error-msg (format "Value does not match schema: %s" error)]
-        #+clj (throw (IllegalArgumentException. error-msg))
-        #+cljs (throw js/Error error-msg)))))
+  (when-let [error (check schema value)]
+    (macros/error! "Value does not match schema: %s" error)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
