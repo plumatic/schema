@@ -144,6 +144,17 @@
       (explain more-schema)
       (symbol (.getName ^Class this)))))
 
+#+cljs
+(do
+  (extend-protocol Schema
+    js/String
+    (check [this x] (string? x))
+    (explain [this])
+
+    js/Number
+    (check [this x] (number? x))
+    (explain [this])))
+
 (extend-protocol Schema
   #+clj
   clojure.lang.AFn
@@ -241,9 +252,6 @@
   (check [this x])
   (explain [this] 'anything))
 
-
-(def Anything (AnythingSchema. nil))
-
 ;; either
 
 (clojure.core/defrecord Either [schemas]
@@ -330,6 +338,13 @@
   (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
                         [(if (= pred :else) (constantly true) pred) schema])))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Shared Schema leaves
+
+(def Any (AnythingSchema. nil))
+(def Str #+clj java.lang.String #+cljs js/String)
+(def Num #+clj java.lang.Number #+cljs js/Number)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata

@@ -89,9 +89,9 @@
 ;;; helpers/wrappers
 
 (deftest anything-test
-  (valid! s/Anything 1)
-  (valid! s/Anything nil)
-  (valid! s/Anything #{:hi :there}))
+  (valid! s/Any 1)
+  (valid! s/Any nil)
+  (valid! s/Any #{:hi :there}))
 
 (deftest either-test
   (let [schema (s/either
@@ -248,15 +248,15 @@
 (defrecord Foo [x ^long y])
 
 (deftest record-test
-  (let [schema (s/record Foo {:x s/Anything (s/optional-key :y) long})]
+  (let [schema (s/record Foo {:x s/Any (s/optional-key :y) long})]
     (valid! schema (Foo. :foo 1))
     (invalid! schema {:x :foo :y 1})
     (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
 
 (deftest record-with-extra-keys test
-  (let [schema (s/record Foo {:x s/Anything
+  (let [schema (s/record Foo {:x s/Any
                               :y long
-                              clojure.lang.Keyword s/Anything})]
+                              clojure.lang.Keyword s/Any})]
     (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
@@ -274,7 +274,7 @@
 (def ASchema [long])
 
 (deftest normalized-metadata-test
-  (testing "empty" (test-normalized-meta 'foo nil {:schema s/Anything}))
+  (testing "empty" (test-normalized-meta 'foo nil {:schema s/Any}))
   (testing "protocol" (test-normalized-meta ^ATestProtocol foo nil {:schema (s/protocol ATestProtocol)}))
   (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
   (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
@@ -404,7 +404,7 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (s/=> String OddLong s/Anything))
+  (s/=> String OddLong s/Any))
 
 (deftest simple-validated-meta-test
   (let [f (s/fn ^String foo [^OddLong arg0 arg1])]

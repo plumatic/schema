@@ -71,7 +71,7 @@
                 "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
     (let [schema (fix-protocol-tag
                   env
-                  (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Anything))]
+                  (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Any))]
       (with-meta imeta
         (-> (or (meta imeta) {})
             (dissoc :tag :s :s? :schema)
