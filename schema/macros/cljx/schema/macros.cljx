@@ -17,6 +17,8 @@
   `(when-not ~form
      (error! ~@format-args)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Map schemata
 (defmacro validation-error [schema value expectation]
   `(ValidationError. ~schema ~value (delay ~expectation)))
 
