@@ -11,7 +11,6 @@
 
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prismatic/cljs-test "0.0.6"]
-                 [prismatic/plumbing "0.1.0"]
                  [potemkin "0.3.0-SNAPSHOT"]]
 
   :source-paths ["target/generated/clj/src"]
@@ -28,6 +27,15 @@
                   {:source-paths ["schema/macros/cljx"]
                    :output-path "target/generated/clj/src"
                    :rules :clj}
+
+                  {:source-paths ["schema/macros-test"]
+                   :output-path "target/generated/clj/test"
+                   :rules :clj}
+
+                  {:source-paths ["schema/macros-test"]
+                   :output-path "target/generated/cljs/test"
+                   :rules {:filetype "clj"
+                           :features #{"cljs"}}}
 
                   {:source-paths ["schema/macros/cljx"]
                    :output-path "target/generated/cljs/src"

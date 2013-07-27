@@ -1,13 +1,14 @@
 (ns schema.core-test
+  #+clj (:use clojure.test schema.test-macros)
   #+cljs
   (:use-macros
-   [cljs-test.macros :only [is is= deftest]])
+   [cljs-test.macros :only [is is= deftest]]
+   [schema.test-macros :only [valid! invalid!]])
   #+cljs
   (:require-macros
    [schema.macros :as sm])
-  #+clj (:use clojure.test)
   (:require
-   potemkin
+   #+clj potemkin
    [schema.core :as s]
    #+clj [schema.macros :as sm]))
 
@@ -27,11 +28,6 @@
                                 :bar java.lang.String
                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schema validation
-
-(defmacro valid! [s x] `(is (do (s/validate ~s ~x) true)))
-(defmacro invalid! [s x] `(is (~'thrown? Exception (s/validate ~s ~x))))
 
 ;;; leaves
 
