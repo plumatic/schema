@@ -345,6 +345,11 @@
 (def Any (AnythingSchema. nil))
 (def Str #+clj java.lang.String #+cljs js/String)
 (def Num #+clj java.lang.Number #+cljs js/Number)
+(def Int
+  #+clj long
+  #+cljs
+  (fn [x]
+    (and (number? x) (identical? x (js/Math.floor x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
