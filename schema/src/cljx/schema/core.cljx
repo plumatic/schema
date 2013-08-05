@@ -350,6 +350,9 @@
   #+cljs
   (fn [x]
     (and (number? x) (identical? x (js/Math.floor x)))))
+(def Key
+  #+clj clojure.lang.Keyword
+  #+cljs cljs.core.Keyword)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
