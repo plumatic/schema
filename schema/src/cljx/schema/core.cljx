@@ -554,7 +554,7 @@
   #+clj Long/MAX_VALUE
   #+cljs js/Number.MAX_VALUE)
 
-(clojure.core/defrecord Fn [output-schema input-schemas] ;; input-schemas sorted by arity
+(clojure.core/defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
   (check [this x] nil) ;; TODO?
   (explain [this]
@@ -573,7 +573,7 @@
   (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
   (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
-  (Fn. output-schema (sort-by arity input-schemas)))
+  (FnSchema. output-schema (sort-by arity input-schemas)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -601,7 +601,7 @@
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
 
 
-(clojure.core/defn ^Fn fn-schema
+(clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a fn.  Since storing metadata on fns currently
    destroys their primitive-ness, and also adds an extra layer of fn call
    overhead, we store the schema on the class when we can (for defns)
