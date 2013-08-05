@@ -32,8 +32,8 @@
 ;;; leaves
 
 (deftest class-test
-  (valid! String "foo")
-  (invalid! String :foo))
+  (valid! s/Str "foo")
+  (invalid! s/Str :foo))
 
 (deftest fn-test
   (valid! odd? 1)
@@ -41,24 +41,26 @@
   (invalid! #(/ % 0) 2)
   (invalid! odd? :foo))
 
-(deftest primitive-test
-  (valid! float (float 1.0))
-  (invalid! float 1.0)
-  (valid! double 1.0)
-  (invalid! double (float 1.0))
-  (valid! boolean true)
-  (invalid! boolean 1)
-  (doseq [f [byte char short int]]
-    (valid! f (f 1))
-    (invalid! f 1))
-  (valid! long 1)
-  (invalid! long (byte 1)))
+#+clj
+(do
+  (deftest primitive-test
+    (valid! float (float 1.0))
+    (invalid! float 1.0)
+    (valid! double 1.0)
+    (invalid! double (float 1.0))
+    (valid! boolean true)
+    (invalid! boolean 1)
+    (doseq [f [byte char short int]]
+      (valid! f (f 1))
+      (invalid! f 1))
+    (valid! long 1)
+    (invalid! long (byte 1)))
 
-(deftest array-test
-  (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
-  (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
-  (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
-  (valid! (Class/forName "[D") (double-array [1.0])))
+  (deftest array-test
+    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
+    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
+    (valid! (Class/forName "[D") (double-array [1.0]))))
 
 (deftest eq-test
   (let [schema (s/eq 10)]
@@ -95,37 +97,37 @@
 
 (deftest either-test
   (let [schema (s/either
-                {(s/required-key :l) long}
-                {(s/required-key :d) double})]
-    (valid! schema {:l 1})
-    (valid! schema {:d 1.0})
-    (invalid! schema {:l 1.0})
-    (invalid! schema {:d 1})))
+                {:num s/Int}
+                {:str s/Str})]
+    (valid! schema {:num 1})
+    (valid! schema {:str "hello"})
+    (invalid! schema {:num "bad!"})
+    (invalid! schema {:str 1})))
 
 (deftest both-test
   (let [schema (s/both
                 (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m))
-                {clojure.lang.Keyword clojure.lang.Keyword})]
+                {s/Key s/Key})]
     (valid! schema {})
     (valid! schema {:foo :foo :bar :bar})
     (invalid! schema {"foo" "foo"})
     (invalid! schema {:foo :bar})))
 
 (deftest maybe-test
-  (let [schema (s/maybe long)]
-    (is (= schema (s/? long)))
+  (let [schema (s/maybe s/Int)]
+    (is (= schema (s/? s/Int)))
     (valid! schema nil)
     (valid! schema 1)
     (invalid! schema 1.0)))
 
 (deftest named-test
-  (let [schema [(s/one String "topic") (s/one (s/named double "score") "asdf")]]
+  (let [schema [(s/one s/Str "topic") (s/one (s/named s/Num "score") "asdf")]]
     (valid! schema ["foo" 1.0])
     (invalid! schema [1 2])))
 
 (deftest conditional-test
-  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz Long}
-                              #(= (:type %) :bar) {:type (s/eq :bar) :baz String})]
+  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Num}
+                              #(= (:type %) :bar) {:type (s/eq :bar) :baz s/Str})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
@@ -137,8 +139,8 @@
 ;;; maps
 
 (deftest simple-map-schema-test
-  (let [schema {(s/required-key :foo) long
-                (s/required-key :bar) double}]
+  (let [schema {:foo long
+                :bar double}]
     (valid! schema {:foo 1 :bar 2.0})
     (invalid! schema [[:foo 1] [:bar 2.0]])
     (invalid! schema {:foo 1 :bar 2.0 :baz 1})
