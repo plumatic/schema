@@ -373,7 +373,7 @@
 
 ;; Now test that schemata and protocols work as type hints.
 
-(def LongOrString (s/either long String))
+(def LongOrString (s/either s/Int s/Str))
 
 (sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
 
@@ -409,19 +409,21 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (s/=> String OddLong s/Any))
+  (s/=> s/Str OddLong s/Any))
 
 (deftest simple-validated-meta-test
-  (let [f (s/fn ^String foo [^OddLong arg0 arg1])]
+  (let [f (s/fn ^s/Str foo [^OddLong arg0 arg1])]
     (def s2 (s/fn-schema f))
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
-  (let [f (s/fn ^{:s even?} test-fn [^long x ^{:s {(s/required-key :foo) (s/both long odd?)}} y]
+  (let [f (s/fn test-fn :- even?
+            [^s/Int x ^{:s {:foo (s/both s/Int odd?)}} y]
             (+ x (:foo y -100)))]
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
-      (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
+      ;; Primitive Interface Test
+      #+clj (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
       (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
       (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?
 
@@ -430,44 +432,44 @@
     (is (= 5 (f 2 {:foo 3})))  ;; return not even?
     ))
 
+(defn parse-long [x]
+  #+clj (Long/parseLong x)
+  #+cljs (js/parseInt x))
+
 (deftest destructured-validated-fn-test
-  (let [LongPair [(s/one long "x") (s/one long "y")]
-        f (s/fn ^long foo [^{:s LongPair} [x y] ^long arg1]
+  (let [LongPair [(s/one s/Int "x") (s/one s/Int "y")]
+        f (s/fn foo :- s/Int
+            [^LongPair [x y] ^s/Int arg1]
             (+ x y arg1))]
-    (is (= (s/=> long LongPair long)
+    (is (= (s/=> s/Int LongPair s/Int)
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 6 (f [1 2] 3)))
-      (is (thrown? Exception (f [(Integer. 1) 2] 3))))))
+      (is (thrown? Exception (f ["a" 2] 3))))))
 
 (deftest two-arity-fn-test
-  (let [f (s/fn ^long foo
-            ([^String arg0 ^long arg1] (+ arg1 (foo arg0)))
-            ([^String arg0] (Long/parseLong arg0)))]
-    (is (= (s/=>* long [String] [String long])
+  (let [f (s/fn foo :- s/Int
+            ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
+            ([^String arg0] (parse-long arg0)))]
+    (is (= (s/=>* s/Int [s/Str] [s/Str s/Int])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
     (is (= 10 (f "3" 7)))))
 
 (deftest infinite-arity-fn-test
-  (let [f (s/fn ^Long foo
-            ([^Long arg0] (inc arg0))
-            ([^Long arg0 & ^{:s [String]} strs]
+  (let [f (s/fn foo :- s/Int
+            ([^s/Int arg0] (inc arg0))
+            ([^s/Int arg0  & ^{:s [s/Str]} strs]
                (reduce + (foo arg0) (map count strs))))]
-    (is (= (s/=>* Long [Long] [Long & [String]])
+    (is (= (s/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 5 (f 4)))
       (is (= 16 (f 4 "55555" "666666")))
-      (is (thrown? Exception (f (int 4) "55555" "666666")))
       (is (thrown? Exception (f 4 [3 3 3]))))))
 
 
 ;;; defn
-
-(defn parse-long [x]
-  #+clj (Long/parseLong x)
-  #+cljs (js/parseInt x))
 
 (def OddLongString
   (s/both s/Str #(odd? (parse-long %))))
