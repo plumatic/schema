@@ -144,7 +144,6 @@
       (explain more-schema)
       (symbol (.getName ^Class this)))))
 
-;; TODO(ah) replace with macros
 #+cljs
 (do
   (extend-protocol Schema
@@ -347,11 +346,10 @@
 (def Str #+clj java.lang.String #+cljs js/String)
 (def Num #+clj java.lang.Number #+cljs js/Number)
 (def Int
-  #+clj integer?
+  #+clj long
   #+cljs
   (fn [x]
     (and (number? x) (identical? x (js/Math.floor x)))))
-(def Keyword #+clj clojure.lang.Keyword #+cljs cljs.core.Keyword)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
@@ -427,11 +425,10 @@
       (into {} errors))))
 
 (extend-protocol Schema
-  #+clj clojure.lang.APersistentMap
-  #+cljs cljs.core.PersistentArrayMap
+  clojure.lang.APersistentMap
   (check [this x]
     (if-not (map? x)
-      (macros/validation-error this x (list 'map? (value-name x)))
+      (macros/validation-error this x (list 'instance? 'clojure.lang.APersistentMap (value-name x)))
       (check-map this x)))
   (explain [this]
     (into {}
@@ -465,8 +462,7 @@
     [(butlast this) (last this)]))
 
 (extend-protocol Schema
-  #+clj clojure.lang.APersistentVector
-  #+cljs cljs.core.PersistentVector
+  clojure.lang.APersistentVector
   (check [this x]
     (or (when (instance? java.util.Map x)
           (macros/validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
@@ -510,8 +506,7 @@
 ;; which roughly corresponds to the 'more-keys' part of map schemas
 
 (extend-protocol Schema
-  #+clj clojure.lang.APersistentSet
-  #+cljs cljs.core.PersistentHashSet
+  clojure.lang.APersistentSet
   (check [this x]
     (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
     (or (when-not (set? x)
@@ -552,11 +547,9 @@
 ;; We make the assumption that for sanity, a function can only have a single output schema,
 ;; over all arities.
 
-(def +infinite-arity+
-  #+clj Long/MAX_VALUE
-  #+cljs js/Number.MAX_VALUE)
+(def +infinite-arity+ Long/MAX_VALUE)
 
-(clojure.core/defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
+(clojure.core/defrecord Fn [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
   (check [this x] nil) ;; TODO?
   (explain [this]
@@ -575,7 +568,7 @@
   (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
   (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
-  (FnSchema. output-schema (sort-by arity input-schemas)))
+  (Fn. output-schema (sort-by arity input-schemas)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -603,7 +596,7 @@
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
 
 
-(clojure.core/defn ^FnSchema fn-schema
+(clojure.core/defn ^Fn fn-schema
   "Produce the schema for a fn.  Since storing metadata on fns currently
    destroys their primitive-ness, and also adds an extra layer of fn call
    overhead, we store the schema on the class when we can (for defns)
