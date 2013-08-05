@@ -291,14 +291,14 @@
   (let [meta-ized (schema.macros/process-arrow-schematized-args {} arrow-form)]
     `(do (is (= '~meta-form '~meta-ized))
          (is (= ~(mapv #(select-keys (meta (schema.macros/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
-                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized)))))
+                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
 
-  (deftest extract-arrow-schematized-args-test
-    (testing "empty" (test-meta-extraction [] []))
-    (testing "no-tag" (test-meta-extraction [x] [x]))
-    (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
-    (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
+(deftest extract-arrow-schematized-args-test
+  (testing "empty" (test-meta-extraction [] []))
+  (testing "no-tag" (test-meta-extraction [x] [x]))
+  (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
+  (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
+  (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
 
 (potemkin/defprotocol+ PProtocol
   (do-something [this]))
@@ -331,7 +331,7 @@
                         (s/optional-key :baz) s/Key})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
-  (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
+  ;; (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
   (valid! Bar (Bar. 1 "test"))
   (invalid! Bar (Bar. 1 :foo))
   (valid! Bar (assoc (Bar. 1 "test") :baz :foo))
@@ -363,7 +363,7 @@
                                 (s/optional-key :baz) s/Key})))
   (is (BarNewStyle. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->BarNewStyle {:foo 1})))))
-  (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
+  ;; (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
   (valid! BarNewStyle (BarNewStyle. 1 "test"))
   (invalid! BarNewStyle (BarNewStyle. 1 :foo))
   (valid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baz :foo))
