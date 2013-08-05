@@ -465,8 +465,12 @@
 
 ;;; defn
 
+(defn parse-long [x]
+  #+clj (Long/parseLong x)
+  #+cljs (js/parseInt x))
+
 (def OddLongString
-  (s/both String #(odd? (Long/parseLong %))))
+  (s/both s/Str #(odd? (parse-long %))))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -474,7 +478,7 @@
   [^OddLong arg0]
   (str arg0))
 
-(sm/defn ^String simple-validated-defn-new :- OddLongString
+(sm/defn ^{:tag String} simple-validated-defn-new :- OddLongString
   "I am a simple schema fn"
   {:metadata :bla}
   [arg0 :- OddLong]
@@ -487,7 +491,7 @@
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema doc metadata]} (meta v)]
-        (is (= tag String))
+        #+clj (is (= tag String))
         (is (= +simple-validated-defn-schema+ schema))
         (is (= doc "I am a simple schema fn"))
         (is (= metadata :bla)))
@@ -500,28 +504,31 @@
 
       (is (= "4" (@v 4))))))
 
+;; Primitive validation testing for JVM
+#+clj
+(do
 
-(def +primitive-validated-defn-schema+
-  (s/=> long OddLong))
+  (def +primitive-validated-defn-schema+
+    (s/=> long OddLong))
 
-(sm/defn ^long primitive-validated-defn
-  [^long ^{:s OddLong} arg0]
-  (inc arg0))
+  (sm/defn ^long primitive-validated-defn
+    [^long ^{:s OddLong} arg0]
+    (inc arg0))
 
-(sm/defn ^long primitive-validated-defn-new :- long
-  [^long arg0 :- OddLong]
-  (inc arg0))
+  (sm/defn ^long primitive-validated-defn-new :- long
+    [^long arg0 :- OddLong]
+    (inc arg0))
 
 
-(deftest simple-primitive-validated-defn-test
-  (doseq [[label f] {"old" primitive-validated-defn "new" primitive-validated-defn-new}]
-    (testing label
-      (is (= +primitive-validated-defn-schema+ (s/fn-schema f)))
+  (deftest simple-primitive-validated-defn-test
+    (doseq [[label f] {"old" primitive-validated-defn "new" primitive-validated-defn-new}]
+      (testing label
+        (is (= +primitive-validated-defn-schema+ (s/fn-schema f)))
 
-      (is ((ancestors (class f)) clojure.lang.IFn$LL))
-      (s/with-fn-validation
-        (is (= 4 (f 3)))
-        (is (= 4 (.invokePrim f 3)))
-        (is (thrown? Exception (f 4))))
+        (is ((ancestors (class f)) clojure.lang.IFn$LL))
+        (s/with-fn-validation
+          (is (= 4 (f 3)))
+          (is (= 4 (.invokePrim f 3)))
+          (is (thrown? Exception (f 4))))
 
-      (is (= 5 (f 4))))))
+        (is (= 5 (f 4)))))))
