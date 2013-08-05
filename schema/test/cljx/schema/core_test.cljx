@@ -12,21 +12,21 @@
    [schema.core :as s]
    #+clj [schema.macros :as sm]))
 
-(sm/defrecord Explainer
-    [^long foo ^String bar]
-  {(s/optional-key :baz) clojure.lang.Keyword})
+;; (sm/defrecord Explainer
+;;     [^long foo ^String bar]
+;;   {(s/optional-key :baz) clojure.lang.Keyword})
 
-(deftest explain-test
-  (is (= (s/explain {(s/required-key 'x) long
-                     String [(s/one int "foo") (s/maybe Explainer)]})
-         '{(required-key x) long
-           java.lang.String [("foo" int)
-                             &
-                             (maybe
-                              (schema.core_test.Explainer
-                               {:foo long
-                                :bar java.lang.String
-                                (optional-key :baz) clojure.lang.Keyword}))]})))
+;; (deftest explain-test
+;;   (is (= (s/explain {(s/required-key 'x) long
+;;                      String [(s/one int "foo") (s/maybe Explainer)]})
+;;          '{(required-key x) long
+;;            java.lang.String [("foo" int)
+;;                              &
+;;                              (maybe
+;;                               (schema.core_test.Explainer
+;;                                {:foo long
+;;                                 :bar java.lang.String
+;;                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
 
 ;;; leaves
