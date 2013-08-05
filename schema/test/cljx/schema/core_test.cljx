@@ -139,8 +139,8 @@
 ;;; maps
 
 (deftest simple-map-schema-test
-  (let [schema {:foo long
-                :bar double}]
+  (let [schema {:foo s/Int
+                :bar s/Num}]
     (valid! schema {:foo 1 :bar 2.0})
     (invalid! schema [[:foo 1] [:bar 2.0]])
     (invalid! schema {:foo 1 :bar 2.0 :baz 1})
@@ -148,19 +148,19 @@
     (invalid! schema {:foo 1.0 :bar 1.0})))
 
 (deftest fancier-map-schema-test
-  (let [schema {(s/required-key :foo) long
-                String double}]
+  (let [schema {:foo s/Int
+                s/Str s/Num}]
     (valid! schema {:foo 1})
     (valid! schema {:foo 1 "bar" 2.0})
     (valid! schema {:foo 1 "bar" 2.0 "baz" 10.0})
     (invalid! schema {:foo 1 :bar 2.0})
     (invalid! schema {:foo 1 :bar 2.0 "baz" 2.0})
-    (invalid! schema {:foo 1 "bar" 2})))
+    (invalid! schema {:foo 1 "bar" "a"})))
 
 (deftest another-fancy-map-schema-test
-  (let [schema {(s/required-key :foo) (s/maybe long)
-                (s/optional-key :bar) double
-                (s/required-key :baz) {(s/required-key :b1) odd?}}]
+  (let [schema {:foo (s/maybe s/Int)
+                (s/optional-key :bar) s/Num
+                :baz {:b1 odd?}}]
     (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
     (valid! schema {:foo 1 :baz {:b1 3}})
     (valid! schema {:foo nil :baz {:b1 3}})
@@ -180,15 +180,15 @@
     (invalid! schema [1 2 1.0])))
 
 (deftest simple-one-seq-test
-  (let [schema [(s/one long "long") (s/one double "double")]]
-    (valid! schema [1 1.0])
+  (let [schema [(s/one s/Int "int") (s/one s/Str "str")]]
+    (valid! schema [1 "a"])
     (invalid! schema [1])
     (invalid! schema [1 1.0 2])
     (invalid! schema [1 1])
     (invalid! schema [1.0 1.0])))
 
 (deftest combo-seq-test
-  (let [schema [(s/one (s/maybe long) "maybe-long") double]]
+  (let [schema [(s/one (s/maybe s/Int) "maybe-long") s/Num]]
     (valid! schema [1])
     (valid! schema [1 1.0 2.0 3.0])
     (valid! schema [nil 1.0 2.0 3.0])
@@ -197,6 +197,7 @@
 
 ;; TODO: most of the invalid! cases above should be replaced with
 ;; explicit checks on the error returned by check?
+#+clj
 (deftest nice-error-test
   (is (= (str (s/check
                {:a long
@@ -213,30 +214,30 @@
 
 (deftest simple-set-test
   ;; basic set identification
-  (let [schema #{clojure.lang.Keyword}]
+  (let [schema #{s/Key}]
     (valid! schema #{:a :b :c})
     (invalid! schema [:a :b :c])
     (invalid! schema {:a :a :b :b}))
 
   ;; enforces matching with single simple entry
-  (let [schema #{long}]
+  (let [schema #{s/Int}]
     (valid! schema #{})
     (valid! schema #{1 2 3})
     (invalid! schema #{1 0.5 :a})
     (invalid! schema #{3 4 "a"}))
   ;; not allowed to have zero or multiple entries
-  (is (thrown? Exception (s/check #{long double} #{})))
+  (is (thrown? Exception (s/check #{s/Int s/Num} #{})))
 
 
   ;; slightly more complicated elem-schema
-  (let [schema #{[long]}]
+  (let [schema #{[s/Int]}]
     (valid! schema #{})
     (valid! schema #{[2 4]})
     (invalid! schema #{2})
     (invalid! schema #{[[2 3]]})))
 
 (deftest mixed-set-test
-  (let [schema #{(s/either [long] #{long})}]
+  (let [schema #{(s/either [s/Int] #{s/Int})}]
     (valid! schema #{})
     (valid! schema #{[3 4] [56 1] [-11 3]})
     (valid! schema #{#{3 4} #{56 1} #{-11 3}})
@@ -247,18 +248,18 @@
 
 ;;; records
 
-(defrecord Foo [x ^long y])
+(defrecord Foo [x ^{:s s/Int} y])
 
 (deftest record-test
-  (let [schema (s/record Foo {:x s/Any (s/optional-key :y) long})]
+  (let [schema (s/record Foo {:x s/Any (s/optional-key :y) s/Int})]
     (valid! schema (Foo. :foo 1))
     (invalid! schema {:x :foo :y 1})
     (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
 
 (deftest record-with-extra-keys test
   (let [schema (s/record Foo {:x s/Any
-                              :y long
-                              clojure.lang.Keyword s/Any})]
+                              :y s/Int
+                              s/Key s/Any})]
     (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
@@ -273,29 +274,31 @@
          (is (= ~(select-keys desired-meta [:schema :tag])
                 ~(select-keys (meta normalized) [:schema :tag]))))))
 
-(def ASchema [long])
+#+clj
+(do
+  (def ASchema [long])
 
-(deftest normalized-metadata-test
-  (testing "empty" (test-normalized-meta 'foo nil {:schema s/Any}))
-  (testing "protocol" (test-normalized-meta ^ATestProtocol foo nil {:schema (s/protocol ATestProtocol)}))
-  (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
-  (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
-  (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
-  (testing "both" (test-normalized-meta ^{:tag Object :schema String} foo nil {:tag Object :schema String}))
-  (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
+  (deftest normalized-metadata-test
+    (testing "empty" (test-normalized-meta 'foo nil {:schema s/Any}))
+    (testing "protocol" (test-normalized-meta ^ATestProtocol foo nil {:schema (s/protocol ATestProtocol)}))
+    (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
+    (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
+    (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
+    (testing "both" (test-normalized-meta ^{:tag Object :schema String} foo nil {:tag Object :schema String}))
+    (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String}))))
 
 (defmacro test-meta-extraction [meta-form arrow-form]
   (let [meta-ized (schema.macros/process-arrow-schematized-args {} arrow-form)]
     `(do (is (= '~meta-form '~meta-ized))
          (is (= ~(mapv #(select-keys (meta (schema.macros/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
-                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
+                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized)))))
 
-(deftest extract-arrow-schematized-args-test
-  (testing "empty" (test-meta-extraction [] []))
-  (testing "no-tag" (test-meta-extraction [x] [x]))
-  (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
-  (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-  (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
+  (deftest extract-arrow-schematized-args-test
+    (testing "empty" (test-meta-extraction [] []))
+    (testing "no-tag" (test-meta-extraction [x] [x]))
+    (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
+    (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
+    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
 
 (potemkin/defprotocol+ PProtocol
   (do-something [this]))
