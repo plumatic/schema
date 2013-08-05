@@ -1,9 +1,9 @@
 (ns schema.core-test
-  #+clj (:use clojure.test schema.test-macros)
+  #+clj (:use clojure.test)
   #+cljs
   (:use-macros
    [cljs-test.macros :only [is is= deftest]]
-   [schema.test-macros :only [valid! invalid!]])
+   [schema.test-macros :only [#_valid! invalid!]])
   #+cljs
   (:require-macros
    [schema.macros :as sm])
@@ -28,6 +28,18 @@
 ;;                                 :bar java.lang.String
 ;;                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
+;;; Helpers
+
+(defn valid! [s x]
+  (is (do (s/validate s x) true)))
+
+(defn invalid! [s x]
+  (let [ex-atom (atom nil)]
+    (try
+      (s/validate s x)
+      (catch #+clj Exception #+cljs js/Error e
+             (reset! ex-atom e)))
+    (is @ex-atom)))
 
 ;;; leaves
 
