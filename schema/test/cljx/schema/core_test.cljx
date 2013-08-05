@@ -305,30 +305,30 @@
 
 ;; exercies some different arities
 (sm/defrecord Bar
-    [^long foo ^String bar]
-  {(s/optional-key :baz) clojure.lang.Keyword})
+    [^s/Int foo  ^s/Str bar]
+  {(s/optional-key :baz) s/Key})
 
 (sm/defrecord Bar2
-    [^long foo ^String bar]
-  {(s/optional-key :baz) clojure.lang.Keyword}
+    [^s/Int foo ^s/Str bar]
+  {(s/optional-key :baz) s/Key}
   PProtocol
   (do-something [this] 2))
 
 (sm/defrecord Bar3
-    [^long foo ^String bar]
+    [^s/Int foo ^s/Str bar]
   PProtocol
   (do-something [this] 3))
 
 (sm/defrecord Bar4
-    [^{:s [long]} foo ^{:s? {String String}} bar]
+    [^{:s [s/Int]} foo ^{:s? {s/Str s/Str}} bar]
   PProtocol
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
   (is (= (s/class-schema Bar)
-         (s/record Bar {:foo long
-                        :bar String
-                        (s/optional-key :baz) clojure.lang.Keyword})))
+         (s/record Bar {:foo s/Int
+                        :bar s/Str
+                        (s/optional-key :baz) s/Key})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
@@ -352,15 +352,15 @@
   (is (= 4 (do-something (Bar4. 1 "test")))))
 
 (sm/defrecord BarNewStyle
-    [foo :- long
-     bar :- String]
-  {(s/optional-key :baz) clojure.lang.Keyword})
+    [foo :- s/Int
+     bar :- s/Str]
+  {(s/optional-key :baz) s/Key})
 
 (deftest defrecord-new-style-schema-test
   (is (= (s/class-schema BarNewStyle)
-         (s/record BarNewStyle {:foo long
-                                :bar String
-                                (s/optional-key :baz) clojure.lang.Keyword})))
+         (s/record BarNewStyle {:foo s/Int
+                                :bar s/Str
+                                (s/optional-key :baz) s/Key})))
   (is (BarNewStyle. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->BarNewStyle {:foo 1})))))
   (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
@@ -387,7 +387,6 @@
     (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
     (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
     (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))
-    (invalid! Nested (Nested. (Bar4. [1] {}) (int 5) bar2))
     (invalid! Nested (Nested. (Bar4. [1] {:foo :bar}) 1 bar2))
     (invalid! Nested (Nested. nil "hi" bar2))))
 
