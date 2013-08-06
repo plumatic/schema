@@ -52,7 +52,8 @@
    #+clj
    potemkin
    #+clj
-   [schema.macros :as macros])
+   [schema.macros :as macros]
+   [schema.utils :as utils])
   #+cljs
   (:require-macros [schema.macros :as macros]))
 
@@ -98,7 +99,7 @@
 
 (clojure.core/defn validate [schema value]
   (when-let [error (check schema value)]
-    (macros/error! "Value does not match schema: %s" error)))
+    (utils/error! "Value does not match schema: %s" error)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
@@ -144,19 +145,7 @@
       (explain more-schema)
       (symbol (.getName ^Class this)))))
 
-#+cljs
-(do
-  (extend-protocol Schema
-    js/String
-    (check [this x] (string? x))
-    (explain [this])
-
-    js/Number
-    (check [this x] (number? x))
-    (explain [this])))
-
 (extend-protocol Schema
-  #+clj
   clojure.lang.AFn
   #+cljs
   js/Function
@@ -225,7 +214,7 @@
   [m k]
   (if-let [pair (find m k)]
     (val pair)
-    (macros/error! "Key %s not found in %s" k m)))
+    (utils/error! "Key %s not found in %s" k m)))
 
 (clojure.core/defrecord Protocol [p]
   Schema
@@ -343,8 +332,8 @@
 ;;; Shared Schema leaves
 
 (def Any (AnythingSchema. nil))
-(def Str #+clj java.lang.String #+cljs js/String)
-(def Num #+clj java.lang.Number #+cljs js/Number)
+(def Str #+clj java.lang.String #+cljs string?)
+(def Num #+clj java.lang.Number #+cljs number?)
 (def Int
   #+clj integer?
   #+cljs
@@ -379,7 +368,7 @@
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.k ^RequiredKey ks)
         (instance? OptionalKey ks) (.k ^OptionalKey ks)
-        :else (macros/error! "Bad explicit key: %s" ks)))
+        :else (utils/error! "Bad explicit key: %s" ks)))
 
 (defn- specific-key? [ks]
   (or (required-key? ks)
@@ -469,8 +458,8 @@
   #+clj clojure.lang.APersistentVector
   #+cljs cljs.core.PersistentVector
   (check [this x]
-    (or (when (instance? java.util.Map x)
-          (macros/validation-error this x (list 'not (list 'instance? 'java.util.Map (value-name x)))))
+    (or (when (map? x)
+          (macros/validation-error this x (list 'not (list 'map? (value-name x)))))
         (when (try (seq x) true
                    (catch #+clj Exception #+cljs js/Error e
                           (macros/validation-error this x (list 'throws (list 'seq (value-name x)))))))

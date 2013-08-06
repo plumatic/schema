@@ -2,15 +2,15 @@
   #+clj (:use clojure.test)
   #+cljs
   (:use-macros
-   [cljs-test.macros :only [is is= deftest]]
-   [schema.test-macros :only [#_valid! invalid!]])
+   [cljs-test.macros :only [is is= deftest]])
   #+cljs
   (:require-macros
    [schema.macros :as sm])
   (:require
    #+clj potemkin
    [schema.core :as s]
-   #+clj [schema.macros :as sm]))
+   #+clj [schema.macros :as sm]
+   #+cljs cljs-test.core))
 
 ;; (sm/defrecord Explainer
 ;;     [^long foo ^String bar]
@@ -312,8 +312,11 @@
   (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
   (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
 
-(potemkin/defprotocol+ PProtocol
-  (do-something [this]))
+(
+ #+clj potemkin/defprotocol+
+       #+cljs defprotocol
+       PProtocol
+       (do-something [this]))
 
 ;; exercies some different arities
 (sm/defrecord Bar

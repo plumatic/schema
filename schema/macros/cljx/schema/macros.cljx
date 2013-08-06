@@ -1,21 +1,18 @@
 (ns schema.macros
   (:refer-clojure :exclude [defrecord defn fn])
-  (:require [clojure.data :as data]))
+  (:require [clojure.data :as data]
+            [schema.utils :as utils]))
 
 ;;;;; Schema protcol
 
 ;; TODO: rename to be more platform agnostic
-
-(defmacro error! [& format-args]
-  #+clj  `(throw (RuntimeException. (format ~@format-args)))
-  #+cljs `(throw js/Error (format ~@format-args)))
 
 ;; TODO(ah) make assert!
 (defmacro assert-iae
   "Like assert, but throws an IllegalArgumentException and takes args to format"
   [form & format-args]
   `(when-not ~form
-     (error! ~@format-args)))
+     (utils/error! ~@format-args)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
@@ -139,16 +136,20 @@
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (process-arrow-schematized-args &env field-schema)]
+        field-schema (process-arrow-schematized-args &env field-schema)
+        defrecord-fn (if (find-ns 'potemkin)
+                       'potemkin/defrecord+
+                       'defrecord)
+        ]
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
                                          (keys ~extra-key-schema?)))]
-         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
-                                        (vec bad-keys#)))))
+         (utils/error! (str "extra-key-schema? can not contain required keys: "
+                            (vec bad-keys#))))
        (when ~extra-validator-fn?
          (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                      (class ~extra-validator-fn?)))
-       (potemkin/defrecord+ ~name ~field-schema ~@more-args)
+       (~defrecord-fn ~name ~field-schema ~@more-args)
        (schema.core/declare-class-schema!
         ~name
         (assoc-when
@@ -177,9 +178,9 @@
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
              [~map-sym]
              (when-not (= (count ~map-sym) ~(count field-schema))
-               (throw (RuntimeException. (format "Record has wrong set of keys: %s"
-                                                 (data/diff (set (keys ~map-sym))
-                                                            ~(set (map keyword field-schema)))))))
+               (utils/error! "Record has wrong set of keys: %s"
+                             (data/diff (set (keys ~map-sym))
+                                        ~(set (map keyword field-schema)))))
              (new ~(symbol (str name))
                   ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
@@ -227,7 +228,7 @@
   [env output-schema-sym bind-meta [bind & body]]
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
+    (utils/error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
   (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg bind)
         input-schema-sym (gensym "input-schema")]
