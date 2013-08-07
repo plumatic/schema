@@ -82,18 +82,6 @@
      also expanding classes schematas at the leaves"))
 
 
-(clojure.core/defn type-of [x]
-  #+clj (class x)
-  #+cljs (js* "typeof ~{}" x))
-
-(clojure.core/defn- value-name
-  "Provide a descriptive short name for a value."
-  [value]
-  (let [t (type-of value)]
-    (if (< (count (str value)) 20)
-      value
-      (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
-
 ;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
 ;; check and produces the validation-error automatically somehow.
 
@@ -131,7 +119,7 @@
 
 (defn- check-class [schema class value]
   (when-not (instance? class value)
-    (macros/validation-error schema value (list 'instance? class (value-name value)))))
+    (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
 
 #+clj
 (extend-protocol Schema
@@ -151,10 +139,10 @@
   js/Function
   (check [this x]
     (try (when-not (this x)
-           (macros/validation-error this x (list this (value-name x))))
+           (macros/validation-error this x (list this (utils/value-name x))))
          (catch #+clj Throwable #+cljs js/Error
                 t
-                (macros/validation-error this x (list 'thrown? t (list this (value-name x)))))))
+                (macros/validation-error this x (list 'thrown? t (list this (utils/value-name x)))))))
   (explain [this] this))
 
 
@@ -185,7 +173,7 @@
   Schema
   (check [this x]
          (when-not (= v x)
-           (macros/validation-error this x (list '= v (value-name x)))))
+           (macros/validation-error this x (list '= v (utils/value-name x)))))
   (explain [this] (cons '= v)))
 
 (clojure.core/defn eq
@@ -199,7 +187,7 @@
   Schema
   (check [this x]
          (when-not (contains? vs x)
-           (macros/validation-error this x (list vs (value-name x)))))
+           (macros/validation-error this x (list vs (utils/value-name x)))))
   (explain [this] (cons 'enum vs)))
 
 (clojure.core/defn enum
@@ -220,7 +208,7 @@
   Schema
   (check [this x]
          (when-not (satisfies? p x)
-           (macros/validation-error this x (list 'satisfies? p (value-name x)))))
+           (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
   (explain [this] (cons 'protocol (safe-get p :var))))
 
 (clojure.core/defn protocol [p]
@@ -247,7 +235,7 @@
   Schema
   (check [this x]
          (when (every? #(check % x) schemas)
-           (macros/validation-error this x (list 'every? (list 'check '% (value-name x)) 'schemas))))
+           (macros/validation-error this x (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -309,7 +297,7 @@
   (check [this x]
          (if-let [[_ match] (first (filter (clojure.core/fn [[pred]] (pred x)) preds-and-schemas))]
            (check match x)
-           (macros/validation-error this x (list 'not-any? (list 'matches-pred? (value-name x))
+           (macros/validation-error this x (list 'not-any? (list 'matches-pred? (utils/value-name x))
                                                  (map first preds-and-schemas)))))
   (explain [this]
            (list 'conditional (for [[pred schema] preds-and-schemas]
@@ -421,7 +409,7 @@
   #+cljs cljs.core.PersistentArrayMap
   (check [this x]
     (if-not (map? x)
-      (macros/validation-error this x (list 'map? (value-name x)))
+      (macros/validation-error this x (list 'map? (utils/value-name x)))
       (check-map this x)))
   (explain [this]
     (into {}
@@ -459,10 +447,10 @@
   #+cljs cljs.core.PersistentVector
   (check [this x]
     (or (when (map? x)
-          (macros/validation-error this x (list 'not (list 'map? (value-name x)))))
+          (macros/validation-error this x (list 'not (list 'map? (utils/value-name x)))))
         (when (try (seq x) true
                    (catch #+clj Exception #+cljs js/Error e
-                          (macros/validation-error this x (list 'throws (list 'seq (value-name x)))))))
+                          (macros/validation-error this x (list 'throws (list 'seq (utils/value-name x)))))))
         (let [[singles multi] (split-singles this)]
           (loop [singles singles x x out []]
             (if-let [[^One first-single & more-singles] (seq singles)]
@@ -505,7 +493,7 @@
   (check [this x]
     (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
     (or (when-not (set? x)
-          (macros/validation-error this x (list 'set? (value-name x))))
+          (macros/validation-error this x (list 'set? (utils/value-name x))))
         (when-let [out (seq (keep #(check (first this) %) x))]
           (macros/validation-error this x (set out)))))
 
@@ -520,7 +508,7 @@
   Schema
   (check [this r]
          (or (when-not (instance? klass r)
-               (macros/validation-error this r (list 'instance? klass (value-name r))))
+               (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
              (check-map schema r)
              (when-let [f (:extra-validator-fn this)]
                (check f r))))
@@ -530,8 +518,8 @@
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
   [klass schema]
-  #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (type-of klass))
-  (macros/assert-iae (map? schema) "Expected map, got %s" (type-of schema))
+  #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
+  (macros/assert-iae (map? schema) "Expected map, got %s" (utils/type-of schema))
   (Record. klass schema))
 
 
@@ -599,8 +587,8 @@
    overhead, we store the schema on the class when we can (for defns)
    and on metadata otherwise (for fns)."
   [f]
-  (macros/assert-iae (fn? f) "Non-function %s" (type-of f))
-  (or (class-schema (type-of f))
+  (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
+  (or (class-schema (utils/type-of f))
       (safe-get (meta f) :schema)))
 
 (clojure.core/defn input-schema
