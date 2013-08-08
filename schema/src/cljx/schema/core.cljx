@@ -66,7 +66,7 @@
 
 #+clj
 (defmethod print-method ValidationError [^ValidationError err writer]
-  (print-method (list 'not @(.expectation-delay err)) writer))
+  (print-method (list 'not @(.-expectation-delay err)) writer))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -360,8 +360,8 @@
 
 (defn- explicit-schema-key [ks]
   (cond (keyword? ks) ks
-        (instance? RequiredKey ks) (.k ^RequiredKey ks)
-        (instance? OptionalKey ks) (.k ^OptionalKey ks)
+        (instance? RequiredKey ks) (.-k ^RequiredKey ks)
+        (instance? OptionalKey ks) (.-k ^OptionalKey ks)
         :else (utils/error! "Bad explicit key: %s" ks)))
 
 (defn- specific-key? [ks]
@@ -465,7 +465,7 @@
                       (macros/validation-error (vec singles) nil (list 'has-enough-elts? (count singles))))
                 (recur more-singles
                        (rest x)
-                       (conj out (check (.schema first-single) (first x)))))
+                       (conj out (check (.-schema first-single) (first x)))))
               (let [out (cond multi
                               (into out (map #(check multi %) x))
 
@@ -481,7 +481,7 @@
       (vec
        (concat
         (for [^One s singles]
-          (list (.name s) (explain (.schema s))))
+          (list (.-name s) (explain (.-schema s))))
         (when multi
           ['& (explain multi)]))))))
 
@@ -519,7 +519,7 @@
              (when-let [f (:extra-validator-fn this)]
                (check f r))))
   (explain [this]
-           (list (symbol (.getName ^Class klass)) (explain schema))))
+           #+clj (list (symbol (.getName ^Class klass)) (explain schema))))
 
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
@@ -600,7 +600,7 @@
 (clojure.core/defn input-schema
   "Convenience method for fns with single arity"
   [f]
-  (let [input-schemas (.input-schemas (fn-schema f))]
+  (let [input-schemas (.-input-schemas (fn-schema f))]
     (macros/assert-iae (= 1 (count input-schemas))
                        "Expected single arity fn, got %s" (count input-schemas))
     (first input-schemas)))
@@ -608,7 +608,7 @@
 (clojure.core/defn output-schema
   "Convenience method for fns with single arity"
   [f]
-  (.output-schema (fn-schema f)))
+  (.-output-schema (fn-schema f)))
 
 #+clj
 (definterface PSimpleCell
