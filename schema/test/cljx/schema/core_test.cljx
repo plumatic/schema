@@ -1,5 +1,5 @@
 (ns schema.core-test
-  #+clj (:use clojure.test)
+  #+clj (:use clojure.test schema.test-macros)
   #+cljs
   (:use-macros
    [cljs-test.macros :only [is is= deftest]])
@@ -28,30 +28,34 @@
 ;;                                 :bar java.lang.String
 ;;                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
-;;; Helpers
+;;; Cljs Helpers Only
+#+cljs
+(do
+  (defn valid! [s x]
+    (is (do (s/validate s x) true)))
 
-(defn valid! [s x]
-  (is (do (s/validate s x) true)))
-
-(defn invalid! [s x]
-  (let [ex-atom (atom nil)]
-    (try
-      (s/validate s x)
-      (catch #+clj Exception #+cljs js/Error e
-             (reset! ex-atom e)))
-    (is @ex-atom)))
+  (defn invalid! [s x]
+    (let [ex-atom (atom nil)]
+      (try
+        (s/validate s x)
+        (catch #+clj Exception #+cljs js/Error e
+               (reset! ex-atom e)))
+      (is @ex-atom))))
 
 ;;; leaves
 
 (deftest class-test
   (valid! s/Str "foo")
-  (invalid! s/Str :foo))
+  (invalid! s/Str :foo)
+  (valid! s/Int 4)
+  (valid! s/Key :foo))
 
 (deftest fn-test
-  (valid! odd? 1)
-  (invalid! odd? 2)
-  (invalid! #(/ % 0) 2)
-  (invalid! odd? :foo))
+  (valid! (s/pred odd?) 1)
+  (invalid! (s/pred odd?) 2)
+  (valid! (s/pred string?) "foo")
+  (valid! (s/pred (constantly true)) nil)
+  (invalid! (s/pred odd?) :foo))
 
 #+clj
 (do
@@ -100,7 +104,7 @@
     (invalid! s nil)
     (invalid! s 117)))
 
-;;; helpers/wrappers
+;; ;;; helpers/wrappers
 
 (deftest anything-test
   (valid! s/Any 1)
@@ -118,7 +122,7 @@
 
 (deftest both-test
   (let [schema (s/both
-                (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m))
+                (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)))
                 {s/Key s/Key})]
     (valid! schema {})
     (valid! schema {:foo :foo :bar :bar})
@@ -148,7 +152,7 @@
 
 
 
-;;; maps
+;; ;;; maps
 
 (deftest simple-map-schema-test
   (let [schema {:foo s/Int
@@ -172,7 +176,7 @@
 (deftest another-fancy-map-schema-test
   (let [schema {:foo (s/maybe s/Int)
                 (s/optional-key :bar) s/Num
-                :baz {:b1 odd?}}]
+                :baz {:b1 (s/pred odd?)}}]
     (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
     (valid! schema {:foo 1 :baz {:b1 3}})
     (valid! schema {:foo nil :baz {:b1 3}})
@@ -222,7 +226,7 @@
                :b '[(not (instance? java.lang.Double 1)) nil nil]
                :c 'disallowed-key)))))
 
-;;; sets
+;; ;;; sets
 
 (deftest simple-set-test
   ;; basic set identification
@@ -419,7 +423,7 @@
 
 ;;; fn
 
-(def OddLong (s/both odd? long))
+(def OddLong (s/both (s/pred odd?) long))
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
@@ -431,8 +435,8 @@
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
-  (let [f (s/fn test-fn :- even?
-            [^s/Int x ^{:s {:foo (s/both s/Int odd?)}} y]
+  (let [f (s/fn test-fn :- (s/pred even?)
+            [^s/Int x ^{:s {:foo (s/both s/Int (s/pred odd?))}} y]
             (+ x (:foo y -100)))]
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
@@ -464,7 +468,7 @@
 (deftest two-arity-fn-test
   (let [f (s/fn foo :- s/Int
             ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
-            ([^String arg0] (parse-long arg0)))]
+            ([^s/Str arg0] (parse-long arg0)))]
     (is (= (s/=>* s/Int [s/Str] [s/Str s/Int])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
@@ -486,7 +490,7 @@
 ;;; defn
 
 (def OddLongString
-  (s/both s/Str #(odd? (parse-long %))))
+  (s/both s/Str (s/pred #(odd? (parse-long %)))))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -507,7 +511,7 @@
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema doc metadata]} (meta v)]
-        #+clj (is (= tag String))
+        #+clj (is (= tag s/Str))
         (is (= +simple-validated-defn-schema+ schema))
         (is (= doc "I am a simple schema fn"))
         (is (= metadata :bla)))

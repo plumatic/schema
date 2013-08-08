@@ -6,8 +6,15 @@
 
 (defn error! [& format-args]
   #+clj  (throw (RuntimeException. (apply format format-args)))
-  #+cljs (throw js/Error (apply format format-args)))
+  #+cljs (throw (js/Error (apply format format-args))))
 
+(defn thrown? [f]
+  (let [ex-atom (atom false)]
+    (try
+      (f)
+      (catch #+clj Throwable #+cljs js/Error e
+             (reset! ex-atom true)))
+    @ex-atom))
 
 (defn value-name
   "Provide a descriptive short name for a value."

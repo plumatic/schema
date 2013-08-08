@@ -122,32 +122,18 @@
     (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
 
 #+clj
-(extend-protocol Schema
-  Class
-  (check [this x]
-    (or (check-class this this x)
-        (when-let [more-schema (class-schema this)]
-          (check more-schema x))))
-  (explain [this]
-    (if-let [more-schema (class-schema this)]
-      (explain more-schema)
-      (symbol (.getName ^Class this)))))
-
-(extend-protocol Schema
-  clojure.lang.AFn
-  #+cljs
-  js/Function
-  (check [this x]
-    (try (when-not (this x)
-           (macros/validation-error this x (list this (utils/value-name x))))
-         (catch #+clj Throwable #+cljs js/Error
-                t
-                (macros/validation-error this x (list 'thrown? t (list this (utils/value-name x)))))))
-  (explain [this] this))
-
-
-#+clj
 (do
+  (extend-protocol Schema
+
+    Class
+    (check [this x]
+      (or (check-class this this x)
+          (when-let [more-schema (class-schema this)]
+            (check more-schema x))))
+    (explain [this]
+      (if-let [more-schema (class-schema this)]
+        (explain more-schema)
+        (symbol (.getName ^Class this)))))
 
   ;; prevent coersion, so you have to be exactly the given type.
   (defmacro extend-primitive [cast-sym class-sym]
@@ -165,6 +151,14 @@
   (extend-primitive clojure.core$char Character)
   (extend-primitive clojure.core$byte Byte)
   (extend-primitive clojure.core$boolean Boolean))
+
+;; Prototype constructor hack
+#+cljs
+(extend-protocol Schema
+  js/Function
+  (check [this x]
+    (when-not (identical? this (.-constructor x))
+      (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
 
 ;; TODO: abstract these into predicates?
 ;; single required value
@@ -212,9 +206,11 @@
   (explain [this] (cons 'protocol (safe-get p :var))))
 
 (clojure.core/defn protocol [p]
-  (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
+  (macros/assert-iae
+   #+clj (:on p)
+   #+cljs true
+   "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple helpers / wrappers
@@ -229,13 +225,30 @@
   (check [this x])
   (explain [this] 'anything))
 
+
+;; pred
+
+(clojure.core/defrecord Predicate [p?]
+
+  Schema
+  (check [this x]
+         (when-not (p? x)
+           (macros/validation-error this x (list p? x))))
+  (explain [this]))
+
+(clojure.core/defn pred [p?]
+  (when-not (fn? p?)
+    (utils/error! "Not a function: %s" p?))
+  (Predicate. p?))
+
 ;; either
 
 (clojure.core/defrecord Either [schemas]
   Schema
   (check [this x]
          (when (every? #(check % x) schemas)
-           (macros/validation-error this x (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
+           (macros/validation-error this x
+                                    (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -320,16 +333,10 @@
 ;;; Shared Schema leaves
 
 (def Any (AnythingSchema. nil))
-(def Str #+clj java.lang.String #+cljs string?)
-(def Num #+clj java.lang.Number #+cljs number?)
-(def Int
-  #+clj integer?
-  #+cljs
-  (fn [x]
-    (and (number? x) (identical? x (js/Math.floor x)))))
-(def Key
-  #+clj clojure.lang.Keyword
-  #+cljs cljs.core.Keyword)
+(def Str #+clj String #+cljs (pred string?))
+(def Num #+clj Number #+cljs js/Number)
+(def Int (pred integer?))
+(def Key (pred keyword?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
