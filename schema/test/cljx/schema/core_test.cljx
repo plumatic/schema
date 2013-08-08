@@ -50,6 +50,13 @@
   (valid! s/Int 4)
   (valid! s/Key :foo))
 
+(deftest map-test
+  (let [Str->Num {s/Str s/Num}]
+    (valid! Str->Num {"a" 1 "b" 2})
+    (valid! Str->Num {"a" 1 "b" 2.0})
+    (invalid! Str->Num {:a 1 "b" 2})
+    (invalid! Str->Num {"a" "1"})))
+
 (deftest fn-test
   (valid! (s/pred odd?) 1)
   (invalid! (s/pred odd?) 2)
@@ -134,7 +141,9 @@
     (is (= schema (s/? s/Int)))
     (valid! schema nil)
     (valid! schema 1)
-    (invalid! schema 1.0)))
+    (invalid! schema 1.1)
+    ;; JVM cares about number type
+    #+clj (invalid! schema 1.0)))
 
 (deftest named-test
   (let [schema [(s/one s/Str "topic") (s/one (s/named s/Num "score") "asdf")]]
@@ -161,7 +170,7 @@
     (invalid! schema [[:foo 1] [:bar 2.0]])
     (invalid! schema {:foo 1 :bar 2.0 :baz 1})
     (invalid! schema {:foo 1})
-    (invalid! schema {:foo 1.0 :bar 1.0})))
+    (invalid! schema {:foo 1.1 :bar 1.0})))
 
 (deftest fancier-map-schema-test
   (let [schema {:foo s/Int
@@ -189,11 +198,12 @@
 ;;; sequences
 
 (deftest simple-repeated-seq-test
-  (let [schema [long]]
+  (let [schema [s/Int]]
     (valid! schema [])
     (valid! schema [1 2 3])
     (invalid! schema {})
-    (invalid! schema [1 2 1.0])))
+    #+clj (invalid! schema [1 2 1.0])
+    (invalid! schema [1 2 1.1])))
 
 (deftest simple-one-seq-test
   (let [schema [(s/one s/Int "int") (s/one s/Str "str")]]
@@ -208,7 +218,8 @@
     (valid! schema [1])
     (valid! schema [1 1.0 2.0 3.0])
     (valid! schema [nil 1.0 2.0 3.0])
-    (invalid! schema [1.0 2.0 3.0])
+    #+clj (invalid! schema [1.0 2.0 3.0])
+    (invalid! schema [1.1 2.01 3.9])
     (invalid! schema [])))
 
 ;; TODO: most of the invalid! cases above should be replaced with
@@ -226,7 +237,7 @@
                :b '[(not (instance? java.lang.Double 1)) nil nil]
                :c 'disallowed-key)))))
 
-;; ;;; sets
+;;; sets
 
 (deftest simple-set-test
   ;; basic set identification
@@ -242,7 +253,7 @@
     (invalid! schema #{1 0.5 :a})
     (invalid! schema #{3 4 "a"}))
   ;; not allowed to have zero or multiple entries
-  (is (thrown? Exception (s/check #{s/Int s/Num} #{})))
+  (invalid!  #{s/Int s/Num} #{})
 
 
   ;; slightly more complicated elem-schema
@@ -272,7 +283,7 @@
     (invalid! schema {:x :foo :y 1})
     (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
 
-(deftest record-with-extra-keys test
+(deftest record-with-extra-keys-test
   (let [schema (s/record Foo {:x s/Any
                               :y s/Int
                               s/Key s/Any})]
@@ -323,6 +334,7 @@
        (do-something [this]))
 
 ;; exercies some different arities
+
 (sm/defrecord Bar
     [^s/Int foo  ^s/Str bar]
   {(s/optional-key :baz) s/Key})
