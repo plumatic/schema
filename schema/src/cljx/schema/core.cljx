@@ -46,13 +46,12 @@
    These forms are all compatible and can be mixed and matched
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
-  #+clj (:refer-clojure :exclude [defrecord defn])
+  #+clj
+  (:refer-clojure :exclude [defrecord defn])
   (:require
    [clojure.string :as str]
-   #+clj
-   potemkin
-   #+clj
-   [schema.macros :as macros]
+   #+clj potemkin
+   #+clj [schema.macros :as macros]
    [schema.utils :as utils])
   #+cljs
   (:require-macros [schema.macros :as macros]))
