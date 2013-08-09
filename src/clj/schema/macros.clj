@@ -1,7 +1,8 @@
 (ns schema.macros
   (:refer-clojure :exclude [defrecord defn fn])
   (:require [clojure.data :as data]
-            [schema.utils :as utils]))
+            [schema.utils :as utils]
+            potemkin))
 
 ;;;;; Schema protcol
 
@@ -110,6 +111,8 @@
     (assert-iae s "%s is missing a schema" symbol)
     s))
 
+(def ^:dynamic *use-potemkin* (atom false))
+
 
 (defmacro defrecord
   "Define a defrecord 'name' using a modified map schema format.
@@ -137,7 +140,6 @@
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
         field-schema (process-arrow-schematized-args &env field-schema)
-        defrecord-fn utils/defrecord
         ]
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
@@ -147,7 +149,10 @@
        (when ~extra-validator-fn?
          (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                      (class ~extra-validator-fn?)))
-       (~defrecord-fn ~name ~field-schema ~@more-args)
+       (~(if @*use-potemkin*
+           `potemkin/defrecord+
+           `clojure.core/defrecord)
+        ~name ~field-schema ~@more-args)
        (schema.core/declare-class-schema!
         ~name
         (assoc-when

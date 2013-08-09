@@ -13,33 +13,33 @@
                  [prismatic/cljs-test "0.0.6"]
                  [potemkin "0.3.2"]]
 
-  :source-paths ["target/generated/clj/src"]
-  :test-paths ["target/generated/clj/test"]
+  :source-paths ["target/generated/src/clj" "src/clj"]
+  :test-paths ["target/generated/test/clj" "test/clj"]
 
-  :cljx {:builds [{:source-paths ["schema/src/cljx"]
-                   :output-path "target/generated/clj/src"
+  :cljx {:builds [{:source-paths ["src/cljx"]
+                   :output-path "target/generated/src/clj"
                    :rules :clj}
 
-                  {:source-paths ["schema/src/cljx"]
-                   :output-path "target/generated/cljs/src"
+                  {:source-paths ["src/cljx"]
+                   :output-path "target/generated/src/cljs"
                    :rules :cljs}
 
-                  {:source-paths ["schema/test/cljx"]
-                   :output-path "target/generated/clj/test"
+                  {:source-paths ["test/cljx"]
+                   :output-path "target/generated/test/clj"
                    :rules :clj}
 
-                  {:source-paths ["schema/test/cljx"]
-                   :output-path "target/generated/cljs/test"
+                  {:source-paths ["test/cljx"]
+                   :output-path "target/generated/test/cljs"
                    :rules :cljs}]}
 
   ;; :hooks [leiningen.cljsbuild]
 
   :cljsbuild {:builds
-              {:dev {:source-paths ["target/generated/cljs/src"]
+              {:dev {:source-paths ["target/generated/src/cljs"]
                      :compiler {:output-to "target/main.js"
                                 :optimizations :whitespace
                                 :pretty-print true}}
-               :test {:source-paths ["target/generated/cljs/src" "target/generated/cljs/test"]
+               :test {:source-paths ["target/generated/src/cljs" "target/generated/test/cljs"]
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
                                  :pretty-print true}}}}

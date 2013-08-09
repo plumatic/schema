@@ -638,12 +638,14 @@
 ;; Finally we get to the prize
 ;; In Clojure, we can keep the macros in this file
 #+clj
-(potemkin/import-vars
- macros/with-fn-validation
- macros/=>
- macros/=>*
- macros/defrecord
- macros/fn
- macros/defn)
+(do
+  (reset! macros/*use-potemkin* true)
+  (potemkin/import-vars
+   macros/with-fn-validation
+   macros/=>
+   macros/=>*
+   macros/defrecord
+   macros/fn
+   macros/defn))
 
 #+clj (set! *warn-on-reflection* false)

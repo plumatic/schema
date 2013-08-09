@@ -1,5 +1,5 @@
 (ns schema.utils
-  (:refer-clojure :exclude [defrecord])
+  (:refer-clojure :exclude [defrecord defprotocol])
   #+clj (:require potemkin))
 
 (clojure.core/defn type-of [x]

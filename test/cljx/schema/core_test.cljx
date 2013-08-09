@@ -7,8 +7,8 @@
   (:require-macros
    [schema.macros :as sm])
   (:require
-   #+clj potemkin
-   [schema.core :as s]
+   [schema.utils :as utils]
+   #+clj potemkin [schema.core :as s]
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
@@ -327,11 +327,8 @@
   (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
   (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
 
-(
- #+clj potemkin/defprotocol+
-       #+cljs defprotocol
-       PProtocol
-       (do-something [this]))
+(defprotocol PProtocol
+  (do-something [this]))
 
 ;; exercies some different arities
 
