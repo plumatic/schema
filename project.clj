@@ -11,7 +11,7 @@
 
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prismatic/cljs-test "0.0.6"]
-                 [potemkin "0.3.0-SNAPSHOT"]]
+                 [potemkin "0.3.2"]]
 
   :source-paths ["target/generated/clj/src"]
   :test-paths ["target/generated/clj/test"]
