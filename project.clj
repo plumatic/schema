@@ -24,25 +24,6 @@
                    :output-path "target/generated/cljs/src"
                    :rules :cljs}
 
-                  {:source-paths ["schema/macros/cljx"]
-                   :output-path "target/generated/clj/src"
-                   :rules :clj}
-
-                  {:source-paths ["schema/macros-test"]
-                   :output-path "target/generated/clj/test"
-                   :rules :clj}
-
-                  {:source-paths ["schema/macros-test"]
-                   :output-path "target/generated/cljs/test"
-                   :rules {:filetype "clj"
-                           :features #{"cljs"}}}
-
-                  {:source-paths ["schema/macros/cljx"]
-                   :output-path "target/generated/cljs/src"
-                   :rules {:filetype "clj"
-                           :features #{"cljs"}
-                           :transforms [(partial cljx.rules/elide-form "defmacro")]}}
-
                   {:source-paths ["schema/test/cljx"]
                    :output-path "target/generated/clj/test"
                    :rules :clj}
