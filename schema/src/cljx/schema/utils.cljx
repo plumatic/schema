@@ -1,4 +1,6 @@
-(ns schema.utils)
+(ns schema.utils
+  (:refer-clojure :exclude [defrecord])
+  #+clj (:require potemkin))
 
 (clojure.core/defn type-of [x]
   #+clj (class x)
@@ -23,3 +25,7 @@
     (if (< (count (str value)) 20)
       value
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
+
+(def defrecord
+  #+clj 'potemkin/defrecord+
+  #+cljs 'clojure.core/defrecord)

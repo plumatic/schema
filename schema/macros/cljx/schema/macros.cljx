@@ -137,9 +137,7 @@
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
         field-schema (process-arrow-schematized-args &env field-schema)
-        defrecord-fn (if (find-ns 'potemkin)
-                       'potemkin/defrecord+
-                       'defrecord)
+        defrecord-fn utils/defrecord
         ]
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
