@@ -341,4 +341,4 @@
                                         (when-not (primitive-sym? t)
                                           t))))
          ~fn-form)
-       (utils/declare-class-schema! (class ~name) ~schema-form))))
+       (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))

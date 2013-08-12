@@ -1,13 +1,11 @@
 (ns schema.test-macros
-  (:require [schema.core :as s]
-            clojure.test
-            [schema.utils :as utils]))
+  (:require clojure.test))
 
 (defmacro valid! [s x]
-  `(clojure.test/is (do (s/validate ~s ~x) true)))
+  `(clojure.test/is (do (schema.core/validate ~s ~x) true)))
 
 (defmacro invalid! [s x]
-  `(clojure.test/is (utils/thrown? #(s/validate ~s ~x))))
+  `(clojure.test/is (schema.utils/thrown? #(schema.core/validate ~s ~x))))
 
 ;; Only for cljs
 (defmacro testing [label & form]

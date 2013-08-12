@@ -445,7 +445,7 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (s/=> s/Str OddLong s/Any))
+  (sm/=> s/Str OddLong s/Any))
 
 (deftest simple-validated-meta-test
   (let [f (s/fn ^s/Str foo [^OddLong arg0 arg1])]
@@ -477,7 +477,7 @@
         f (s/fn foo :- s/Int
             [^LongPair [x y] ^s/Int arg1]
             (+ x y arg1))]
-    (is (= (s/=> s/Int LongPair s/Int)
+    (is (= (sm/=> s/Int LongPair s/Int)
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 6 (f [1 2] 3)))
@@ -487,7 +487,7 @@
   (let [f (s/fn foo :- s/Int
             ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
             ([^s/Str arg0] (parse-long arg0)))]
-    (is (= (s/=>* s/Int [s/Str] [s/Str s/Int])
+    (is (= (sm/=>* s/Int [s/Str] [s/Str s/Int])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
     (is (= 10 (f "3" 7)))))
@@ -497,7 +497,7 @@
             ([^s/Int arg0] (inc arg0))
             ([^s/Int arg0  & ^{:s [s/Str]} strs]
                (reduce + (foo arg0) (map count strs))))]
-    (is (= (s/=>* s/Int [s/Int] [s/Int & [s/Str]])
+    (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 5 (f 4)))
@@ -523,7 +523,7 @@
   (str arg0))
 
 (def +simple-validated-defn-schema+
-  (s/=> OddLongString OddLong))
+  (sm/=> OddLongString OddLong))
 
 (deftest simple-validated-defn-test
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
@@ -547,7 +547,7 @@
 (do
 
   (def +primitive-validated-defn-schema+
-    (s/=> long OddLong))
+    (sm/=> long OddLong))
 
   (sm/defn ^long primitive-validated-defn
     [^long ^{:s OddLong} arg0]
