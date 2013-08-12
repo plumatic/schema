@@ -91,18 +91,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas
 
-;; anything
+;; anything: The (constantly true) of schemas
 
-;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
-;; loses type info, which makes this unusable in schema-fn.
-;; http://dev.clojure.org/jira/browse/CLJ-1196
 (clojure.core/defrecord AnythingSchema [_]
+  ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
+  ;; loses type info, which makes this unusable in schema-fn.
+  ;; http://dev.clojure.org/jira/browse/CLJ-1196
   Schema
   (check [this x])
   (explain [this] 'anything))
 
 
 ;; eq: single required value
+
 (clojure.core/defrecord EqSchema [v]
   Schema
   (check [this x]
@@ -115,7 +116,7 @@
   [v]
   (EqSchema. v))
 
-;; either
+;; either: satisfy one of the schemas
 
 (clojure.core/defrecord Either [schemas]
   Schema
@@ -131,7 +132,7 @@
   (Either. schemas))
 
 
-;; both
+;; both: satisfy all schemas
 
 (clojure.core/defrecord Both [schemas]
   Schema
@@ -147,7 +148,7 @@
   (Both. schemas))
 
 
-;; maybe
+;; maybe: Can be nil, or if not, satisfy schema
 
 (clojure.core/defrecord Maybe [schema]
   Schema
@@ -164,7 +165,7 @@
 (def ? maybe)
 
 
-;; enum
+;; enum: Must satisfy one of the passed in elems
 
 (clojure.core/defrecord EnumSchema [vs]
   Schema
@@ -178,7 +179,7 @@
   [& vs]
   (EnumSchema. (set vs)))
 
-;; protocol
+;; protocol: Must satisfy? protocol to pass schema
 
 (clojure.core/defn safe-get
   "Like get but throw an exception if not found"
@@ -201,7 +202,7 @@
    "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
-;; pred
+;; pred: Passed in predicate must be true on object to pass
 
 (clojure.core/defrecord Predicate [p?]
   Schema
@@ -216,7 +217,7 @@
   (Predicate. p?))
 
 
-;; named
+;; named: A schema with just a name field
 
 (clojure.core/defrecord NamedSchema [name schema]
   Schema
@@ -258,10 +259,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Shared Schema leaves
 
+;; Satisfied by everything
 (def Any (AnythingSchema. nil))
+
+;; Satisfied only by String
+;; In cljs, must be (pred string?) to and not js/String
+;; because of keywords
 (def Str #+clj String #+cljs (pred string?))
+
+;; Satisfied by any number
 (def Num #+clj Number #+cljs js/Number)
+
+;; Satisfied by integer (e.g., 1.0 is an integer)
 (def Int (pred integer?))
+
+;; Satisfied by keyword
 (def Key (pred keyword?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
