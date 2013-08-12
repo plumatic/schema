@@ -604,20 +604,26 @@
 
 #+cljs
 (defprotocol PSimpleCell
-  (get-cell [this])
-  (set-cell [this x]))
+  (get_cell [this])
+  (set_cell [this x]))
 
 ;; adds ~5% overhead compared to no check
 (deftype SimpleVCell [^:volatile-mutable ^boolean q]
   PSimpleCell
-  (get-cell [this] q)
-  (set-cell [this x] (set! q x)))
+  (get_cell [this] q)
+  (set_cell [this x] (set! q x)))
 
 (def ^schema.core.PSimpleCell use-fn-validation
   "Turn on run-time function validation for functions compiled when
    *compile-function-validation* was true -- has no effect for functions compiled
    when it is false."
   (SimpleVCell. false))
+
+#+cljs
+(do
+  (aset use-fn-validation "get_cell" (partial get_cell use-fn-validation))
+  (aset use-fn-validation "set_cell" (partial set_cell use-fn-validation)))
+
 
 ;; Finally we get to the prize
 ;; In Clojure, we can keep the defn/defrecord macros in this file

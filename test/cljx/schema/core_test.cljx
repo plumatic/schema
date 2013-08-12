@@ -448,15 +448,15 @@
   (sm/=> s/Str OddLong s/Any))
 
 (deftest simple-validated-meta-test
-  (let [f (s/fn ^s/Str foo [^OddLong arg0 arg1])]
+  (let [f (sm/fn ^s/Str foo [^OddLong arg0 arg1])]
     (def s2 (s/fn-schema f))
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest simple-validated-fn-test
-  (let [f (s/fn test-fn :- (s/pred even?)
+  (let [f (sm/fn test-fn :- (s/pred even?)
             [^s/Int x ^{:s {:foo (s/both s/Int (s/pred odd?))}} y]
             (+ x (:foo y -100)))]
-    (s/with-fn-validation
+    (sm/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
       ;; Primitive Interface Test
       #+clj (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
@@ -464,7 +464,7 @@
       (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?
 
     (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
-    (is (= 4 (f (Integer. (int 1)) {:foo 3}))) ;; first arg not long
+    (is (= 4.0 (f 1.0 {:foo 3}))) ;; first arg not long
     (is (= 5 (f 2 {:foo 3})))  ;; return not even?
     ))
 
@@ -474,7 +474,7 @@
 
 (deftest destructured-validated-fn-test
   (let [LongPair [(s/one s/Int "x") (s/one s/Int "y")]
-        f (s/fn foo :- s/Int
+        f (sm/fn foo :- s/Int
             [^LongPair [x y] ^s/Int arg1]
             (+ x y arg1))]
     (is (= (sm/=> s/Int LongPair s/Int)
@@ -484,7 +484,7 @@
       (is (thrown? Exception (f ["a" 2] 3))))))
 
 (deftest two-arity-fn-test
-  (let [f (s/fn foo :- s/Int
+  (let [f (sm/fn foo :- s/Int
             ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
             ([^s/Str arg0] (parse-long arg0)))]
     (is (= (sm/=>* s/Int [s/Str] [s/Str s/Int])
@@ -493,7 +493,7 @@
     (is (= 10 (f "3" 7)))))
 
 (deftest infinite-arity-fn-test
-  (let [f (s/fn foo :- s/Int
+  (let [f (sm/fn foo :- s/Int
             ([^s/Int arg0] (inc arg0))
             ([^s/Int arg0  & ^{:s [s/Str]} strs]
                (reduce + (foo arg0) (map count strs))))]

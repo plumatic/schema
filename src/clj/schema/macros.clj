@@ -177,9 +177,10 @@
                   ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 (defmacro with-fn-validation [& body]
-  `(do (.set_cell schema.core/use-fn-validation true)
-       ~@body
-       (.set_cell schema.core/use-fn-validation false)))
+  `(do
+     (.set_cell schema.core/use-fn-validation true)
+     ~@body
+     (.set_cell schema.core/use-fn-validation false)))
 
 (clojure.core/defn split-rest-arg [bind]
   (let [[pre-& post-&] (split-with #(not= % '&) bind)]
