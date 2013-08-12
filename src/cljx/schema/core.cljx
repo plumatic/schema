@@ -257,26 +257,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Shared Schema leaves
-
-;; Satisfied by everything
-(def Any (AnythingSchema. nil))
-
-;; Satisfied only by String
-;; In cljs, must be (pred string?) to and not js/String
-;; because of keywords
-(def Str #+clj String #+cljs (pred string?))
-
-;; Satisfied by any number
-(def Num #+clj Number #+cljs js/Number)
-
-;; Satisfied by integer (e.g., 1.0 is an integer)
-(def Int (pred integer?))
-
-;; Satisfied by keyword
-(def Key (pred keyword?))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
 
 (clojure.core/defrecord RequiredKey [k])
@@ -501,6 +481,26 @@
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Shared Schema leaves
+
+;; Satisfied by everything
+(def Any (AnythingSchema. nil))
+
+;; Satisfied only by String
+;; In cljs, must be (pred string?) to and not js/String
+;; because of keywords
+(def Str #+clj String #+cljs (pred string?))
+
+;; Satisfied by any number
+(def Num #+clj Number #+cljs js/Number)
+
+;; Satisfied by integer (e.g., 1.0 is an integer)
+(def Int (pred integer?))
+
+;; Satisfied by keyword
+(def Key (pred keyword?))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
 
 ;; On JVM, a Class itself is a schema
@@ -545,8 +545,10 @@
 (extend-protocol Schema
   js/Function
   (check [this x]
-    (when-not (identical? this (.-constructor x))
-      (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
+    (if-let [schema (utils/class-schema this)]
+      (check schema x)
+      (when-not (identical? this (.-constructor x))
+        (macros/validation-error this x (list 'instance? this (utils/value-name x)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -625,12 +627,13 @@
   (aset use-fn-validation "set_cell" (partial set_cell use-fn-validation)))
 
 
-;; Finally we get to the prize
 ;; In Clojure, we can keep the defn/defrecord macros in this file
 ;; In ClojureScript, you have to use from clj schema.macros
 #+clj
 (do
   (ns-unmap *ns* 'fn)
+  ;; schema.core/defrecord gens
+  ;; potemkin records on JVM
   (reset! macros/*use-potemkin* true)
   (potemkin/import-vars
    macros/with-fn-validation
