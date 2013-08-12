@@ -69,7 +69,7 @@
   (print-method (list 'not @(.-expectation-delay err)) writer))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
 (defprotocol Schema
@@ -88,108 +88,8 @@
   (when-let [error (check schema value)]
     (utils/error! "Value does not match schema: %s" error)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Leaf values
-
-
-
-#+clj
-(do
-  (defn- check-class [schema class value]
-    (when-not (instance? class value)
-      (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
-
-  (extend-protocol Schema
-
-    Class
-    (check [this x]
-      (or (check-class this this x)
-          (when-let [more-schema (utils/class-schema this)]
-            (check more-schema x))))
-    (explain [this]
-      (if-let [more-schema (utils/class-schema this)]
-        (explain more-schema)
-        (symbol (.getName ^Class this)))))
-
-  ;; prevent coersion, so you have to be exactly the given type.
-  (defmacro extend-primitive [cast-sym class-sym]
-    `(extend-protocol Schema
-       ~cast-sym
-       (check [this# x#]
-         (check-class ~cast-sym ~class-sym x#))
-       (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
-
-  (extend-primitive clojure.core$double Double)
-  (extend-primitive clojure.core$float Float)
-  (extend-primitive clojure.core$long Long)
-  (extend-primitive clojure.core$int Integer)
-  (extend-primitive clojure.core$short Short)
-  (extend-primitive clojure.core$char Character)
-  (extend-primitive clojure.core$byte Byte)
-  (extend-primitive clojure.core$boolean Boolean))
-
-;; Prototype constructor hack
-#+cljs
-(extend-protocol Schema
-  js/Function
-  (check [this x]
-    (when-not (identical? this (.-constructor x))
-      (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
-
-;; TODO: abstract these into predicates?
-;; single required value
-
-(clojure.core/defrecord EqSchema [v]
-  Schema
-  (check [this x]
-         (when-not (= v x)
-           (macros/validation-error this x (list '= v (utils/value-name x)))))
-  (explain [this] (cons '= v)))
-
-(clojure.core/defn eq
-  "A value that must be = to one element of v."
-  [v]
-  (EqSchema. v))
-
-;; enum
-
-(clojure.core/defrecord EnumSchema [vs]
-  Schema
-  (check [this x]
-         (when-not (contains? vs x)
-           (macros/validation-error this x (list vs (utils/value-name x)))))
-  (explain [this] (cons 'enum vs)))
-
-(clojure.core/defn enum
-  "A value that must be = to one element of vs."
-  [& vs]
-  (EnumSchema. (set vs)))
-
-;; protocol
-
-(clojure.core/defn safe-get
-  "Like get but throw an exception if not found"
-  [m k]
-  (if-let [pair (find m k)]
-    (val pair)
-    (utils/error! "Key %s not found in %s" k m)))
-
-(clojure.core/defrecord Protocol [p]
-  Schema
-  (check [this x]
-         (when-not (satisfies? p x)
-           (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
-  (explain [this] (cons 'protocol (safe-get p :var))))
-
-(clojure.core/defn protocol [p]
-  (macros/assert-iae
-   #+clj (:on p)
-   #+cljs true
-   "Cannot make protocol schema for non-protocol %s" p)
-  (Protocol. p))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Simple helpers / wrappers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Simple Schemas
 
 ;; anything
 
@@ -202,20 +102,18 @@
   (explain [this] 'anything))
 
 
-;; pred
-
-(clojure.core/defrecord Predicate [p?]
-
+;; eq: single required value
+(clojure.core/defrecord EqSchema [v]
   Schema
   (check [this x]
-         (when-not (p? x)
-           (macros/validation-error this x (list p? x))))
-  (explain [this]))
+         (when-not (= v x)
+           (macros/validation-error this x (list '= v (utils/value-name x)))))
+  (explain [this] (cons '= v)))
 
-(clojure.core/defn pred [p?]
-  (when-not (fn? p?)
-    (utils/error! "Not a function: %s" p?))
-  (Predicate. p?))
+(clojure.core/defn eq
+  "A value that must be = to one element of v."
+  [v]
+  (EqSchema. v))
 
 ;; either
 
@@ -264,6 +162,58 @@
   (Maybe. schema))
 
 (def ? maybe)
+
+
+;; enum
+
+(clojure.core/defrecord EnumSchema [vs]
+  Schema
+  (check [this x]
+         (when-not (contains? vs x)
+           (macros/validation-error this x (list vs (utils/value-name x)))))
+  (explain [this] (cons 'enum vs)))
+
+(clojure.core/defn enum
+  "A value that must be = to one element of vs."
+  [& vs]
+  (EnumSchema. (set vs)))
+
+;; protocol
+
+(clojure.core/defn safe-get
+  "Like get but throw an exception if not found"
+  [m k]
+  (if-let [pair (find m k)]
+    (val pair)
+    (utils/error! "Key %s not found in %s" k m)))
+
+(clojure.core/defrecord Protocol [p]
+  Schema
+  (check [this x]
+         (when-not (satisfies? p x)
+           (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
+  (explain [this] (cons 'protocol (safe-get p :var))))
+
+(clojure.core/defn protocol [p]
+  (macros/assert-iae
+   #+clj (:on p)
+   #+cljs true
+   "Cannot make protocol schema for non-protocol %s" p)
+  (Protocol. p))
+
+;; pred
+
+(clojure.core/defrecord Predicate [p?]
+  Schema
+  (check [this x]
+         (when-not (p? x)
+           (macros/validation-error this x (list p? x))))
+  (explain [this]))
+
+(clojure.core/defn pred [p?]
+  (when-not (fn? p?)
+    (utils/error! "Not a function: %s" p?))
+  (Predicate. p?))
 
 
 ;; named
@@ -538,6 +488,54 @@
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Platform-specific Schemas
+
+;; On JVM, a Class itself is a schema
+#+clj
+(do
+  (defn- check-class [schema class value]
+    (when-not (instance? class value)
+      (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
+
+  (extend-protocol Schema
+
+    Class
+    (check [this x]
+      (or (check-class this this x)
+          (when-let [more-schema (utils/class-schema this)]
+            (check more-schema x))))
+    (explain [this]
+      (if-let [more-schema (utils/class-schema this)]
+        (explain more-schema)
+        (symbol (.getName ^Class this)))))
+
+  ;; prevent coersion, so you have to be exactly the given type.
+  (defmacro extend-primitive [cast-sym class-sym]
+    `(extend-protocol Schema
+       ~cast-sym
+       (check [this# x#]
+         (check-class ~cast-sym ~class-sym x#))
+       (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
+
+  (extend-primitive clojure.core$double Double)
+  (extend-primitive clojure.core$float Float)
+  (extend-primitive clojure.core$long Long)
+  (extend-primitive clojure.core$int Integer)
+  (extend-primitive clojure.core$short Short)
+  (extend-primitive clojure.core$char Character)
+  (extend-primitive clojure.core$byte Byte)
+  (extend-primitive clojure.core$boolean Boolean))
+
+;; On JS, we treat functions as prototypes so any function prototype checks
+;; objects for compatibility (Prototype constructor hack)
+#+cljs
+(extend-protocol Schema
+  js/Function
+  (check [this x]
+    (when-not (identical? this (.-constructor x))
+      (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
@@ -610,7 +608,8 @@
   (SimpleVCell. false))
 
 ;; Finally we get to the prize
-;; In Clojure, we can keep the macros in this file
+;; In Clojure, we can keep the defn/defrecord macros in this file
+;; In ClojureScript, you have to use from clj schema.macros
 #+clj
 (do
   (ns-unmap *ns* 'fn)
