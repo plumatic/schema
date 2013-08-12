@@ -153,7 +153,7 @@
            `potemkin/defrecord+
            `clojure.core/defrecord)
         ~name ~field-schema ~@more-args)
-       (schema.core/declare-class-schema!
+       (utils/declare-class-schema!
         ~name
         (assoc-when
          (schema.core/record ~name (merge ~(into {}
@@ -352,4 +352,4 @@
                                   (when-not (primitive-sym? t)
                                     t))))
          ~fn-form)
-       (schema.core/declare-class-schema! (class ~name) ~schema-form))))
+       (utils/declare-class-schema! (class ~name) ~schema-form))))

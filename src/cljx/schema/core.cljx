@@ -74,8 +74,8 @@
 
 (defprotocol Schema
   (check [this x]
-    "Validate that x satisfies this schema, returning a description of the validation
-     failure(s) or nil for success.")
+    "Validate that x satisfies this schema, returning a ValidationError when
+     `x` doesn't satisfy the schema and nil for success.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
@@ -91,46 +91,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Leaf values
 
-#+clj
-(let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
-  ;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))
-  ;; is too slow in practice, so for now we leak classes.  Figure out a concurrent, fast,
-  ;; weak alternative.
-  (clojure.core/defn declare-class-schema! [klass schema]
-    "Globally set the schema for a class (above and beyond a simple instance? check).
-   Use with care, i.e., only on classes that you control.  Also note that this
-   schema only applies to instances of the concrete type passed, i.e.,
-   (= (class x) klass), not (instance? klass x)."
-    (macros/assert-iae (class? klass) "Cannot declare class schema for non-class %s" (class klass))
-    (.put +class-schemata+ klass schema))
 
-  (clojure.core/defn class-schema [klass]
-    "The last schema for a class set by declare-class-schema!, or nil."
-    (.get +class-schemata+ klass)))
-
-#+cljs
-(let [+class-schemata+ (js-obj)]
-  (clojure.core/defn declare-class-schema! [klass schema]
-    (aset +class-schemata+ klass schema))
-
-  (clojure.core/defn class-schema [klass]
-    (aget +class-schemata+ klass)))
-
-(defn- check-class [schema class value]
-  (when-not (instance? class value)
-    (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
 
 #+clj
 (do
+  (defn- check-class [schema class value]
+    (when-not (instance? class value)
+      (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
+
   (extend-protocol Schema
 
     Class
     (check [this x]
       (or (check-class this this x)
-          (when-let [more-schema (class-schema this)]
+          (when-let [more-schema (utils/class-schema this)]
             (check more-schema x))))
     (explain [this]
-      (if-let [more-schema (class-schema this)]
+      (if-let [more-schema (utils/class-schema this)]
         (explain more-schema)
         (symbol (.getName ^Class this)))))
 
@@ -594,7 +571,7 @@
    and on metadata otherwise (for fns)."
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
-  (or (class-schema (utils/type-of f))
+  (or (utils/class-schema (utils/type-of f))
       (safe-get (meta f) :schema)))
 
 (clojure.core/defn input-schema
@@ -632,13 +609,11 @@
    when it is false."
   (SimpleVCell. false))
 
-#+clj
-(ns-unmap *ns* 'fn)
-
 ;; Finally we get to the prize
 ;; In Clojure, we can keep the macros in this file
 #+clj
 (do
+  (ns-unmap *ns* 'fn)
   (reset! macros/*use-potemkin* true)
   (potemkin/import-vars
    macros/with-fn-validation
@@ -646,6 +621,5 @@
    macros/=>*
    macros/defrecord
    macros/fn
-   macros/defn))
-
-#+clj (set! *warn-on-reflection* false)
+   macros/defn)
+  (set! *warn-on-reflection* false))

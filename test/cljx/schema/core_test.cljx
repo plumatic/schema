@@ -1,14 +1,18 @@
 (ns schema.core-test
-  #+clj (:use clojure.test schema.test-macros)
+  #+clj
+  (:use clojure.test
+        [schema.test-macros :only [valid! invalid!]])
   #+cljs
   (:use-macros
-   [cljs-test.macros :only [is is= deftest]])
+   [cljs-test.macros :only [is is= deftest]]
+   [schema.test-macros :only [testing]])
   #+cljs
   (:require-macros
    [schema.macros :as sm])
   (:require
    [schema.utils :as utils]
-   #+clj potemkin [schema.core :as s]
+   #+clj potemkin
+   [schema.core :as s]
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
@@ -38,17 +42,28 @@
     (let [ex-atom (atom nil)]
       (try
         (s/validate s x)
-        (catch #+clj Exception #+cljs js/Error e
-               (reset! ex-atom e)))
+        (catch js/Error e
+          (reset! ex-atom e)))
       (is @ex-atom))))
 
-;;; leaves
 
-(deftest class-test
-  (valid! s/Str "foo")
-  (invalid! s/Str :foo)
-  (valid! s/Int 4)
-  (valid! s/Key :foo))
+;;; Eq Tests
+
+(deftest eq-test
+  (let [schema (s/eq 10)]
+    (valid! schema 10)
+    (invalid! schema 9)))
+
+;;; Enum Tests
+
+(deftest enum-test
+  (let [schema (s/enum :a :b 1)]
+    (valid! schema :a)
+    (valid! schema 1)
+    (invalid! schema :c)
+    (invalid! schema 2)))
+
+;;; leaves
 
 (deftest map-test
   (let [Str->Num {s/Str s/Num}]
@@ -57,7 +72,7 @@
     (invalid! Str->Num {:a 1 "b" 2})
     (invalid! Str->Num {"a" "1"})))
 
-(deftest fn-test
+(deftest pred-test
   (valid! (s/pred odd?) 1)
   (invalid! (s/pred odd?) 2)
   (valid! (s/pred string?) "foo")
@@ -85,17 +100,11 @@
     (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
     (valid! (Class/forName "[D") (double-array [1.0]))))
 
-(deftest eq-test
-  (let [schema (s/eq 10)]
-    (valid! schema 10)
-    (invalid! schema 9)))
-
-(deftest enum-test
-  (let [schema (s/enum :a :b 1)]
-    (valid! schema :a)
-    (valid! schema 1)
-    (invalid! schema :c)
-    (invalid! schema 2)))
+(deftest class-test
+  (valid! s/Str "foo")
+  (invalid! s/Str :foo)
+  (valid! s/Int 4)
+  (valid! s/Key :foo))
 
 (defprotocol ATestProtocol)
 (def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
@@ -312,20 +321,20 @@
     (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
     (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
     (testing "both" (test-normalized-meta ^{:tag Object :schema String} foo nil {:tag Object :schema String}))
-    (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String}))))
+    (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
 
-(defmacro test-meta-extraction [meta-form arrow-form]
-  (let [meta-ized (schema.macros/process-arrow-schematized-args {} arrow-form)]
-    `(do (is (= '~meta-form '~meta-ized))
-         (is (= ~(mapv #(select-keys (meta (schema.macros/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
-                ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
+  (defmacro test-meta-extraction [meta-form arrow-form]
+    (let [meta-ized (schema.macros/process-arrow-schematized-args {} arrow-form)]
+      `(do (is (= '~meta-form '~meta-ized))
+           (is (= ~(mapv #(select-keys (meta (schema.macros/normalized-metadata {} % nil)) [:schema :tag]) meta-form)
+                  ~(mapv #(select-keys (meta %) [:schema :tag]) meta-ized))))))
 
-(deftest extract-arrow-schematized-args-test
-  (testing "empty" (test-meta-extraction [] []))
-  (testing "no-tag" (test-meta-extraction [x] [x]))
-  (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
-  (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-  (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
+  (deftest extract-arrow-schematized-args-test
+    (testing "empty" (test-meta-extraction [] []))
+    (testing "no-tag" (test-meta-extraction [x] [x]))
+    (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
+    (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
+    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
 
 (defprotocol PProtocol
   (do-something [this]))
@@ -353,7 +362,7 @@
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
-  (is (= (s/class-schema Bar)
+  (is (= (utils/class-schema Bar)
          (s/record Bar {:foo s/Int
                         :bar s/Str
                         (s/optional-key :baz) s/Key})))
@@ -385,7 +394,7 @@
   {(s/optional-key :baz) s/Key})
 
 (deftest defrecord-new-style-schema-test
-  (is (= (s/class-schema BarNewStyle)
+  (is (= (utils/class-schema BarNewStyle)
          (s/record BarNewStyle {:foo s/Int
                                 :bar s/Str
                                 (s/optional-key :baz) s/Key})))
@@ -408,7 +417,7 @@
 (deftest fancier-defrecord-schema-test
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
-    (is (= (s/class-schema Nested)
+    (is (= (utils/class-schema Nested)
            (s/record Nested {:b Bar4
                              :c LongOrString
                              :p (s/protocol PProtocol)})))
