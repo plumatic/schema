@@ -35,11 +35,12 @@
   ;; :hooks [leiningen.cljsbuild]
 
   :cljsbuild {:builds
-              {:dev {:source-paths ["target/generated/src/cljs"]
+              {:dev {:source-paths ["src/clj" "target/generated/src/cljs"]
                      :compiler {:output-to "target/main.js"
                                 :optimizations :whitespace
                                 :pretty-print true}}
-               :test {:source-paths ["target/generated/src/cljs" "target/generated/test/cljs"]
+               :test {:source-paths [ "src/clj" "test/clj"
+                                      "target/generated/src/cljs" "target/generated/test/cljs"]
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
                                  :pretty-print true}}}}
