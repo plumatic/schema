@@ -2,6 +2,18 @@
   (:refer-clojure :exclude [defrecord defprotocol])
   #+clj (:require potemkin))
 
+;; TODO(ah) copied from plumbing. explain why
+
+(defn assoc-when
+  "Like assoc but only assocs when value is truthy"
+  [m & kvs]
+  (assert (even? (count kvs)))
+  (into (or m {})
+        (for [[k v] (partition 2 kvs)
+              :when v]
+          [k v])))
+
+
 #+clj
 (let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
   ;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))

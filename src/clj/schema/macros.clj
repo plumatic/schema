@@ -41,17 +41,6 @@
       tag))
 
 
-;; TODO(ah) copied from plumbing. explain why
-
-(clojure.core/defn assoc-when
-  "Like assoc but only assocs when value is truthy"
-  [m & kvs]
-  (assert (even? (count kvs)))
-  (into (or m {})
-        (for [[k v] (partition 2 kvs)
-              :when v]
-          [k v])))
-
 
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
@@ -73,10 +62,10 @@
       (with-meta imeta
         (-> (or (meta imeta) {})
             (dissoc :tag :s :s? :schema)
-            (assoc-when :schema schema
-                        :tag (let [t (or tag schema)]
-                               (when (valid-tag? env t)
-                                 t))))))))
+            (utils/assoc-when :schema schema
+                              :tag (let [t (or tag schema)]
+                                     (when (valid-tag? env t)
+                                       t))))))))
 
 
 (clojure.core/defn extract-arrow-schematized-element
@@ -155,7 +144,7 @@
         ~name ~field-schema ~@more-args)
        (utils/declare-class-schema!
         ~name
-        (assoc-when
+        (utils/assoc-when
          (schema.core/record ~name (merge ~(into {}
                                                  (for [k field-schema]
                                                    [ (keyword (clojure.core/name k))
@@ -345,11 +334,11 @@
         {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
     `(let ~schema-bindings
        (def ~(with-meta name
-               (assoc-when (or attr-map? {})
-                           :doc doc-string?
-                           :schema schema-form
-                           :tag (let [t (:tag (meta name))]
-                                  (when-not (primitive-sym? t)
-                                    t))))
+               (utils/assoc-when (or attr-map? {})
+                                 :doc doc-string?
+                                 :schema schema-form
+                                 :tag (let [t (:tag (meta name))]
+                                        (when-not (primitive-sym? t)
+                                          t))))
          ~fn-form)
        (utils/declare-class-schema! (class ~name) ~schema-form))))
