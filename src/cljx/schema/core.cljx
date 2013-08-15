@@ -86,7 +86,7 @@
 
 (clojure.core/defn validate [schema value]
   (when-let [error (check schema value)]
-    (utils/error! "Value does not match schema: %s" error)))
+    (utils/error! "Value does not match schema: %s" (pr-str error))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas

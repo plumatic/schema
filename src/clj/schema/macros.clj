@@ -168,8 +168,8 @@
           `(clojure.core/defn ~(symbol (str 'strict-map-> name))
              ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym]
-             (when-not (= (count ~map-sym) ~(count field-schema))
+             [~map-sym & [drop-extra-keys?#]]
+             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
                (utils/error! "Record has wrong set of keys: %s"
                              (data/diff (set (keys ~map-sym))
                                         ~(set (map keyword field-schema)))))
