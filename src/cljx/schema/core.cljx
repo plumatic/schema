@@ -80,6 +80,9 @@
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves"))
 
+#+clj
+(defmethod print-method Schema [s writer]
+  (print-method (explain s) writer))
 
 ;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
 ;; check and produces the validation-error automatically somehow.
@@ -99,8 +102,7 @@
   ;; http://dev.clojure.org/jira/browse/CLJ-1196
   Schema
   (check [this x])
-  (explain [this] 'anything))
-
+  (explain [this] 'Any))
 
 ;; eq: single required value
 
@@ -109,7 +111,7 @@
   (check [this x]
          (when-not (= v x)
            (macros/validation-error this x (list '= v (utils/value-name x)))))
-  (explain [this] (cons '= v)))
+  (explain [this] (list 'eq v)))
 
 (clojure.core/defn eq
   "A value that must be = to one element of v."
@@ -193,7 +195,7 @@
   (check [this x]
          (when-not (satisfies? p x)
            (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
-  (explain [this] (cons 'protocol (safe-get p :var))))
+  (explain [this] (list 'protocol p)))
 
 (clojure.core/defn protocol [p]
   (macros/assert-iae
@@ -209,7 +211,10 @@
   (check [this x]
          (when-not (p? x)
            (macros/validation-error this x (list p? x))))
-  (explain [this]))
+  (explain [this]
+           (cond (= p? integer?) 'Int
+                 (= p? keyword?) 'Key
+                 :else (list 'pred p?))))
 
 (clojure.core/defn pred [p?]
   (when-not (fn? p?)
@@ -219,15 +224,15 @@
 
 ;; named: A schema with just a name field
 
-(clojure.core/defrecord NamedSchema [name schema]
+(clojure.core/defrecord NamedSchema [schema name]
   Schema
-  (check [this x] (check schema x)) ;; TODO: something more?
-  (explain [this] (list 'named name (explain schema))))
+  (check [this x] (check schema x))
+  (explain [this] (list 'named (explain schema) name)))
 
 (clojure.core/defn named
   "Provide an explicit name for this schema element, useful for seqs."
   [schema name]
-  (NamedSchema. name schema))
+  (NamedSchema. schema name))
 
 
 ;; conditional
@@ -240,8 +245,10 @@
            (macros/validation-error this x (list 'not-any? (list 'matches-pred? (utils/value-name x))
                                                  (map first preds-and-schemas)))))
   (explain [this]
-           (list 'conditional (for [[pred schema] preds-and-schemas]
-                                [pred (explain schema)]))))
+           (cons 'conditional
+                 (->> preds-and-schemas
+                      (partition 2)
+                      (mapcat (fn [pred schema] [pred (explain schema)]))))))
 
 (clojure.core/defn conditional
   "Define a conditional schema.  Takes args like cond,
@@ -339,14 +346,14 @@
   (explain [this]
     (into {}
           (for [[k v] this]
-            [ (if (specific-key? k)
-                (if (keyword? k)
-                  k
-                  (list (cond (instance? RequiredKey k) 'required-key
-                              (instance? OptionalKey k) 'optional-key)
-                        (safe-get k :k)))
-                (explain k))
-              (explain v)]))))
+            [(if (specific-key? k)
+               (if (keyword? k)
+                 k
+                 (list (cond (instance? RequiredKey k) 'required-key
+                             (instance? OptionalKey k) 'optional-key)
+                       (safe-get k :k)))
+               (explain k))
+             (explain v)]))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -357,6 +364,7 @@
 ;; followed by an optional (implicit) repeated.
 
 (clojure.core/defrecord One [schema name])
+
 (clojure.core/defn one
   "A single element of a sequence (not repeated, the implicit default)"
   [schema name]
@@ -400,9 +408,9 @@
       (vec
        (concat
         (for [^One s singles]
-          (list (.-name s) (explain (.-schema s))))
+          (list 'one (explain (:schema s)) (:name s)))
         (when multi
-          ['& (explain multi)]))))))
+          [(explain multi)]))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set schemas
@@ -421,9 +429,7 @@
           (macros/validation-error this x (list 'set? (utils/value-name x))))
         (when-let [out (seq (keep #(check (first this) %) x))]
           (macros/validation-error this x (set out)))))
-
-  (explain [this]
-    (set (map explain this))))
+  (explain [this] (set [(explain (first this))])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -438,7 +444,7 @@
              (when-let [f (:extra-validator-fn this)]
                (check f r))))
   (explain [this]
-           #+clj (list (symbol (.getName ^Class klass)) (explain schema))))
+           #+clj (list 'record (symbol (.getName ^Class klass)) (explain schema))))
 
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
@@ -511,7 +517,6 @@
       (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
 
   (extend-protocol Schema
-
     Class
     (check [this x]
       (or (check-class this this x)

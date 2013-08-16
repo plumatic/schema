@@ -342,7 +342,7 @@
 ;; exercies some different arities
 
 (sm/defrecord Bar
-    [^s/Int foo  ^s/Str bar]
+    [^s/Int foo ^s/Str bar]
   {(s/optional-key :baz) s/Key})
 
 (sm/defrecord Bar2
