@@ -359,21 +359,30 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence schemata
 
-;; default for seqs is repeated schema.
-;; to do destructuring style, can use any number of 'single' elements
-;; followed by an optional (implicit) repeated.
+;; A sequence schema looks like [one* optional* rest-schema?].
+;; one matches a single required element.  Then optional matches a single
+;; optional element (with arguments always matching the earliest optional schema).
+;; Finally, rest-schema must match any remaining elements.
 
-(clojure.core/defrecord One [schema name])
+(clojure.core/defrecord One [schema optional? name])
 
 (clojure.core/defn one
-  "A single element of a sequence (not repeated, the implicit default)"
-  [schema name]
-  (One. schema name))
+  "A single required element of a sequence (not repeated, the implicit default)"
+  ([schema name]
+     (One. schema false name)))
 
-(defn- split-singles [this]
-  (if (instance? One (last this))
-    [this nil]
-    [(butlast this) (last this)]))
+(clojure.core/defn optional
+  "A single optional element of a sequence (not repeated, the implicit default)"
+  ([schema name]
+     (One. schema true name)))
+
+(defn- parse-sequence-schema [s]
+  (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
+        [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
+    (macros/assert-iae
+     (and (<= (count more) 1) (every? #(not (instance? One %)) more))
+     "Sequence schema must look like [one* optional* rest-schema?]")
+    [(concat required optional) (first more)]))
 
 (extend-protocol Schema
   #+clj clojure.lang.APersistentVector
@@ -384,31 +393,33 @@
         (when (try (seq x) true
                    (catch #+clj Exception #+cljs js/Error e
                           (macros/validation-error this x (list 'throws (list 'seq (utils/value-name x)))))))
-        (let [[singles multi] (split-singles this)]
-          (loop [singles singles x x out []]
-            (if-let [[^One first-single & more-singles] (seq singles)]
-              (if (empty? x)
-                (conj out
-                      (macros/validation-error (vec singles) nil (list 'has-enough-elts? (count singles))))
-                (recur more-singles
-                       (rest x)
-                       (conj out (check (.-schema first-single) (first x)))))
-              (let [out (cond multi
-                              (into out (map #(check multi %) x))
+        (let [[singles multi] (parse-sequence-schema this)]
+          (#(when (some identity %) %)
+           (loop [singles singles x x out []]
+             (if-let [[^One first-single & more-singles] (seq singles)]
+               (if (empty? x)
+                 (if (.-optional? first-single)
+                   out
+                   (conj out
+                         (macros/validation-error
+                          (vec singles) nil (list 'has-enough-elts? (count singles)))))
+                 (recur more-singles
+                        (rest x)
+                        (conj out (check (.-schema first-single) (first x)))))
+               (cond multi
+                     (into out (map #(check multi %) x))
 
-                              (seq x)
-                              (conj out (macros/validation-error nil x (list 'has-extra-elts? (count x))))
+                     (seq x)
+                     (conj out (macros/validation-error nil x (list 'has-extra-elts? (count x))))
 
-                              :else
-                              out)]
-                (when (some identity out)
-                  out)))))))
+                     :else
+                     out)))))))
   (explain [this]
-    (let [[singles multi] (split-singles this)]
+    (let [[singles multi] (parse-sequence-schema this)]
       (vec
        (concat
         (for [^One s singles]
-          (list 'one (explain (:schema s)) (:name s)))
+          (list (if (.-optional? s) 'optional 'one) (explain (:schema s)) (:name s)))
         (when multi
           [(explain multi)]))))))
 

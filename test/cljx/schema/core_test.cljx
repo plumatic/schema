@@ -222,13 +222,28 @@
     (invalid! schema [1 1])
     (invalid! schema [1.0 1.0])))
 
-(deftest combo-seq-test
-  (let [schema [(s/one (s/maybe s/Int) "maybe-long") s/Num]]
+(deftest optional-seq-test
+  (let [schema [(s/one s/Int "int")
+                (s/optional s/Str "str")
+                (s/optional s/Int "int2")]]
     (valid! schema [1])
-    (valid! schema [1 1.0 2.0 3.0])
-    (valid! schema [nil 1.0 2.0 3.0])
-    #+clj (invalid! schema [1.0 2.0 3.0])
-    (invalid! schema [1.1 2.01 3.9])
+    (valid! schema [1 "a"])
+    (valid! schema [1 "a" 2])
+    (invalid! schema [])
+    (invalid! schema [1 "a" 2 3])
+    (invalid! schema [1 1])))
+
+(deftest combo-seq-test
+  (let [schema [(s/one (s/maybe s/Int) "maybe-long")
+                (s/optional s/Str "str")
+                s/Num]]
+    (valid! schema [1])
+    (valid! schema [1 "a"])
+    (valid! schema [1 "a" 1.0 2.0 3.0])
+    (valid! schema [nil "b" 1.0 2.0 3.0])
+    (invalid! schema [nil 1 1.0 2.0 3.0])
+    #+clj (invalid! schema [1.0 "A" 2.0 3.0])
+    (invalid! schema [1.1 "A" 2.01 3.9])
     (invalid! schema [])))
 
 ;; TODO: most of the invalid! cases above should be replaced with
