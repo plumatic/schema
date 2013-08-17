@@ -15,21 +15,21 @@
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
-;; (sm/defrecord Explainer
-;;     [^long foo ^String bar]
-;;   {(s/optional-key :baz) clojure.lang.Keyword})
+(sm/defrecord Explainer
+    [^s/Int foo ^s/Key bar]
+  {(s/optional-key :baz) s/Key})
 
-;; (deftest explain-test
-;;   (is (= (s/explain {(s/required-key 'x) long
-;;                      String [(s/one int "foo") (s/maybe Explainer)]})
-;;          '{(required-key x) long
-;;            java.lang.String [("foo" int)
-;;                              &
-;;                              (maybe
-;;                               (schema.core_test.Explainer
-;;                                {:foo long
-;;                                 :bar java.lang.String
-;;                                 (optional-key :baz) clojure.lang.Keyword}))]})))
+(deftest explain-test
+  (is (= (s/explain {(s/required-key 'x) s/Int
+                     s/Key [(s/one s/Int "foo") (s/maybe Explainer)]})
+         `{~'(required-key x) ~'Int
+           ~'Key [(~'one ~'Int "foo")
+                  (~'maybe
+                   (~'record
+                    Explainer
+                    {:foo ~'Int
+                     :bar ~'Key
+                     (~'optional-key :baz) ~'Key}))]})))
 
 ;;; clj helpers
 (do

@@ -59,8 +59,6 @@
 #+clj (set! *warn-on-reflection* true)
 
 ;; TODO: better error messages for fn schema validation
-;; TODO: sequences have to support optional args before final to handle
-;; (defn foo [x & [y]]) type things.
 
 (deftype ValidationError [schema value expectation-delay])
 
