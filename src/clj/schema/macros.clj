@@ -128,8 +128,7 @@
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (process-arrow-schematized-args &env field-schema)
-        ]
+        field-schema (process-arrow-schematized-args &env field-schema)]
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
                                          (keys ~extra-key-schema?)))]
@@ -145,13 +144,15 @@
        (utils/declare-class-schema!
         ~name
         (utils/assoc-when
-         (schema.core/record ~name (merge ~(into {}
-                                                 (for [k field-schema]
-                                                   [ (keyword (clojure.core/name k))
-                                                     (do (assert-iae (symbol? k)
-                                                                     "Non-symbol in record binding form: %s" k)
-                                                         (extract-schema-form k))]))
-                                          ~extra-key-schema?))
+         (schema.core/record
+          ~name
+          (merge ~(into {}
+                        (for [k field-schema]
+                          [(keyword (clojure.core/name k))
+                           (do (assert-iae (symbol? k)
+                                           "Non-symbol in record binding form: %s" k)
+                               (extract-schema-form k))]))
+                 ~extra-key-schema?))
          :extra-validator-fn ~extra-validator-fn?))
        ~(let [map-sym (gensym "m")]
           `(clojure.core/defn ~(symbol (str 'map-> name))
@@ -182,30 +183,42 @@
      ~@body
      (.set_cell schema.core/use-fn-validation false)))
 
-(clojure.core/defn split-rest-arg [bind]
-  (let [[pre-& post-&] (split-with #(not= % '&) bind)]
+(clojure.core/defn split-rest-arg [env bind]
+  (let [[pre-& [_ rest-arg :as post-&]] (split-with #(not= % '&) bind)]
     (if (seq post-&)
-      (do (assert-iae (= (count post-&) 2) "Got more than 1 symbol after &: %s" (vec post-&))
-          (assert-iae (symbol? (second post-&)) "Got non-symbol after & (currently unsupported): %s" (vec post-&))
-          [(vec pre-&) (last post-&)])
+      (do (assert-iae (= (count post-&) 2) "& must be followed by a single binding" (vec post-&))
+          (assert-iae (or (symbol? rest-arg)
+                          (and (vector? rest-arg)
+                               (not-any? #{'&} rest-arg)))
+                      "Bad & binding form: currently only bare symbols and vectors supported" (vec post-&))
+
+          [(vec pre-&)
+           (if (vector? rest-arg)
+             (with-meta (process-arrow-schematized-args env rest-arg) (meta rest-arg))
+             rest-arg)])
       [bind nil])))
 
-(clojure.core/defn single-arg-schema-form [[index arg]]
-  `(schema.core/one
+(clojure.core/defn single-arg-schema-form [rest? [index arg]]
+  `(~(if rest? `schema.core/optional `schema.core/one)
     ~(extract-schema-form arg)
     ~(if (symbol? arg)
        (name arg)
-       (str "arg" index))))
+       (str (if rest? "rest" "arg") index))))
+
+(clojure.core/defn simple-arglist-schema-form [rest? regular-args]
+  (mapv (partial single-arg-schema-form rest?) (map-indexed vector regular-args)))
 
 (clojure.core/defn rest-arg-schema-form [arg]
   (let [s (extract-schema-form arg)]
-    (if (= s `schema.core/Anything)
-      [`schema.core/Anything]
+    (if (= s `schema.core/Any)
+      (if (vector? arg)
+        (simple-arglist-schema-form true arg)
+        [`schema.core/Any])
       (do (assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 
 (clojure.core/defn input-schema-form [regular-args rest-arg]
-  (let [base (mapv single-arg-schema-form (map-indexed vector regular-args))]
+  (let [base (simple-arglist-schema-form false regular-args)]
     (if rest-arg
       (vec (concat base (rest-arg-schema-form rest-arg)))
       base)))
@@ -223,23 +236,25 @@
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
     (utils/error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
   (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
-        [regular-args rest-arg] (split-rest-arg bind)
+        [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
      :arity-form (if true
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
+                         rest-sym (when rest-arg (gensym "rest"))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
                      (list
                       (if rest-arg
-                        (-> metad-bind-syms (conj '&) (conj rest-arg))
+                        (into metad-bind-syms ['& rest-sym])
                         metad-bind-syms)
-                      `(let ~(vec (interleave (map #(with-meta % {}) bind) bind-syms))
+                      `(let ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
+                                   (when rest-arg [rest-arg rest-sym]))
                          (let [validate# (.get_cell ~'ufv)]
                            (when validate#
                              (schema.core/validate
                               ~input-schema-sym
                               ~(if rest-arg
-                                 `(list* ~@bind-syms ~rest-arg)
+                                 `(list* ~@bind-syms ~rest-sym)
                                  bind-syms)))
                            (let [o# (do ~@body)]
                              (when validate# (schema.core/validate ~output-schema-sym o#))
@@ -297,10 +312,8 @@
 
 (defmacro fn
   "Like clojure.core/fn, except that schema-style typehints can be given on the argument
-   symbols and on the arguemnt vector (for the return value), and (for now)
-   schema metadata is only processed at the top-level.  i.e., you can use destructuring,
-   but you must put schema metadata on the top level arguments and not on the destructured
-   shit.  The only unsupported form is the '& {}' map destructuring.
+   symbols and on the function name (for the return value).  The rules for typehints are
+   the same as for defrecord.
 
    This produces a fn that you can call fn-schema on to get a schema back.
    This is currently done using metadata for fns, which currently causes
@@ -309,7 +322,19 @@
 
    When compile-fn-validation is true (at compile-time), also automatically
    generates pre- and post-conditions on each arity that validate the input and output
-   schemata whenever *use-fn-validation* is true (at run-time)."
+   schemata whenever *use-fn-validation* is true (at run-time).
+
+   Current limitations / notable differences from clojure.core/defn:
+    - Return type metadata always goes on the fn name.  Primitive hints will be propagated
+    to the arg vector automatically.  All arities must share the same return schema
+    - Schema metadata is only processed on top-level arguments.  I.e., you can use
+    destructing, but you must put schema metadata on the top-level arguments, not the
+    destructured variables
+    - Only a specific subset of rest-arg destructuring is supported:
+      - & rest works as expected, with for any number of extra args
+      - & [a b] works, with schemas for individual elements parsed out of the binding,
+        or an overall schema on the vector
+      - & {} is not supported."
   [& fn-args]
   (let [[name more-fn-args] (if (symbol? (first fn-args))
                               (extract-arrow-schematized-element &env fn-args)
@@ -321,13 +346,10 @@
 (defmacro defn
   "defn : clojure.core/defn :: fn : clojure.core/fn.
 
-   Things of note:
-    - Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions
-    - The '& {}' map destructing form is not supported
+   Notes specific to defn:
     - fn-schema works on the class of the fn, so primitive hints are supported and there
       is no overhead, unlike with 'fn' above
-    - Output metadata always goes on the argument vector.  If you use the same bare
-      class on every arity, this will automatically propagate to the tag on the name."
+    - Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions"
   [& defn-args]
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)

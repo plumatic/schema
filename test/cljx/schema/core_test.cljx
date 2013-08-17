@@ -1,7 +1,6 @@
 (ns schema.core-test
   #+clj
-  (:use clojure.test
-        [schema.test-macros :only [valid! invalid!]])
+  (:use clojure.test)
   #+cljs
   (:use-macros
    [cljs-test.macros :only [is is= deftest]]
@@ -32,6 +31,17 @@
 ;;                                 :bar java.lang.String
 ;;                                 (optional-key :baz) clojure.lang.Keyword}))]})))
 
+;;; clj helpers
+(do
+  (defmacro valid! [s x]
+    `(is (do (schema.core/validate ~s ~x) true)))
+
+  (defmacro invalid! [s x]
+    `(is (~'thrown? Throwable (schema.core/validate ~s ~x))))
+
+  (defmacro invalid-call! [f & args]
+    `(is (~'thrown? Throwable (~f ~@args)))))
+
 ;;; Cljs Helpers Only
 #+cljs
 (do
@@ -39,12 +49,17 @@
     (is (do (s/validate s x) true)))
 
   (defn invalid! [s x]
-    (let [ex-atom (atom nil)]
-      (try
-        (s/validate s x)
-        (catch js/Error e
-          (reset! ex-atom e)))
-      (is @ex-atom))))
+    (is
+     (try
+       (s/validate s x)
+       (catch js/Error e
+         e))))
+
+  (defn invalid-call! [f & args]
+    (is
+     (try
+       (apply f args) false
+       (catch js/Error e true)))))
 
 
 ;;; Eq Tests
@@ -405,22 +420,24 @@
 
 (sm/defrecord BarNewStyle
     [foo :- s/Int
-     bar :- s/Str]
+     bar :- s/Str
+     zoo]
   {(s/optional-key :baz) s/Key})
 
 (deftest defrecord-new-style-schema-test
   (is (= (utils/class-schema BarNewStyle)
          (s/record BarNewStyle {:foo s/Int
                                 :bar s/Str
+                                :zoo s/Any
                                 (s/optional-key :baz) s/Key})))
-  (is (BarNewStyle. 1 :foo))
-  (is (= #{:foo :bar} (set (keys (map->BarNewStyle {:foo 1})))))
+  (is (BarNewStyle. 1 :foo "a"))
+  (is (= #{:foo :bar :zoo} (set (keys (map->BarNewStyle {:foo 1})))))
   ;; (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
-  (valid! BarNewStyle (BarNewStyle. 1 "test"))
-  (invalid! BarNewStyle (BarNewStyle. 1 :foo))
-  (valid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baz :foo))
-  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baaaz :foo))
-  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test") :baz "foo")))
+  (valid! BarNewStyle (BarNewStyle. 1 "test" "a"))
+  (invalid! BarNewStyle (BarNewStyle. 1 :foo "a"))
+  (valid! BarNewStyle (assoc (BarNewStyle. 1 "test" "a") :baz :foo))
+  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test" "a") :baaaz :foo))
+  (invalid! BarNewStyle (assoc (BarNewStyle. 1 "test" "a") :baz "foo")))
 
 
 ;; Now test that schemata and protocols work as type hints.
@@ -447,11 +464,11 @@
 ;;; Schematized functions
 
 ;; helpers
-
+#+clj
 (deftest split-rest-arg-test
-  (is (= (schema.macros/split-rest-arg ['a '& 'b])
+  (is (= (schema.macros/split-rest-arg {} ['a '& 'b])
          '[[a] b]))
-  (is (= (schema.macros/split-rest-arg ['a 'b])
+  (is (= (schema.macros/split-rest-arg {} ['a 'b])
          '[[a b] nil])))
 
 ;;; fn
@@ -475,8 +492,8 @@
       (is (= 4 (f 1 {:foo 3})))
       ;; Primitive Interface Test
       #+clj (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
-      (is (thrown? Exception (f 1 {:foo 4}))) ;; foo not odd?
-      (is (thrown? Exception (f 2 {:foo 3}))))  ;; return not even?
+      (invalid-call! f 1 {:foo 4}) ;; foo not odd?
+      (invalid-call! f 2 {:foo 3}))  ;; return not even?
 
     (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
     (is (= 4.0 (f 1.0 {:foo 3}))) ;; first arg not long
@@ -496,7 +513,7 @@
            (s/fn-schema f)))
     (s/with-fn-validation
       (is (= 6 (f [1 2] 3)))
-      (is (thrown? Exception (f ["a" 2] 3))))))
+      (invalid-call! f ["a" 2] 3))))
 
 (deftest two-arity-fn-test
   (let [f (sm/fn foo :- s/Int
@@ -517,8 +534,38 @@
     (s/with-fn-validation
       (is (= 5 (f 4)))
       (is (= 16 (f 4 "55555" "666666")))
-      (is (thrown? Exception (f 4 [3 3 3]))))))
+      (invalid-call! f 4 [3 3 3]))))
 
+(deftest rest-arg-destructuring-test
+  (testing "no schema"
+    (let [f (sm/fn foo :- s/Int
+              [^s/Int arg0 & [rest0]] (+ arg0 (or rest0 2)))]
+      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Any "rest0")]])
+             (s/fn-schema f)))
+      (s/with-fn-validation
+        (is (= 6 (f 4)))
+        (is (= 9 (f 4 5)))
+        (invalid-call! f 4 9 2))))
+  (testing "arg schema"
+    (let [f (sm/fn foo :- s/Int
+              [^s/Int arg0 & [rest0 :- s/Int]] (+ arg0 (or rest0 2)))]
+      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Int "rest0")]])
+             (s/fn-schema f)))
+      (s/with-fn-validation
+        (is (= 6 (f 4)))
+        (is (= 9 (f 4 5)))
+        (invalid-call! f 4 9 2)
+        (invalid-call! f 4 1.5))))
+  (testing "list schema"
+    (let [f (sm/fn foo :- s/Int
+              [^s/Int arg0 & [rest0] :- [s/Int]] (+ arg0 (or rest0 2)))]
+      (is (= (sm/=>* s/Int [s/Int & [s/Int]])
+             (s/fn-schema f)))
+      (s/with-fn-validation
+        (is (= 6 (f 4)))
+        (is (= 9 (f 4 5)))
+        (is (= 9 (f 4 5 9)))
+        (invalid-call! f 4 1.5)))))
 
 ;;; defn
 
@@ -552,8 +599,8 @@
 
       (s/with-fn-validation
         (is (= "3" (@v 3)))
-        (is (thrown? Exception (@v 4)))
-        (is (thrown? Exception (@v "a"))))
+        (invalid-call! @v 4)
+        (invalid-call! @v "a"))
 
       (is (= "4" (@v 4))))))
 
