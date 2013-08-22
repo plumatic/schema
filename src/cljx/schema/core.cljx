@@ -562,7 +562,8 @@
     (if-let [schema (utils/class-schema this)]
       (check schema x)
       ;; Am I from this proto
-      (when-not (identical? this (.-constructor x))
+      (when-not (or (identical? this (.-constructor x))
+                    (js* "~{} instanceof ~{}" x this))
         (macros/validation-error this x (list 'instance? this (utils/value-name x)))))))
 
 
