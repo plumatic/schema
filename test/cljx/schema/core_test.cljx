@@ -452,7 +452,7 @@
     (is (= (utils/class-schema Nested)
            (s/record Nested {:b Bar4
                              :c LongOrString
-                             :p (s/protocol PProtocol)})))
+                             :p PProtocol})))
     (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
     (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
     (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))

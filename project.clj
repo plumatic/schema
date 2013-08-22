@@ -1,5 +1,4 @@
 (defproject prismatic/schema "0.0.1-SNAPSHOT"
-  :description "TBD"
 
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
@@ -31,8 +30,6 @@
                   {:source-paths ["test/cljx"]
                    :output-path "target/generated/test/cljs"
                    :rules :cljs}]}
-
-  ;; :hooks [leiningen.cljsbuild]
 
   :cljsbuild {:builds
               {:dev {:source-paths ["src/clj" "target/generated/src/cljs"]

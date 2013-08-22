@@ -13,6 +13,9 @@
               :when v]
           [k v])))
 
+(clojure.core/defn type-of [x]
+  #+clj (class x)
+  #+cljs (js* "typeof ~{}" x))
 
 #+clj
 (let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
@@ -33,17 +36,13 @@
     (.get +class-schemata+ klass)))
 
 #+cljs
-(let [+class-schemata+ (js-obj)]
+(do
   (defn declare-class-schema! [klass schema]
-    (aset +class-schemata+ klass schema))
+    (aset klass "schema$utils$schema" schema))
 
   (defn class-schema [klass]
-    (aget +class-schemata+ klass)))
+    (aget klass "schema$utils$schema")))
 
-
-(clojure.core/defn type-of [x]
-  #+clj (class x)
-  #+cljs (js* "typeof ~{}" x))
 
 (defn error! [& format-args]
   #+clj  (throw (RuntimeException. (apply format format-args)))
