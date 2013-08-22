@@ -1,4 +1,4 @@
-(defproject prismatic/schema "0.0.1-SNAPSHOT"
+(defproject prismatic/schema "0.0.1"
 
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
