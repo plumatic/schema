@@ -452,7 +452,7 @@
     (is (= (utils/class-schema Nested)
            (s/record Nested {:b Bar4
                              :c LongOrString
-                             :p PProtocol})))
+                             :p (s/protocol PProtocol)})))
     (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
     (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
     (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))
@@ -473,7 +473,7 @@
 
 ;;; fn
 
-(def OddLong (s/both (s/pred odd?) long))
+(def OddLong (s/both (s/pred odd?) #+cljs s/Int #+clj long))
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
@@ -511,7 +511,7 @@
             (+ x y arg1))]
     (is (= (sm/=> s/Int LongPair s/Int)
            (s/fn-schema f)))
-    (s/with-fn-validation
+    (sm/with-fn-validation
       (is (= 6 (f [1 2] 3)))
       (invalid-call! f ["a" 2] 3))))
 
@@ -531,7 +531,7 @@
                (reduce + (foo arg0) (map count strs))))]
     (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
-    (s/with-fn-validation
+    (sm/with-fn-validation
       (is (= 5 (f 4)))
       (is (= 16 (f 4 "55555" "666666")))
       (invalid-call! f 4 [3 3 3]))))
@@ -542,7 +542,7 @@
               [^s/Int arg0 & [rest0]] (+ arg0 (or rest0 2)))]
       (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Any "rest0")]])
              (s/fn-schema f)))
-      (s/with-fn-validation
+      (sm/with-fn-validation
         (is (= 6 (f 4)))
         (is (= 9 (f 4 5)))
         (invalid-call! f 4 9 2))))
@@ -551,7 +551,7 @@
               [^s/Int arg0 & [rest0 :- s/Int]] (+ arg0 (or rest0 2)))]
       (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Int "rest0")]])
              (s/fn-schema f)))
-      (s/with-fn-validation
+      (sm/with-fn-validation
         (is (= 6 (f 4)))
         (is (= 9 (f 4 5)))
         (invalid-call! f 4 9 2)
@@ -561,7 +561,7 @@
               [^s/Int arg0 & [rest0] :- [s/Int]] (+ arg0 (or rest0 2)))]
       (is (= (sm/=>* s/Int [s/Int & [s/Int]])
              (s/fn-schema f)))
-      (s/with-fn-validation
+      (sm/with-fn-validation
         (is (= 6 (f 4)))
         (is (= 9 (f 4 5)))
         (is (= 9 (f 4 5 9)))
@@ -587,6 +587,15 @@
 (def +simple-validated-defn-schema+
   (sm/=> OddLongString OddLong))
 
+#+cljs
+(deftest simple-validated-defn-test
+  (doseq [f [simple-validated-defn simple-validated-defn-new]]
+    (sm/with-fn-validation
+      (is (= "3" (f 3)))
+      (invalid-call! f 4)
+      (invalid-call! f "a"))))
+
+#+clj
 (deftest simple-validated-defn-test
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
@@ -597,7 +606,7 @@
         (is (= metadata :bla)))
       (is (= +simple-validated-defn-schema+ (s/fn-schema @v)))
 
-      (s/with-fn-validation
+      (sm/with-fn-validation
         (is (= "3" (@v 3)))
         (invalid-call! @v 4)
         (invalid-call! @v "a"))
@@ -626,7 +635,7 @@
         (is (= +primitive-validated-defn-schema+ (s/fn-schema f)))
 
         (is ((ancestors (class f)) clojure.lang.IFn$LL))
-        (s/with-fn-validation
+        (sm/with-fn-validation
           (is (= 4 (f 3)))
           (is (= 4 (.invokePrim f 3)))
           (is (thrown? Exception (f 4))))
