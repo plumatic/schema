@@ -188,18 +188,18 @@
     (val pair)
     (utils/error! "Key %s not found in %s" k m)))
 
+;; in cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
+;; and put it in metadata of the record so that equality is preserved.
 (clojure.core/defrecord Protocol [p]
   Schema
   (check [this x]
-         (when-not (satisfies? p x)
-           (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
+         (when-not #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
+                   (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
   (explain [this] (list 'protocol p)))
 
+#+clj
 (clojure.core/defn protocol [p]
-  (macros/assert-iae
-   #+clj (:on p)
-   #+cljs true
-   "Cannot make protocol schema for non-protocol %s" p)
+  (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
 ;; pred: Passed in predicate must be true on object to pass

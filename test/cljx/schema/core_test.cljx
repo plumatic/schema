@@ -9,6 +9,7 @@
   (:require-macros
    [schema.macros :as sm])
   (:require
+   clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
    #+clj potemkin
@@ -87,7 +88,7 @@
 (defrecord NonTestProtocolSatisfier [])
 
 (deftest protocol-test
-  (let [s (s/protocol ATestProtocol)]
+  (let [s (sm/protocol ATestProtocol)]
     (valid! s (DirectTestProtocolSatisfier.))
     (valid! s (IndirectTestProtocolSatisfier.))
     (invalid! s (NonTestProtocolSatisfier.))
@@ -418,23 +419,44 @@
 
 
 ;; Now test that schemata and protocols work as type hints.
+;; (auto-detecting protocols only works in clj currently)
 
 (def LongOrString (s/either s/Int s/Str))
 
-(sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
+#+clj (sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
+#+clj (sm/defrecord NestedNew [b :- Bar4 c :- LongOrString p :- PProtocol])
+(sm/defrecord NestedExplicit [b :- Bar4 c :- LongOrString p :- (sm/protocol PProtocol)])
 
-(deftest fancier-defrecord-schema-test
+(defn test-fancier-defrecord-schema [klass constructor]
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
-    (is (= (utils/class-schema Nested)
-           (s/record Nested {:b Bar4
-                             :c LongOrString
-                             :p (s/protocol PProtocol)})))
-    (valid! Nested (Nested. (Bar4. [1] {}) 1 bar2))
-    (valid! Nested (Nested. (Bar4. [1] {}) "hi" bar2))
-    (invalid! Nested (Nested. (Bar4. [1] {}) "hi" bar1))
-    (invalid! Nested (Nested. (Bar4. [1] {:foo :bar}) 1 bar2))
-    (invalid! Nested (Nested. nil "hi" bar2))))
+    (is (= (utils/class-schema klass)
+           (s/record klass {:b Bar4
+                            :c LongOrString
+                            :p (sm/protocol PProtocol)})))
+    (valid! klass (constructor (Bar4. [1] {}) 1 bar2))
+    (valid! klass (constructor (Bar4. [1] {}) "hi" bar2))
+    (invalid! klass (constructor (Bar4. [1] {}) "hi" bar1))
+    (invalid! klass (constructor (Bar4. [1] {:foo :bar}) 1 bar2))
+    (invalid! klass (constructor nil "hi" bar2))))
+
+#+clj
+(deftest implicit-protocol-fancier-defrecord-schema-test
+  (test-fancier-defrecord-schema Nested ->Nested)
+  (test-fancier-defrecord-schema NestedNew ->NestedNew))
+
+(deftest explicit-protocol-fancier-defrecord-schema-test
+  (test-fancier-defrecord-schema NestedExplicit ->NestedExplicit))
+
+
+(sm/defrecord OddSum
+    [a b]
+  {}
+  #(odd? (+ (:a %) (:b %))))
+
+(deftest defrecord-extra-validation-test
+  (valid! OddSum (OddSum. 1 2))
+  (invalid! OddSum (OddSum. 1 3)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

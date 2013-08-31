@@ -1,12 +1,9 @@
 (ns schema.macros
+  "Macros used in and provided by schema, separated out for Clojurescript's sake."
   (:refer-clojure :exclude [defrecord defn fn])
   (:require [clojure.data :as data]
             [schema.utils :as utils]
             potemkin))
-
-;;;;; Schema protcol
-
-;; TODO: rename to be more platform agnostic
 
 ;; TODO(ah) make assert!
 (defmacro assert-iae
@@ -14,6 +11,10 @@
   [form & format-args]
   `(when-not ~form
      (utils/error! ~@format-args)))
+
+;; cljs only, since satisfies? is a macro in clojurescript, we have to do something sneaky.
+(defmacro protocol [p]
+  `(with-meta (schema.core/->Protocol ~p) {:proto-pred #(satisfies? ~p %)}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
