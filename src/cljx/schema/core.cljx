@@ -92,16 +92,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas
 
-;; anything: The (constantly true) of schemas
-
-(clojure.core/defrecord AnythingSchema [_]
-  ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
-  ;; loses type info, which makes this unusable in schema-fn.
-  ;; http://dev.clojure.org/jira/browse/CLJ-1196
-  Schema
-  (check [this x])
-  (explain [this] 'Any))
-
 ;; eq: single required value
 
 (clojure.core/defrecord EqSchema [v]
@@ -214,7 +204,7 @@
                   (macros/validation-error this x (list p? (utils/value-name x))))))
   (explain [this]
            (cond (= p? integer?) 'Int
-                 (= p? keyword?) 'Key
+                 (= p? keyword?) 'Keyword
                  :else (list 'pred p?))))
 
 (clojure.core/defn pred [p?]
@@ -501,22 +491,34 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Shared Schema leaves
 
-;; Satisfied by everything
-(def Any (AnythingSchema. nil))
+(clojure.core/defrecord AnythingSchema [_]
+  ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
+  ;; loses type info, which makes this unusable in schema-fn.
+  ;; http://dev.clojure.org/jira/browse/CLJ-1196
+  Schema
+  (check [this x] nil)
+  (explain [this] 'Any))
 
-;; Satisfied only by String
-;; In cljs, must be (pred string?) to and not js/String
-;; because of keywords
-(def Str #+clj String #+cljs (pred string?))
+(def Any
+  "The (constantly true) of schemas"
+  (AnythingSchema. nil))
 
-;; Satisfied by any number
-(def Num #+clj Number #+cljs js/Number)
+(def Str
+  "Satisfied only by String.
+   Is (pred string?) and not js/String in cljs because of keywords."
+  #+clj String #+cljs (pred string?))
 
-;; Satisfied by integer (e.g., 1.0 is an integer)
-(def Int (pred integer?))
+(def Num
+  "Any number"
+  #+clj Number #+cljs js/Number)
 
-;; Satisfied by keyword
-(def Key (pred keyword?))
+(def Int
+  "Any integral number"
+  (pred integer?))
+
+(def Keyword
+  "A keyword"
+  (pred keyword?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas

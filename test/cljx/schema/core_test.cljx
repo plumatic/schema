@@ -78,8 +78,8 @@
   (valid! s/Int 4)
   (invalid! s/Int nil)
   (invalid! s/Int 1.5)
-  (valid! s/Key :foo)
-  (invalid! s/Key 'foo))
+  (valid! s/Keyword :foo)
+  (invalid! s/Keyword 'foo))
 
 (defprotocol ATestProtocol)
 (def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
@@ -114,7 +114,7 @@
 (deftest both-test
   (let [schema (s/both
                 (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)))
-                {s/Key s/Key})]
+                {s/Keyword s/Keyword})]
     (valid! schema {})
     (valid! schema {:foo :foo :bar :bar})
     (invalid! schema {"foo" "foo"})
@@ -240,7 +240,7 @@
 
 (deftest simple-set-test
   (testing "basic set identification"
-    (let [schema #{s/Key}]
+    (let [schema #{s/Keyword}]
       (valid! schema #{:a :b :c})
       (invalid! schema [:a :b :c])
       (invalid! schema {:a :a :b :b})))
@@ -285,7 +285,7 @@
 (deftest record-with-extra-keys-test
   (let [schema (s/record Foo {:x s/Any
                               :y s/Int
-                              s/Key s/Any})]
+                              s/Keyword s/Any})]
     (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
@@ -293,20 +293,20 @@
 ;;; Explains
 
 (sm/defrecord Explainer
-    [^s/Int foo ^s/Key bar]
-  {(s/optional-key :baz) s/Key})
+    [^s/Int foo ^s/Keyword bar]
+  {(s/optional-key :baz) s/Keyword})
 
 (deftest explain-test
   (is (= (s/explain {(s/required-key 'x) s/Int
-                     s/Key [(s/one s/Int "foo") (s/maybe Explainer)]})
+                     s/Keyword [(s/one s/Int "foo") (s/maybe Explainer)]})
          `{~'(required-key x) ~'Int
-           ~'Key [(~'one ~'Int "foo")
-                  (~'maybe
-                   (~'record
-                    #+clj Explainer #+cljs schema.core-test/Explainer
-                    {:foo ~'Int
-                     :bar ~'Key
-                     (~'optional-key :baz) ~'Key}))]})))
+           ~'Keyword [(~'one ~'Int "foo")
+                      (~'maybe
+                       (~'record
+                        #+clj Explainer #+cljs schema.core-test/Explainer
+                        {:foo ~'Int
+                         :bar ~'Keyword
+                         (~'optional-key :baz) ~'Keyword}))]})))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -351,11 +351,11 @@
 
 (sm/defrecord Bar
     [^s/Int foo ^s/Str bar]
-  {(s/optional-key :baz) s/Key})
+  {(s/optional-key :baz) s/Keyword})
 
 (sm/defrecord Bar2
     [^s/Int foo ^s/Str bar]
-  {(s/optional-key :baz) s/Key}
+  {(s/optional-key :baz) s/Keyword}
   PProtocol
   (do-something [this] 2))
 
@@ -373,7 +373,7 @@
   (is (= (utils/class-schema Bar)
          (s/record Bar {:foo s/Int
                         :bar s/Str
-                        (s/optional-key :baz) s/Key})))
+                        (s/optional-key :baz) s/Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
   ;; (is (thrown? Exception (map->Bar {}))) ;; check for primitive long
@@ -400,14 +400,14 @@
     [foo :- s/Int
      bar :- s/Str
      zoo]
-  {(s/optional-key :baz) s/Key})
+  {(s/optional-key :baz) s/Keyword})
 
 (deftest defrecord-new-style-schema-test
   (is (= (utils/class-schema BarNewStyle)
          (s/record BarNewStyle {:foo s/Int
                                 :bar s/Str
                                 :zoo s/Any
-                                (s/optional-key :baz) s/Key})))
+                                (s/optional-key :baz) s/Keyword})))
   (is (BarNewStyle. 1 :foo "a"))
   (is (= #{:foo :bar :zoo} (set (keys (map->BarNewStyle {:foo 1})))))
   ;; (is (thrown? Exception (map->BarNewStyle {}))) ;; check for primitive long
