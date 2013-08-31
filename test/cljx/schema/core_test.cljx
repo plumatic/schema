@@ -1,66 +1,21 @@
 (ns schema.core-test
   #+clj
-  (:use clojure.test)
+  (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs
   (:use-macros
    [cljs-test.macros :only [is is= deftest]]
-   [schema.test-macros :only [testing]])
+   [schema.test-macros :only [testing valid! invalid! invalid-call! thrown?]])
   #+cljs
   (:require-macros
    [schema.macros :as sm])
   (:require
    [schema.utils :as utils]
-   #+clj potemkin
    [schema.core :as s]
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
-(sm/defrecord Explainer
-    [^s/Int foo ^s/Key bar]
-  {(s/optional-key :baz) s/Key})
-
-(deftest explain-test
-  (is (= (s/explain {(s/required-key 'x) s/Int
-                     s/Key [(s/one s/Int "foo") (s/maybe Explainer)]})
-         `{~'(required-key x) ~'Int
-           ~'Key [(~'one ~'Int "foo")
-                  (~'maybe
-                   (~'record
-                    Explainer
-                    {:foo ~'Int
-                     :bar ~'Key
-                     (~'optional-key :baz) ~'Key}))]})))
-
-;;; clj helpers
-(do
-  (defmacro valid! [s x]
-    `(is (do (schema.core/validate ~s ~x) true)))
-
-  (defmacro invalid! [s x]
-    `(is (~'thrown? Throwable (schema.core/validate ~s ~x))))
-
-  (defmacro invalid-call! [f & args]
-    `(is (~'thrown? Throwable (~f ~@args)))))
-
-;;; Cljs Helpers Only
-#+cljs
-(do
-  (defn valid! [s x]
-    (is (do (s/validate s x) true)))
-
-  (defn invalid! [s x]
-    (is
-     (try
-       (s/validate s x)
-       (catch js/Error e
-         e))))
-
-  (defn invalid-call! [f & args]
-    (is
-     (try
-       (apply f args) false
-       (catch js/Error e true)))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Helpers
 
 ;;; Eq Tests
 
@@ -119,7 +74,10 @@
   (valid! s/Str "foo")
   (invalid! s/Str :foo)
   (valid! s/Int 4)
-  (valid! s/Key :foo))
+  (invalid! s/Int nil)
+  (invalid! s/Int 1.5)
+  (valid! s/Key :foo)
+  (invalid! s/Key 'foo))
 
 (defprotocol ATestProtocol)
 (def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
@@ -279,28 +237,28 @@
 ;;; sets
 
 (deftest simple-set-test
-  ;; basic set identification
-  (let [schema #{s/Key}]
-    (valid! schema #{:a :b :c})
-    (invalid! schema [:a :b :c])
-    (invalid! schema {:a :a :b :b}))
+  (testing "basic set identification"
+    (let [schema #{s/Key}]
+      (valid! schema #{:a :b :c})
+      (invalid! schema [:a :b :c])
+      (invalid! schema {:a :a :b :b})))
 
-  ;; enforces matching with single simple entry
-  (let [schema #{s/Int}]
-    (valid! schema #{})
-    (valid! schema #{1 2 3})
-    (invalid! schema #{1 0.5 :a})
-    (invalid! schema #{3 4 "a"}))
-  ;; not allowed to have zero or multiple entries
-  (invalid!  #{s/Int s/Num} #{})
+  (testing "enforces matching with single simple entry"
+    (let [schema #{s/Int}]
+      (valid! schema #{})
+      (valid! schema #{1 2 3})
+      (invalid! schema #{1 0.5 :a})
+      (invalid! schema #{3 4 "a"})))
 
+  (testing "set schemas must have exactly one entry"
+    (is (thrown? Exception (s/check #{s/Int s/Num} #{}))))
 
-  ;; slightly more complicated elem-schema
-  (let [schema #{[s/Int]}]
-    (valid! schema #{})
-    (valid! schema #{[2 4]})
-    (invalid! schema #{2})
-    (invalid! schema #{[[2 3]]})))
+  (testing "more complex element schema"
+    (let [schema #{[s/Int]}]
+      (valid! schema #{})
+      (valid! schema #{[2 4]})
+      (invalid! schema #{2})
+      (invalid! schema #{[[2 3]]}))))
 
 (deftest mixed-set-test
   (let [schema #{(s/either [s/Int] #{s/Int})}]
@@ -329,6 +287,24 @@
     (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
+
+;;; Explains
+
+(sm/defrecord Explainer
+    [^s/Int foo ^s/Key bar]
+  {(s/optional-key :baz) s/Key})
+
+(deftest explain-test
+  (is (= (s/explain {(s/required-key 'x) s/Int
+                     s/Key [(s/one s/Int "foo") (s/maybe Explainer)]})
+         `{~'(required-key x) ~'Int
+           ~'Key [(~'one ~'Int "foo")
+                  (~'maybe
+                   (~'record
+                    Explainer
+                    {:foo ~'Int
+                     :bar ~'Key
+                     (~'optional-key :baz) ~'Key}))]})))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
