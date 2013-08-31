@@ -60,30 +60,45 @@
 
 ;; TODO: better error messages for fn schema validation
 
+;; TODO(jw): describe this.
 (deftype ValidationError [schema value expectation-delay])
 
-#+clj
+#+clj ;; Validation errors print like forms that would return false
 (defmethod print-method ValidationError [^ValidationError err writer]
   (print-method (list 'not @(.-expectation-delay err)) writer))
 
+;; Allow the file to be reloaded in Clojure, undoing some weirdness below
+#+clj (do (ns-unmap *ns* 'String) (ns-unmap *ns* 'Number)
+          (import 'java.lang.String 'java.lang.Number))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
 (defprotocol Schema
   (check [this x]
-    "Validate that x satisfies this schema, returning a ValidationError when
-     `x` doesn't satisfy the schema and nil for success.")
+    "Check that x satisfies this schema, returning nil for success or a datum that looks
+     like the 'bad' parts of x with ValidationErrors at the leaves describing the error.
+
+     Examples:
+     user> (s/check s/Keyword :a)
+     nil
+
+     user> (s/check s/Keyword 'a)
+     (not (keyword? a)) ;; pretty-printed validation error in clojure
+
+     user> (s/check {:a s/Keyword :b [s/Int]}
+                    {:a :z        :b [1 :whoops 3]})
+     {:b [nil (not (integer? :whoops)) nil]}")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
-     also expanding classes schematas at the leaves"))
+     also expanding classes schematas at the leaves.  Example:
 
-#+clj
+     user> (s/explain {:a s/Keyword :b [s/Int]} )
+     {:a Keyword, :b [Int]}"))
+
+#+clj ;; Schemas print as their explains
 (defmethod print-method Schema [s writer]
   (print-method (explain s) writer))
-
-;; TODO(JW): some sugar macro for simple validations that just takes an expression and does the
-;; check and produces the validation-error automatically somehow.
 
 (clojure.core/defn validate [schema value]
   (when-let [error (check schema value)]
@@ -91,6 +106,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas
+
+;; Any: the (constantly true) of schemas
+
+(clojure.core/defrecord AnythingSchema [_]
+  ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
+  ;; loses type info, which makes this unusable in schema-fn.
+  ;; http://dev.clojure.org/jira/browse/CLJ-1196
+  Schema
+  (check [this x] nil)
+  (explain [this] 'Any))
+
+(def Any
+  "Accepts anything, including nil"
+  (AnythingSchema. nil))
 
 ;; eq: single required value
 
@@ -194,23 +223,24 @@
 
 ;; pred: Passed in predicate must be true on object to pass
 
-(clojure.core/defrecord Predicate [p?]
+(clojure.core/defrecord Predicate [p? pred-name]
   Schema
   (check [this x]
-         (try
-           (when-not (p? x)
-             (macros/validation-error this x (list p? (utils/value-name x))))
-           (catch #+clj Exception #+cljs js/Error e
-                  (macros/validation-error this x (list p? (utils/value-name x))))))
+         (when (try (not (p? x))
+                    (catch #+clj Exception #+cljs js/Error e true))
+           (macros/validation-error this x (list pred-name (utils/value-name x)))))
   (explain [this]
            (cond (= p? integer?) 'Int
                  (= p? keyword?) 'Keyword
-                 :else (list 'pred p?))))
+                 :else (list 'pred pred-name))))
 
-(clojure.core/defn pred [p?]
-  (when-not (fn? p?)
-    (utils/error! "Not a function: %s" p?))
-  (Predicate. p?))
+(clojure.core/defn pred
+  ([p?] (pred p? p?))
+  ([p? pred-name]
+     (when-not (fn? p?)
+       (utils/error! "Not a function: %s" p?))
+     (Predicate. p? pred-name)))
+
 
 
 ;; named: A schema with just a name field
@@ -489,19 +519,7 @@
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Shared Schema leaves
-
-(clojure.core/defrecord AnythingSchema [_]
-  ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
-  ;; loses type info, which makes this unusable in schema-fn.
-  ;; http://dev.clojure.org/jira/browse/CLJ-1196
-  Schema
-  (check [this x] nil)
-  (explain [this] 'Any))
-
-(def Any
-  "The (constantly true) of schemas"
-  (AnythingSchema. nil))
+;;; Cross-platform schema leaves, for writing Schemas that are valid in both clj and cljs.
 
 #+clj (ns-unmap *ns* 'String)
 (def String
@@ -516,11 +534,11 @@
 
 (def Int
   "Any integral number"
-  (pred integer?))
+  (pred integer? 'integer?))
 
 (def Keyword
   "A keyword"
-  (pred keyword?))
+  (pred keyword? 'keyword?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
