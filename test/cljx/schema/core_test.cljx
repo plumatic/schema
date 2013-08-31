@@ -38,7 +38,7 @@
 ;;; leaves
 
 (deftest map-test
-  (let [Str->Num {s/Str s/Num}]
+  (let [Str->Num {s/String s/Number}]
     (valid! Str->Num {"a" 1 "b" 2})
     (valid! Str->Num {"a" 1 "b" 2.0})
     (invalid! Str->Num {:a 1 "b" 2})
@@ -73,8 +73,8 @@
     (valid! (Class/forName "[D") (double-array [1.0]))))
 
 (deftest class-test
-  (valid! s/Str "foo")
-  (invalid! s/Str :foo)
+  (valid! s/String "foo")
+  (invalid! s/String :foo)
   (valid! s/Int 4)
   (invalid! s/Int nil)
   (invalid! s/Int 1.5)
@@ -105,7 +105,7 @@
 (deftest either-test
   (let [schema (s/either
                 {:num s/Int}
-                {:str s/Str})]
+                {:str s/String})]
     (valid! schema {:num 1})
     (valid! schema {:str "hello"})
     (invalid! schema {:num "bad!"})
@@ -130,13 +130,13 @@
     #+clj (invalid! schema 1.0)))
 
 (deftest named-test
-  (let [schema [(s/one s/Str "topic") (s/one (s/named s/Num "score") "asdf")]]
+  (let [schema [(s/one s/String "topic") (s/one (s/named s/Number "score") "asdf")]]
     (valid! schema ["foo" 1.0])
     (invalid! schema [1 2])))
 
 (deftest conditional-test
-  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Num}
-                              #(= (:type %) :bar) {:type (s/eq :bar) :baz s/Str})]
+  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Number}
+                              #(= (:type %) :bar) {:type (s/eq :bar) :baz s/String})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
@@ -149,7 +149,7 @@
 
 (deftest simple-map-schema-test
   (let [schema {:foo s/Int
-                :bar s/Num}]
+                :bar s/Number}]
     (valid! schema {:foo 1 :bar 2.0})
     (invalid! schema [[:foo 1] [:bar 2.0]])
     (invalid! schema {:foo 1 :bar 2.0 :baz 1})
@@ -158,7 +158,7 @@
 
 (deftest fancier-map-schema-test
   (let [schema {:foo s/Int
-                s/Str s/Num}]
+                s/String s/Number}]
     (valid! schema {:foo 1})
     (valid! schema {:foo 1 "bar" 2.0})
     (valid! schema {:foo 1 "bar" 2.0 "baz" 10.0})
@@ -168,7 +168,7 @@
 
 (deftest another-fancy-map-schema-test
   (let [schema {:foo (s/maybe s/Int)
-                (s/optional-key :bar) s/Num
+                (s/optional-key :bar) s/Number
                 :baz {:b1 (s/pred odd?)}}]
     (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
     (valid! schema {:foo 1 :baz {:b1 3}})
@@ -190,7 +190,7 @@
     (invalid! schema [1 2 1.1])))
 
 (deftest simple-one-seq-test
-  (let [schema [(s/one s/Int "int") (s/one s/Str "str")]]
+  (let [schema [(s/one s/Int "int") (s/one s/String "str")]]
     (valid! schema [1 "a"])
     (invalid! schema [1])
     (invalid! schema [1 1.0 2])
@@ -199,7 +199,7 @@
 
 (deftest optional-seq-test
   (let [schema [(s/one s/Int "int")
-                (s/optional s/Str "str")
+                (s/optional s/String "str")
                 (s/optional s/Int "int2")]]
     (valid! schema [1])
     (valid! schema [1 "a"])
@@ -210,8 +210,8 @@
 
 (deftest combo-seq-test
   (let [schema [(s/one (s/maybe s/Int) "maybe-long")
-                (s/optional s/Str "str")
-                s/Num]]
+                (s/optional s/String "str")
+                s/Number]]
     (valid! schema [1])
     (valid! schema [1 "a"])
     (valid! schema [1 "a" 1.0 2.0 3.0])
@@ -253,7 +253,7 @@
       (invalid! schema #{3 4 "a"})))
 
   (testing "set schemas must have exactly one entry"
-    (is (thrown? Exception (s/check #{s/Int s/Num} #{}))))
+    (is (thrown? Exception (s/check #{s/Int s/Number} #{}))))
 
   (testing "more complex element schema"
     (let [schema #{[s/Int]}]
@@ -350,29 +350,29 @@
 ;; exercies some different arities
 
 (sm/defrecord Bar
-    [^s/Int foo ^s/Str bar]
+    [^s/Int foo ^s/String bar]
   {(s/optional-key :baz) s/Keyword})
 
 (sm/defrecord Bar2
-    [^s/Int foo ^s/Str bar]
+    [^s/Int foo ^s/String bar]
   {(s/optional-key :baz) s/Keyword}
   PProtocol
   (do-something [this] 2))
 
 (sm/defrecord Bar3
-    [^s/Int foo ^s/Str bar]
+    [^s/Int foo ^s/String bar]
   PProtocol
   (do-something [this] 3))
 
 (sm/defrecord Bar4
-    [^{:s [s/Int]} foo ^{:s? {s/Str s/Str}} bar]
+    [^{:s [s/Int]} foo ^{:s? {s/String s/String}} bar]
   PProtocol
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
   (is (= (utils/class-schema Bar)
          (s/record Bar {:foo s/Int
-                        :bar s/Str
+                        :bar s/String
                         (s/optional-key :baz) s/Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
@@ -398,14 +398,14 @@
 
 (sm/defrecord BarNewStyle
     [foo :- s/Int
-     bar :- s/Str
+     bar :- s/String
      zoo]
   {(s/optional-key :baz) s/Keyword})
 
 (deftest defrecord-new-style-schema-test
   (is (= (utils/class-schema BarNewStyle)
          (s/record BarNewStyle {:foo s/Int
-                                :bar s/Str
+                                :bar s/String
                                 :zoo s/Any
                                 (s/optional-key :baz) s/Keyword})))
   (is (BarNewStyle. 1 :foo "a"))
@@ -421,7 +421,7 @@
 ;; Now test that schemata and protocols work as type hints.
 ;; (auto-detecting protocols only works in clj currently)
 
-(def LongOrString (s/either s/Int s/Str))
+(def LongOrString (s/either s/Int s/String))
 
 #+clj (sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
 #+clj (sm/defrecord NestedNew [b :- Bar4 c :- LongOrString p :- PProtocol])
@@ -476,10 +476,10 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (sm/=> s/Str OddLong s/Any))
+  (sm/=> s/String OddLong s/Any))
 
 (deftest simple-validated-meta-test
-  (let [f (sm/fn ^s/Str foo [^OddLong arg0 arg1])]
+  (let [f (sm/fn ^s/String foo [^OddLong arg0 arg1])]
     (def s2 (s/fn-schema f))
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
@@ -516,9 +516,9 @@
 
 (deftest two-arity-fn-test
   (let [f (sm/fn foo :- s/Int
-            ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
-            ([^s/Str arg0] (parse-long arg0)))]
-    (is (= (sm/=>* s/Int [s/Str] [s/Str s/Int])
+            ([^s/String arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
+            ([^s/String arg0] (parse-long arg0)))]
+    (is (= (sm/=>* s/Int [s/String] [s/String s/Int])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
     (is (= 10 (f "3" 7)))))
@@ -526,9 +526,9 @@
 (deftest infinite-arity-fn-test
   (let [f (sm/fn foo :- s/Int
             ([^s/Int arg0] (inc arg0))
-            ([^s/Int arg0  & ^{:s [s/Str]} strs]
+            ([^s/Int arg0  & ^{:s [s/String]} strs]
                (reduce + (foo arg0) (map count strs))))]
-    (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/Str]])
+    (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/String]])
            (s/fn-schema f)))
     (sm/with-fn-validation
       (is (= 5 (f 4)))
@@ -569,7 +569,7 @@
 ;;; defn
 
 (def OddLongString
-  (s/both s/Str (s/pred #(odd? (parse-long %)))))
+  (s/both s/String (s/pred #(odd? (parse-long %)))))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -599,7 +599,7 @@
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema doc metadata]} (meta v)]
-        #+clj (is (= tag s/Str))
+        #+clj (is (= tag s/String))
         (is (= +simple-validated-defn-schema+ schema))
         (is (= doc "I am a simple schema fn"))
         (is (= metadata :bla)))

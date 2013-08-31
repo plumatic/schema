@@ -503,14 +503,16 @@
   "The (constantly true) of schemas"
   (AnythingSchema. nil))
 
-(def Str
+#+clj (ns-unmap *ns* 'String)
+(def String
   "Satisfied only by String.
    Is (pred string?) and not js/String in cljs because of keywords."
-  #+clj String #+cljs (pred string?))
+  #+clj java.lang.String #+cljs (pred string?))
 
-(def Num
+#+clj (ns-unmap *ns* 'Number)
+(def Number
   "Any number"
-  #+clj Number #+cljs js/Number)
+  #+clj java.lang.Number #+cljs js/Number)
 
 (def Int
   "Any integral number"
