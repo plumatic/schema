@@ -46,8 +46,6 @@
    These forms are all compatible and can be mixed and matched
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
-  #+clj
-  (:refer-clojure :exclude [defrecord defn])
   (:require
    [clojure.string :as str]
    #+clj potemkin
@@ -100,7 +98,7 @@
 (defmethod print-method Schema [s writer]
   (print-method (explain s) writer))
 
-(clojure.core/defn validate [schema value]
+(defn validate [schema value]
   (when-let [error (check schema value)]
     (utils/error! "Value does not match schema: %s" (pr-str error))))
 
@@ -109,7 +107,7 @@
 
 ;; Any: the (constantly true) of schemas
 
-(clojure.core/defrecord AnythingSchema [_]
+(defrecord AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
   ;; loses type info, which makes this unusable in schema-fn.
   ;; http://dev.clojure.org/jira/browse/CLJ-1196
@@ -123,29 +121,29 @@
 
 ;; eq: single required value
 
-(clojure.core/defrecord EqSchema [v]
+(defrecord EqSchema [v]
   Schema
   (check [this x]
-         (when-not (= v x)
-           (macros/validation-error this x (list '= v (utils/value-name x)))))
+    (when-not (= v x)
+      (macros/validation-error this x (list '= v (utils/value-name x)))))
   (explain [this] (list 'eq v)))
 
-(clojure.core/defn eq
+(defn eq
   "A value that must be = to one element of v."
   [v]
   (EqSchema. v))
 
 ;; either: satisfy one of the schemas
 
-(clojure.core/defrecord Either [schemas]
+(defrecord Either [schemas]
   Schema
   (check [this x]
-         (when (every? #(check % x) schemas)
-           (macros/validation-error this x
-                                    (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
+    (when (every? #(check % x) schemas)
+      (macros/validation-error this x
+                               (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
   (explain [this] (cons 'either (map explain schemas))))
 
-(clojure.core/defn either
+(defn either
   "The disjunction of multiple schemas."
   [& schemas]
   (Either. schemas))
@@ -153,14 +151,14 @@
 
 ;; both: satisfy all schemas
 
-(clojure.core/defrecord Both [schemas]
+(defrecord Both [schemas]
   Schema
   (check [this x]
-         (when-let [errors (seq (keep #(check % x) schemas))]
-           (macros/validation-error this x (cons 'empty? [errors]))))
+    (when-let [errors (seq (keep #(check % x) schemas))]
+      (macros/validation-error this x (cons 'empty? [errors]))))
   (explain [this] (cons 'both (map explain schemas))))
 
-(clojure.core/defn both
+(defn both
   "The intersection of multiple schemas.  Useful, e.g., to combine a special-
    purpose function validator with a normal map schema."
   [& schemas]
@@ -169,14 +167,14 @@
 
 ;; maybe: Can be nil, or if not, satisfy schema
 
-(clojure.core/defrecord Maybe [schema]
+(defrecord Maybe [schema]
   Schema
   (check [this x]
-         (when-not (nil? x)
-           (check schema x)))
+    (when-not (nil? x)
+      (check schema x)))
   (explain [this] (list 'maybe (explain schema))))
 
-(clojure.core/defn maybe
+(defn maybe
   "Value can be nil or must satisfy schema"
   [schema]
   (Maybe. schema))
@@ -186,21 +184,21 @@
 
 ;; enum: Must satisfy one of the passed in elems
 
-(clojure.core/defrecord EnumSchema [vs]
+(defrecord EnumSchema [vs]
   Schema
   (check [this x]
-         (when-not (contains? vs x)
-           (macros/validation-error this x (list vs (utils/value-name x)))))
+    (when-not (contains? vs x)
+      (macros/validation-error this x (list vs (utils/value-name x)))))
   (explain [this] (cons 'enum vs)))
 
-(clojure.core/defn enum
+(defn enum
   "A value that must be = to one element of vs."
   [& vs]
   (EnumSchema. (set vs)))
 
 ;; protocol: Must satisfy? protocol to pass schema
 
-(clojure.core/defn safe-get
+(defn safe-get
   "Like get but throw an exception if not found"
   [m k]
   (if-let [pair (find m k)]
@@ -209,32 +207,32 @@
 
 ;; in cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
 ;; and put it in metadata of the record so that equality is preserved.
-(clojure.core/defrecord Protocol [p]
+(defrecord Protocol [p]
   Schema
   (check [this x]
-         (when-not #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
-                   (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
+    (when-not #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
+              (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
   (explain [this] (list 'protocol p)))
 
 #+clj
-(clojure.core/defn protocol [p]
+(defn protocol [p]
   (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
 ;; pred: Passed in predicate must be true on object to pass
 
-(clojure.core/defrecord Predicate [p? pred-name]
+(defrecord Predicate [p? pred-name]
   Schema
   (check [this x]
-         (when (try (not (p? x))
-                    (catch #+clj Exception #+cljs js/Error e true))
-           (macros/validation-error this x (list pred-name (utils/value-name x)))))
+    (when (try (not (p? x))
+               (catch #+clj Exception #+cljs js/Error e true))
+      (macros/validation-error this x (list pred-name (utils/value-name x)))))
   (explain [this]
-           (cond (= p? integer?) 'Int
-                 (= p? keyword?) 'Keyword
-                 :else (list 'pred pred-name))))
+    (cond (= p? integer?) 'Int
+          (= p? keyword?) 'Keyword
+          :else (list 'pred pred-name))))
 
-(clojure.core/defn pred
+(defn pred
   ([p?] (pred p? p?))
   ([p? pred-name]
      (when-not (fn? p?)
@@ -245,12 +243,12 @@
 
 ;; named: A schema with just a name field
 
-(clojure.core/defrecord NamedSchema [schema name]
+(defrecord NamedSchema [schema name]
   Schema
   (check [this x] (check schema x))
   (explain [this] (list 'named (explain schema) name)))
 
-(clojure.core/defn named
+(defn named
   "Provide an explicit name for this schema element, useful for seqs."
   [schema name]
   (NamedSchema. schema name))
@@ -258,20 +256,20 @@
 
 ;; conditional
 
-(clojure.core/defrecord ConditionalSchema [preds-and-schemas]
+(defrecord ConditionalSchema [preds-and-schemas]
   Schema
   (check [this x]
-         (if-let [[_ match] (first (filter (clojure.core/fn [[pred]] (pred x)) preds-and-schemas))]
-           (check match x)
-           (macros/validation-error this x (list 'not-any? (list 'matches-pred? (utils/value-name x))
-                                                 (map first preds-and-schemas)))))
+    (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
+      (check match x)
+      (macros/validation-error this x (list 'not-any? (list 'matches-pred? (utils/value-name x))
+                                            (map first preds-and-schemas)))))
   (explain [this]
-           (cons 'conditional
-                 (->> preds-and-schemas
-                      (partition 2)
-                      (mapcat (fn [pred schema] [pred (explain schema)]))))))
+    (cons 'conditional
+          (->> preds-and-schemas
+               (partition 2)
+               (mapcat (fn [pred schema] [pred (explain schema)]))))))
 
-(clojure.core/defn conditional
+(defn conditional
   "Define a conditional schema.  Takes args like cond,
    (conditional pred1 schema1 pred2 schema2 ...),
    and checks the first schema where pred is true on the value.
@@ -287,20 +285,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
 
-(clojure.core/defrecord RequiredKey [k])
+(defrecord RequiredKey [k])
 
-(clojure.core/defn required-key
+(defn required-key
   "A required key in a map"
   [k]
   (RequiredKey. k))
 
-(clojure.core/defn required-key? [ks]
+(defn required-key? [ks]
   (or (keyword? ks)
       (instance? RequiredKey ks)))
 
-(clojure.core/defrecord OptionalKey [k])
+(defrecord OptionalKey [k])
 
-(clojure.core/defn optional-key
+(defn optional-key
   "An optional key in a map"
   [k]
   (OptionalKey. k))
@@ -385,14 +383,14 @@
 ;; optional element (with arguments always matching the earliest optional schema).
 ;; Finally, rest-schema must match any remaining elements.
 
-(clojure.core/defrecord One [schema optional? name])
+(defrecord One [schema optional? name])
 
-(clojure.core/defn one
+(defn one
   "A single required element of a sequence (not repeated, the implicit default)"
   ([schema name]
      (One. schema false name)))
 
-(clojure.core/defn optional
+(defn optional
   "A single optional element of a sequence (not repeated, the implicit default)"
   ([schema name]
      (One. schema true name)))
@@ -467,18 +465,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record schemata
 
-(clojure.core/defrecord Record [klass schema]
+(defrecord Record [klass schema]
   Schema
   (check [this r]
-         (or (when-not (instance? klass r)
-               (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
-             (check-map schema r)
-             (when-let [f (:extra-validator-fn this)]
-               (check (pred f) r))))
+    (or (when-not (instance? klass r)
+          (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
+        (check-map schema r)
+        (when-let [f (:extra-validator-fn this)]
+          (check (pred f) r))))
   (explain [this]
-           (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
+    (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
-(clojure.core/defn record
+(defn record
   "A schema for record with class klass and map schema schema"
   [klass schema]
   #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
@@ -497,22 +495,22 @@
   #+clj Long/MAX_VALUE
   #+cljs js/Number.MAX_VALUE)
 
-(clojure.core/defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
+(defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
   (check [this x] nil) ;; TODO?
   (explain [this]
-           (if (> (count input-schemas) 1)
-             (list* '=>* (explain output-schema) (map explain input-schemas))
-             (list* '=> (explain output-schema) (explain (first input-schemas))))))
+    (if (> (count input-schemas) 1)
+      (list* '=>* (explain output-schema) (map explain input-schemas))
+      (list* '=> (explain output-schema) (explain (first input-schemas))))))
 
-(clojure.core/defn arity [input-schema]
+(defn arity [input-schema]
   (if (seq input-schema)
     (if (instance? One (last input-schema))
       (count input-schema)
       +infinite-arity+)
     0))
 
-(clojure.core/defn make-fn-schema [output-schema input-schemas]
+(defn make-fn-schema [output-schema input-schemas]
   (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
   (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
@@ -622,7 +620,7 @@
 ;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
 
 
-(clojure.core/defn ^FnSchema fn-schema
+(defn ^FnSchema fn-schema
   "Produce the schema for a fn.  Since storing metadata on fns currently
    destroys their primitive-ness, and also adds an extra layer of fn call
    overhead, we store the schema on the class when we can (for defns)
@@ -632,7 +630,7 @@
   (or (utils/class-schema (utils/type-of f))
       (safe-get (meta f) :schema)))
 
-(clojure.core/defn input-schema
+(defn input-schema
   "Convenience method for fns with single arity"
   [f]
   (let [input-schemas (.-input-schemas (fn-schema f))]
@@ -640,7 +638,7 @@
                        "Expected single arity fn, got %s" (count input-schemas))
     (first input-schemas)))
 
-(clojure.core/defn output-schema
+(defn output-schema
   "Convenience method for fns with single arity"
   [f]
   (.-output-schema (fn-schema f)))
@@ -677,7 +675,7 @@
 ;; In ClojureScript, you have to use from clj schema.macros
 #+clj
 (do
-  (ns-unmap *ns* 'fn)
+  (doseq [s ['fn 'defn 'defrecord]] (ns-unmap *ns* s))
   ;; schema.core/defrecord gens
   ;; potemkin records on JVM
   (reset! macros/*use-potemkin* true)
