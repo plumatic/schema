@@ -207,8 +207,11 @@
 (clojure.core/defrecord Predicate [p?]
   Schema
   (check [this x]
-         (when-not (p? x)
-           (macros/validation-error this x (list p? x))))
+         (try
+           (when-not (p? x)
+             (macros/validation-error this x (list p? (utils/value-name x))))
+           (catch #+clj Exception #+cljs js/Error e
+                  (macros/validation-error this x (list p? (utils/value-name x))))))
   (explain [this]
            (cond (= p? integer?) 'Int
                  (= p? keyword?) 'Key
@@ -388,9 +391,9 @@
   (check [this x]
     (or (when (map? x)
           (macros/validation-error this x (list 'not (list 'map? (utils/value-name x)))))
-        (when (try (seq x) true
-                   (catch #+clj Exception #+cljs js/Error e
-                          (macros/validation-error this x (list 'throws (list 'seq (utils/value-name x)))))))
+        (try (seq x) nil
+             (catch #+clj Exception #+cljs js/Error e
+                    (macros/validation-error this x (list 'seq? (utils/value-name x)))))
         (let [[singles multi] (parse-sequence-schema this)]
           (#(when (some identity %) %)
            (loop [singles singles x x out []]
@@ -562,8 +565,9 @@
     (if-let [schema (utils/class-schema this)]
       (check schema x)
       ;; Am I from this proto
-      (when-not (or (identical? this (.-constructor x))
-                    (js* "~{} instanceof ~{}" x this))
+      (when (or (nil? x)
+                (not (or (identical? this (.-constructor x))
+                         (js* "~{} instanceof ~{}" x this))))
         (macros/validation-error this x (list 'instance? this (utils/value-name x)))))))
 
 
