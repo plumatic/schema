@@ -11,6 +11,7 @@
   (:require
    [schema.utils :as utils]
    [schema.core :as s]
+   #+clj potemkin
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
@@ -301,7 +302,7 @@
            ~'Key [(~'one ~'Int "foo")
                   (~'maybe
                    (~'record
-                    Explainer
+                    #+clj Explainer #+cljs schema.core-test/Explainer
                     {:foo ~'Int
                      :bar ~'Key
                      (~'optional-key :baz) ~'Key}))]})))
@@ -342,8 +343,8 @@
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
     (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
 
-(defprotocol PProtocol
-  (do-something [this]))
+(#+clj potemkin/defprotocol+ #+cljs defprotocol PProtocol
+       (do-something [this]))
 
 ;; exercies some different arities
 

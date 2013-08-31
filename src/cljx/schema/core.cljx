@@ -434,7 +434,7 @@
 
 (extend-protocol Schema
   #+clj clojure.lang.APersistentSet
-  #+cljs  cljs.core.PersistentHashSet
+  #+cljs cljs.core.PersistentHashSet
   (check [this x]
     (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
     (or (when-not (set? x)
@@ -454,9 +454,9 @@
                (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
              (check-map schema r)
              (when-let [f (:extra-validator-fn this)]
-               (check f r))))
+               (check (pred f) r))))
   (explain [this]
-           #+clj (list 'record (symbol (.getName ^Class klass)) (explain schema))))
+           (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
 (clojure.core/defn record
   "A schema for record with class klass and map schema schema"
@@ -568,7 +568,11 @@
       (when (or (nil? x)
                 (not (or (identical? this (.-constructor x))
                          (js* "~{} instanceof ~{}" x this))))
-        (macros/validation-error this x (list 'instance? this (utils/value-name x)))))))
+        (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
+  (explain [this]
+    (if-let [more-schema (utils/class-schema this)]
+      (explain more-schema)
+      this)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
