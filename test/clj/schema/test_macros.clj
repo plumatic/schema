@@ -8,9 +8,13 @@
   `(~'is (not (s/check ~s ~x))))
 
 (defmacro invalid!
-  "Assert that x does not satisfy schema s"
-  [s x]
-  `(~'is (s/check ~s ~x)))
+  "Assert that x does not satisfy schema s, optionally checking the stringified return value"
+  ([s x]
+     `(~'is (s/check ~s ~x)))
+  ([s x expected]
+     `(do (invalid! ~s ~x)
+          (when *clojure-version* ;; not in cljs
+            (~'is (= ~expected (pr-str (s/check ~s ~x))))))))
 
 (defmacro invalid-call!
   "Assert that f throws (presumably due to schema validation error) when called on args."

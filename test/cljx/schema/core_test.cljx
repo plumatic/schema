@@ -1,13 +1,16 @@
 (ns schema.core-test
-  #+clj
-  (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
-  #+cljs
-  (:use-macros
-   [cljs-test.macros :only [is is= deftest]]
-   [schema.test-macros :only [testing valid! invalid! invalid-call! thrown?]])
-  #+cljs
-  (:require-macros
-   [schema.macros :as sm])
+  "Tests for schema.
+
+   Uses helpers defined in schema.test-macros (for cljs sake):
+    - (valid! s x) asserts that (s/check s x) returns nil
+    - (invalid!
+"
+  #+clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
+  #+cljs (:use-macros
+          [cljs-test.macros :only [is is= deftest]]
+          [schema.test-macros :only [testing valid! invalid! invalid-call! thrown?]])
+  #+cljs (:require-macros
+          [schema.macros :as sm])
   (:require
    clojure.data
    [schema.utils :as utils]
@@ -17,90 +20,40 @@
    #+cljs cljs-test.core))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Helpers
+;;; Simple Schemas
 
-;;; Eq Tests
+(deftest any-test
+  (valid! s/Any 10)
+  (valid! s/Any nil)
+  (valid! s/Any :whatever)
+  (is (= 'Any (s/explain s/Any))))
+
+(deftest maybe-test
+  (let [schema (s/maybe s/Int)]
+    (valid! schema nil)
+    (valid! schema 1)
+    (invalid! schema 1.1 "(not (integer? 1.1))")
+    (is (= '(maybe Int) (s/explain schema)))))
+
+(deftest named-test
+  (let [schema (s/named s/Int "score")]
+    (valid! schema 12)
+    (invalid! schema :a "(not (integer? :a))")
+    (is (= '(named Int "score") (s/explain schema)))))
 
 (deftest eq-test
   (let [schema (s/eq 10)]
     (valid! schema 10)
-    (invalid! schema 9)))
-
-;;; Enum Tests
+    (invalid! schema 9 "(not (= 10 9))")
+    (is (= '(eq 10) (s/explain schema)))))
 
 (deftest enum-test
   (let [schema (s/enum :a :b 1)]
     (valid! schema :a)
     (valid! schema 1)
     (invalid! schema :c)
-    (invalid! schema 2)))
-
-;;; leaves
-
-(deftest map-test
-  (let [Str->Num {s/String s/Number}]
-    (valid! Str->Num {"a" 1 "b" 2})
-    (valid! Str->Num {"a" 1 "b" 2.0})
-    (invalid! Str->Num {:a 1 "b" 2})
-    (invalid! Str->Num {"a" "1"})))
-
-(deftest pred-test
-  (valid! (s/pred odd?) 1)
-  (invalid! (s/pred odd?) 2)
-  (valid! (s/pred string?) "foo")
-  (valid! (s/pred (constantly true)) nil)
-  (invalid! (s/pred odd?) :foo))
-
-#+clj
-(do
-  (deftest primitive-test
-    (valid! float (float 1.0))
-    (invalid! float 1.0)
-    (valid! double 1.0)
-    (invalid! double (float 1.0))
-    (valid! boolean true)
-    (invalid! boolean 1)
-    (doseq [f [byte char short int]]
-      (valid! f (f 1))
-      (invalid! f 1))
-    (valid! long 1)
-    (invalid! long (byte 1)))
-
-  (deftest array-test
-    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
-    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
-    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
-    (valid! (Class/forName "[D") (double-array [1.0]))))
-
-(deftest class-test
-  (valid! s/String "foo")
-  (invalid! s/String :foo)
-  (valid! s/Int 4)
-  (invalid! s/Int nil)
-  (invalid! s/Int 1.5)
-  (valid! s/Keyword :foo)
-  (invalid! s/Keyword 'foo))
-
-(defprotocol ATestProtocol)
-(def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
-(defrecord DirectTestProtocolSatisfier [] ATestProtocol)
-(defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
-(defrecord NonTestProtocolSatisfier [])
-
-(deftest protocol-test
-  (let [s (sm/protocol ATestProtocol)]
-    (valid! s (DirectTestProtocolSatisfier.))
-    (valid! s (IndirectTestProtocolSatisfier.))
-    (invalid! s (NonTestProtocolSatisfier.))
-    (invalid! s nil)
-    (invalid! s 117)))
-
-;; ;;; helpers/wrappers
-
-(deftest anything-test
-  (valid! s/Any 1)
-  (valid! s/Any nil)
-  (valid! s/Any #{:hi :there}))
+    (invalid! schema 2 "(not (#{1 :a :b} 2))")
+    (is (= '(1 :a :b enum) (sort-by str (s/explain schema))))))
 
 (deftest either-test
   (let [schema (s/either
@@ -109,30 +62,43 @@
     (valid! schema {:num 1})
     (valid! schema {:str "hello"})
     (invalid! schema {:num "bad!"})
-    (invalid! schema {:str 1})))
+    (invalid! schema {:str 1})
+    (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
+    (is (s/explain schema))))
 
 (deftest both-test
   (let [schema (s/both
-                (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)))
+                (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)) 'equal-keys?)
                 {s/Keyword s/Keyword})]
     (valid! schema {})
     (valid! schema {:foo :foo :bar :bar})
     (invalid! schema {"foo" "foo"})
-    (invalid! schema {:foo :bar})))
+    (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
+    (invalid! schema {:foo 1} "(not (empty? [(not (equal-keys? {:foo 1})) {:foo (not (keyword? 1))}]))")
+    (is (= '(both (pred vector?) [Int])
+           (s/explain (s/both (s/pred vector? 'vector?) [s/Int]))))))
 
-(deftest maybe-test
-  (let [schema (s/maybe s/Int)]
-    (is (= schema (s/? s/Int)))
-    (valid! schema nil)
+(defprotocol ATestProtocol)
+(def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
+(defrecord DirectTestProtocolSatisfier [] ATestProtocol)
+(defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
+(defrecord NonTestProtocolSatisfier [])
+
+(deftest protocol-test
+  (let [schema (sm/protocol ATestProtocol)]
+    (valid! schema (DirectTestProtocolSatisfier.))
+    (valid! schema (IndirectTestProtocolSatisfier.))
+    (invalid! schema (NonTestProtocolSatisfier.))
+    (invalid! schema nil)
+    (invalid! schema 117 "(not (satisfies? ATestProtocol 117))")
+    (is (= '(protocol ATestProtocol) (s/explain schema)))))
+
+(deftest pred-test
+  (let [schema (s/pred odd? 'odd?)]
     (valid! schema 1)
-    (invalid! schema 1.1)
-    ;; JVM cares about number type
-    #+clj (invalid! schema 1.0)))
-
-(deftest named-test
-  (let [schema [(s/one s/String "topic") (s/one (s/named s/Number "score") "asdf")]]
-    (valid! schema ["foo" 1.0])
-    (invalid! schema [1 2])))
+    (invalid! schema 2 "(not (odd? 2))")
+    (invalid! schema :foo "(throws? (odd? :foo))")
+    (is (= '(pred odd?) (s/explain schema)))))
 
 (deftest conditional-test
   (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Number}
@@ -140,12 +106,21 @@
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
-    (invalid! schema {:type :bar :baz 10})
-    (invalid! schema {:type :zzz :baz 10})))
+    (invalid! schema {:type :bar :baz 10} "{:baz (not (instance? java.lang.String 10))}")
+    (invalid! schema {:type :zzz :baz 10}
+              "(not (matches-some-condition? a-clojure.lang.PersistentArrayMap))")
+    (is (s/explain schema))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Map Schemas
 
-;; ;;; maps
+(deftest map-test
+  (let [Str->Num {s/String s/Number}]
+    (valid! Str->Num {"a" 1 "b" 2})
+    (valid! Str->Num {"a" 1 "b" 2.0})
+    (invalid! Str->Num {:a 1 "b" 2})
+    (invalid! Str->Num {"a" "1"})))
 
 (deftest simple-map-schema-test
   (let [schema {:foo s/Int
@@ -178,6 +153,42 @@
     (invalid! schema {:foo 1 :bar 1.0 :baz {:b1 4}})
     (invalid! schema {:bar 1.0 :baz {:b1 3}})
     (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})))
+
+
+
+#+clj
+(do
+  (deftest primitive-test
+    (valid! float (float 1.0))
+    (invalid! float 1.0)
+    (valid! double 1.0)
+    (invalid! double (float 1.0))
+    (valid! boolean true)
+    (invalid! boolean 1)
+    (doseq [f [byte char short int]]
+      (valid! f (f 1))
+      (invalid! f 1))
+    (valid! long 1)
+    (invalid! long (byte 1)))
+
+  (deftest array-test
+    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
+    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
+    (valid! (Class/forName "[D") (double-array [1.0]))))
+
+(deftest class-test
+  (valid! s/String "foo")
+  (invalid! s/String :foo)
+  (valid! s/Int 4)
+  (invalid! s/Int nil)
+  (invalid! s/Int 1.5)
+  #+clj (invalid! s/Int 1.0) ;; only jvm cares about number type
+  (valid! s/Keyword :foo)
+  (invalid! s/Keyword 'foo))
+
+
+
 
 ;;; sequences
 

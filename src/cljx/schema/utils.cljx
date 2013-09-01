@@ -45,7 +45,7 @@
 
 
 (defn error! [& format-args]
-  #+clj  (throw (RuntimeException. (apply format format-args)))
+  #+clj  (throw (RuntimeException. ^String (apply format format-args)))
   #+cljs (throw (js/Error (apply format format-args))))
 
 (defn value-name

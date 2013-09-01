@@ -58,11 +58,11 @@
 ;; TODO: better error messages for fn schema validation
 
 ;; TODO(jw): describe this.
-(deftype ValidationError [schema value expectation-delay])
+(deftype ValidationError [schema value expectation-delay fail-explanation])
 
 #+clj ;; Validation errors print like forms that would return false
 (defmethod print-method ValidationError [^ValidationError err writer]
-  (print-method (list 'not @(.-expectation-delay err)) writer))
+  (print-method (list (or (.fail-explanation err) 'not) @(.expectation-delay err)) writer))
 
 ;; Allow the file to be reloaded in Clojure, undoing some weirdness below
 #+clj (do (ns-unmap *ns* 'String) (ns-unmap *ns* 'Number)
@@ -101,10 +101,15 @@
   (when-let [error (check schema value)]
     (utils/error! "Value does not match schema: %s" (pr-str error))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas
 
-;; Any: the (constantly true) of schemas
+;;; The schemas here are defined as records (rather than reify), so they behave like data
+;;; and print reasonably (even when not going through print-method/explain above).
+
+
+;;; Any(thing)
 
 (defrecord AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
@@ -115,10 +120,39 @@
   (explain [this] 'Any))
 
 (def Any
-  "Accepts anything, including nil"
+  "Any value, including nil."
   (AnythingSchema. nil))
 
-;; eq: single required value
+
+;;; maybe (nil)
+
+(defrecord Maybe [schema]
+  Schema
+  (check [this x]
+    (when-not (nil? x)
+      (check schema x)))
+  (explain [this] (list 'maybe (explain schema))))
+
+(defn maybe
+  "A value that must either be nil or satisfy schema"
+  [schema]
+  (Maybe. schema))
+
+
+;;; named (schema elements)
+
+(defrecord NamedSchema [schema name]
+  Schema
+  (check [this x] (check schema x))
+  (explain [this] (list 'named (explain schema) name)))
+
+(defn named
+  "A value that must satisfy schema, and has a name for documentation purposes."
+  [schema name]
+  (NamedSchema. schema name))
+
+
+;;; eq (to a single allowed value)
 
 (defrecord EqSchema [v]
   Schema
@@ -128,11 +162,27 @@
   (explain [this] (list 'eq v)))
 
 (defn eq
-  "A value that must be = to one element of v."
+  "A value that must be (= v)."
   [v]
   (EqSchema. v))
 
-;; either: satisfy one of the schemas
+
+;;; enum (in a set of allowed values)
+
+(defrecord EnumSchema [vs]
+  Schema
+  (check [this x]
+    (when-not (contains? vs x)
+      (macros/validation-error this x (list vs (utils/value-name x)))))
+  (explain [this] (cons 'enum vs)))
+
+(defn enum
+  "A value that must be = to some element of vs."
+  [& vs]
+  (EnumSchema. (set vs)))
+
+
+;;; either (satisfies this schema or that one)
 
 (defrecord Either [schemas]
   Schema
@@ -143,95 +193,67 @@
   (explain [this] (cons 'either (map explain schemas))))
 
 (defn either
-  "The disjunction of multiple schemas."
+  "A value that must satisfy at least one schema in schemas."
   [& schemas]
   (Either. schemas))
 
 
-;; both: satisfy all schemas
+;;; both (satisfies this schema and that one)
 
 (defrecord Both [schemas]
   Schema
   (check [this x]
     (when-let [errors (seq (keep #(check % x) schemas))]
-      (macros/validation-error this x (cons 'empty? [errors]))))
+      (if (= 1 (count errors))
+        (first errors)
+        (macros/validation-error this x (list 'empty? (vec errors))))))
   (explain [this] (cons 'both (map explain schemas))))
 
 (defn both
-  "The intersection of multiple schemas.  Useful, e.g., to combine a special-
-   purpose function validator with a normal map schema."
+  "A value that must satisfy every schema in schemas."
   [& schemas]
   (Both. schemas))
 
 
-;; maybe: Can be nil, or if not, satisfy schema
+;;; protocol (which value must satisfy?)
 
-(defrecord Maybe [schema]
-  Schema
-  (check [this x]
-    (when-not (nil? x)
-      (check schema x)))
-  (explain [this] (list 'maybe (explain schema))))
+(defn protocol-name [protocol]
+  #+clj (-> protocol :p :var meta :name)
+  #+cljs (-> protocol meta :proto-sym))
 
-(defn maybe
-  "Value can be nil or must satisfy schema"
-  [schema]
-  (Maybe. schema))
-
-(def ? maybe)
-
-
-;; enum: Must satisfy one of the passed in elems
-
-(defrecord EnumSchema [vs]
-  Schema
-  (check [this x]
-    (when-not (contains? vs x)
-      (macros/validation-error this x (list vs (utils/value-name x)))))
-  (explain [this] (cons 'enum vs)))
-
-(defn enum
-  "A value that must be = to one element of vs."
-  [& vs]
-  (EnumSchema. (set vs)))
-
-;; protocol: Must satisfy? protocol to pass schema
-
-(defn safe-get
-  "Like get but throw an exception if not found"
-  [m k]
-  (if-let [pair (find m k)]
-    (val pair)
-    (utils/error! "Key %s not found in %s" k m)))
-
-;; in cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
-;; and put it in metadata of the record so that equality is preserved.
+;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
+;; and put it in metadata of the record so that equality is preserved, along with the name.
 (defrecord Protocol [p]
   Schema
   (check [this x]
     (when-not #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
-              (macros/validation-error this x (list 'satisfies? p (utils/value-name x)))))
-  (explain [this] (list 'protocol p)))
+              (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x)))))
+  (explain [this] (list 'protocol (protocol-name this))))
 
-#+clj
-(defn protocol [p]
+#+clj ;; The cljs version is macros/protocol
+(defn protocol
+  "A value that must satsify? protocol p"
+  [p]
   (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
-;; pred: Passed in predicate must be true on object to pass
+
+;;; predicate (which must return truthy for value)
 
 (defrecord Predicate [p? pred-name]
   Schema
   (check [this x]
-    (when (try (not (p? x))
-               (catch #+clj Exception #+cljs js/Error e true))
-      (macros/validation-error this x (list pred-name (utils/value-name x)))))
+    (when-let [reason (try (when-not (p? x) 'not)
+                           (catch #+clj Exception #+cljs js/Error e 'throws?))]
+      (macros/validation-error this x (list pred-name (utils/value-name x)) reason)))
   (explain [this]
     (cond (= p? integer?) 'Int
           (= p? keyword?) 'Keyword
           :else (list 'pred pred-name))))
 
 (defn pred
+  "A value for which p? returns true (and does not throw).
+   Optional pred-name can be passed for nicer validation errors."
   ([p?] (pred p? p?))
   ([p? pred-name]
      (when-not (fn? p?)
@@ -239,41 +261,26 @@
      (Predicate. p? pred-name)))
 
 
-
-;; named: A schema with just a name field
-
-(defrecord NamedSchema [schema name]
-  Schema
-  (check [this x] (check schema x))
-  (explain [this] (list 'named (explain schema) name)))
-
-(defn named
-  "Provide an explicit name for this schema element, useful for seqs."
-  [schema name]
-  (NamedSchema. schema name))
-
-
-;; conditional
+;;; conditional (choice of schema, based on predicates on the value)
 
 (defrecord ConditionalSchema [preds-and-schemas]
   Schema
   (check [this x]
     (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
       (check match x)
-      (macros/validation-error this x (list 'not-any? (list 'matches-pred? (utils/value-name x))
-                                            (map first preds-and-schemas)))))
+      (macros/validation-error this x (list 'matches-some-condition? (utils/value-name x)))))
   (explain [this]
-    (cons 'conditional
-          (->> preds-and-schemas
-               (partition 2)
-               (mapcat (fn [pred schema] [pred (explain schema)]))))))
+    (->> preds-and-schemas
+         (mapcat (fn [[pred schema]] [pred (explain schema)]))
+         (cons 'conditional))))
 
 (defn conditional
   "Define a conditional schema.  Takes args like cond,
    (conditional pred1 schema1 pred2 schema2 ...),
    and checks the first schema where pred is true on the value.
    Unlike cond, throws if the value does not match any condition.
-   :else may be used as a final condition in the place of (constantly true)."
+   :else may be used as a final condition in the place of (constantly true).
+   More efficient than either, since only one schema must be checked."
   [& preds-and-schemas]
   (macros/assert-iae (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
                      "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
@@ -282,7 +289,26 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Map schemata
+;;; Map Schemas
+
+;; A map schema is itself a Clojure map, which can provide value schemas for specific required
+;; and optional keys, as well as a single, optional schema for additional key-value pairs.
+
+;; Specific keys are mapped to value schemas, and given as either:
+;;  - (required-key k), a required key (= k)
+;;  - a keyword, also a required key
+;;  - (optional-key k), an optional key (= k)
+;; For example, {:a Int (optional-key :b) String} describes a map with key :a mapping to an
+;; integer, an optional key :b mapping to a String, and no other keys.
+
+;; There can also be a single additional key, itself a schema, mapped to the schema for
+;; corresponding values.
+;; For example, {Int String} is a mapping from integers to strings, and
+;; {:a Int Int String} is a mapping from :a to an integer, plus zero or more additional
+;; mappings from integers to strings.
+
+
+;;; Definitions for required and optional keys
 
 (defrecord RequiredKey [k])
 
@@ -301,6 +327,9 @@
   "An optional key in a map"
   [k]
   (OptionalKey. k))
+
+
+;;; Implementation helper functions
 
 (defn- explicit-schema-key [ks]
   (cond (keyword? ks) ks
@@ -353,6 +382,16 @@
                       (apply dissoc value (map explicit-schema-key (keys explicit-schema)))))]
     (when (seq errors)
       (into {} errors))))
+
+(defn safe-get
+  "Like get but throw an exception if not found"
+  [m k]
+  (if-let [pair (find m k)]
+    (val pair)
+    (utils/error! "Key %s not found in %s" k m)))
+
+
+;;; Extending the Schema protocol to Clojure maps.
 
 (extend-protocol Schema
   #+clj clojure.lang.APersistentMap
@@ -642,7 +681,6 @@
   [f]
   (.-output-schema (fn-schema f)))
 
-;; TODO: fn versions of => here, describe macros.
 ;; TODO: schema.test
 
 ;; In Clojure, we can keep the defn/defrecord macros in this file

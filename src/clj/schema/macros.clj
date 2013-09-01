@@ -14,13 +14,17 @@
      (utils/error! ~@format-args)))
 
 ;; cljs only, since satisfies? is a macro in clojurescript, we have to do something sneaky.
-(defmacro protocol [p]
-  `(with-meta (schema.core/->Protocol ~p) {:proto-pred #(satisfies? ~p %)}))
+(defmacro protocol
+  "A value that must satsify? protocol p"
+  [p]
+  `(with-meta (schema.core/->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
-(defmacro validation-error [schema value expectation]
-  `(ValidationError. ~schema ~value (delay ~expectation)))
+(defmacro validation-error [schema value expectation & [fail-explanation]]
+  `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
 
 (clojure.core/defn maybe-split-first [pred s]
   (if (pred (first s))
