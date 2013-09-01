@@ -380,3 +380,8 @@
                                           t))))
          ~fn-form)
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
+
+(defmacro defschema
+  "Convenience macro to make it clear to reader that body is mean to be used as a schema"
+  [name body]
+  `(def ~name ~body))
