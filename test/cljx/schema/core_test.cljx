@@ -115,21 +115,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
-(deftest map-test
-  (let [Str->Num {s/String s/Number}]
-    (valid! Str->Num {"a" 1 "b" 2})
-    (valid! Str->Num {"a" 1 "b" 2.0})
-    (invalid! Str->Num {:a 1 "b" 2})
-    (invalid! Str->Num {"a" "1"})))
+(deftest uniform-map-test
+  (let [schema {s/Keyword s/Int}]
+    (valid! schema {})
+    (valid! schema {:a 1 :b 2})
+    (invalid! schema {'a 1 :b 2} "{(not (keyword? a)) invalid-key}")
+    (invalid! schema {:a :a :b :b} "{:a (not (integer? :a)), :b (not (integer? :b))}")
+    (is (= '{Keyword Int} (s/explain {s/Keyword s/Int})))))
 
-(deftest simple-map-schema-test
-  (let [schema {:foo s/Int
-                :bar s/Number}]
-    (valid! schema {:foo 1 :bar 2.0})
-    (invalid! schema [[:foo 1] [:bar 2.0]])
-    (invalid! schema {:foo 1 :bar 2.0 :baz 1})
-    (invalid! schema {:foo 1})
-    (invalid! schema {:foo 1.1 :bar 1.0})))
+(deftest simple-specific-key-map-test
+  (let [schema {:foo s/Keyword
+                :bar s/Int}]
+    (valid! schema {:foo :a :bar 2})
+    (invalid! schema [[:foo :a] [:bar 2]] "(not (map? a-clojure.lang.PersistentVector))")
+    (invalid! schema {:foo :a} "{:bar missing-required-key}")
+    (invalid! schema {:foo :a :bar 2 :baz 1} "{:baz disallowed-key}")
+    (invalid! schema {:foo :a :bar 1.5} "{:bar (not (integer? 1.5))}")
+    (is (= '{:foo Keyword, :bar Int} (s/explain schema)))))
 
 (deftest fancier-map-schema-test
   (let [schema {:foo s/Int
@@ -138,59 +140,68 @@
     (valid! schema {:foo 1 "bar" 2.0})
     (valid! schema {:foo 1 "bar" 2.0 "baz" 10.0})
     (invalid! schema {:foo 1 :bar 2.0})
+    (invalid! schema {:foo 1 :bar 2.0})
     (invalid! schema {:foo 1 :bar 2.0 "baz" 2.0})
     (invalid! schema {:foo 1 "bar" "a"})))
 
 (deftest another-fancy-map-schema-test
   (let [schema {:foo (s/maybe s/Int)
                 (s/optional-key :bar) s/Number
-                :baz {:b1 (s/pred odd?)}}]
+                :baz {:b1 (s/pred odd?)}
+                s/Keyword s/Any}]
     (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
     (valid! schema {:foo 1 :baz {:b1 3}})
     (valid! schema {:foo nil :baz {:b1 3}})
+    (valid! schema {:foo nil :baz {:b1 3} :whatever "whatever"})
     (invalid! schema {:foo 1 :bar 1.0 :baz [[:b1 3]]})
     (invalid! schema {:foo 1 :bar 1.0 :baz {:b2 3}})
     (invalid! schema {:foo 1 :bar 1.0 :baz {:b1 4}})
     (invalid! schema {:bar 1.0 :baz {:b1 3}})
-    (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})))
+    (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})
+    (invalid! schema {:foo 1 :bar "z" :baz {:b1 3}})))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Set Schemas
 
-#+clj
-(do
-  (deftest primitive-test
-    (valid! float (float 1.0))
-    (invalid! float 1.0)
-    (valid! double 1.0)
-    (invalid! double (float 1.0))
-    (valid! boolean true)
-    (invalid! boolean 1)
-    (doseq [f [byte char short int]]
-      (valid! f (f 1))
-      (invalid! f 1))
-    (valid! long 1)
-    (invalid! long (byte 1)))
+(deftest simple-set-test
+  (testing "set schemas must have exactly one entry"
+    (is (thrown? Exception (s/check #{s/Int s/Number} #{})))
+    (is (thrown? Exception (s/check #{} #{}))))
 
-  (deftest array-test
-    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
-    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
-    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
-    (valid! (Class/forName "[D") (double-array [1.0]))))
+  (testing "basic set identification"
+    (let [schema #{s/Keyword}]
+      (valid! schema #{:a :b :c})
+      (invalid! schema [:a :b :c] "(not (set? [:a :b :c]))")
+      (invalid! schema {:a :a :b :b})
+      (is (= '#{Keyword} (s/explain schema)))))
 
-(deftest class-test
-  (valid! s/String "foo")
-  (invalid! s/String :foo)
-  (valid! s/Int 4)
-  (invalid! s/Int nil)
-  (invalid! s/Int 1.5)
-  #+clj (invalid! s/Int 1.0) ;; only jvm cares about number type
-  (valid! s/Keyword :foo)
-  (invalid! s/Keyword 'foo))
+  (testing "enforces matching with single simple entry"
+    (let [schema #{s/Int}]
+      (valid! schema #{})
+      (valid! schema #{1 2 3})
+      (invalid! schema #{1 :a} "#{(not (integer? :a))}")
+      (invalid! schema #{:a "c" {}})))
+
+  (testing "more complex element schema"
+    (let [schema #{[s/Int]}]
+      (valid! schema #{})
+      (valid! schema #{[2 4] [3 6]})
+      (invalid! schema #{2})
+      (invalid! schema #{[[2 3]]}))))
+
+(deftest mixed-set-test
+  (let [schema #{(s/either [s/Int] #{s/Int})}]
+    (valid! schema #{})
+    (valid! schema #{[3 4] [56 1] [-11 3]})
+    (valid! schema #{#{3 4} #{56 1} #{-11 3}})
+    (valid! schema #{[3 4] #{56 1} #{-11 3}})
+    (invalid! schema #{#{[3 4]}})
+    (invalid! schema #{[[3 4]]})))
 
 
-
-
-;;; sequences
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Sequence Schemas
 
 (deftest simple-repeated-seq-test
   (let [schema [s/Int]]
@@ -221,69 +232,21 @@
 
 (deftest combo-seq-test
   (let [schema [(s/one (s/maybe s/Int) "maybe-long")
-                (s/optional s/String "str")
-                s/Number]]
+                (s/optional s/Keyword "str")
+                s/Int]]
     (valid! schema [1])
-    (valid! schema [1 "a"])
-    (valid! schema [1 "a" 1.0 2.0 3.0])
-    (valid! schema [nil "b" 1.0 2.0 3.0])
-    (invalid! schema [nil 1 1.0 2.0 3.0])
-    #+clj (invalid! schema [1.0 "A" 2.0 3.0])
-    (invalid! schema [1.1 "A" 2.01 3.9])
-    (invalid! schema [])))
-
-;; TODO: most of the invalid! cases above should be replaced with
-;; explicit checks on the error returned by check?
-#+clj
-(deftest nice-error-test
-  (is (= (str (s/check
-               {:a long
-                :b [(s/one double "d") long]}
-               {:a "test"
-                :b [1 2 2]
-                :c "foo"}))
-         (str (array-map
-               :a '(not (instance? java.lang.Long "test"))
-               :b '[(not (instance? java.lang.Double 1)) nil nil]
-               :c 'disallowed-key)))))
-
-;;; sets
-
-(deftest simple-set-test
-  (testing "basic set identification"
-    (let [schema #{s/Keyword}]
-      (valid! schema #{:a :b :c})
-      (invalid! schema [:a :b :c])
-      (invalid! schema {:a :a :b :b})))
-
-  (testing "enforces matching with single simple entry"
-    (let [schema #{s/Int}]
-      (valid! schema #{})
-      (valid! schema #{1 2 3})
-      (invalid! schema #{1 0.5 :a})
-      (invalid! schema #{3 4 "a"})))
-
-  (testing "set schemas must have exactly one entry"
-    (is (thrown? Exception (s/check #{s/Int s/Number} #{}))))
-
-  (testing "more complex element schema"
-    (let [schema #{[s/Int]}]
-      (valid! schema #{})
-      (valid! schema #{[2 4]})
-      (invalid! schema #{2})
-      (invalid! schema #{[[2 3]]}))))
-
-(deftest mixed-set-test
-  (let [schema #{(s/either [s/Int] #{s/Int})}]
-    (valid! schema #{})
-    (valid! schema #{[3 4] [56 1] [-11 3]})
-    (valid! schema #{#{3 4} #{56 1} #{-11 3}})
-    (valid! schema #{[3 4] #{56 1} #{-11 3}})
-    (invalid! schema #{#{[3 4]}})
-    (invalid! schema #{[[3 4]]})))
+    (valid! schema [1 :a])
+    (valid! schema [1 :a 1 2 3])
+    (valid! schema [nil :b 1 2 3])
+    (invalid! schema {} "(not (not (map? {})))")
+    (invalid! schema [nil 1 1 2 3] "[nil (not (keyword? 1)) nil nil nil]")
+    (invalid! schema [1.4 :A 2 3] "[(not (integer? 1.4)) nil nil nil]")
+    (invalid! schema [] "[(not (has-enough-elts? 1))]")
+    (is (= '[(one (maybe Int) "maybe-long") (optional Keyword "str") Int] (s/explain schema)))))
 
 
-;;; records
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Record Schemas
 
 (defrecord Foo [x ^{:s s/Int} y])
 
@@ -291,7 +254,9 @@
   (let [schema (s/record Foo {:x s/Any (s/optional-key :y) s/Int})]
     (valid! schema (Foo. :foo 1))
     (invalid! schema {:x :foo :y 1})
-    (invalid! schema (assoc (Foo. :foo 1) :bar 2))))
+    (invalid! schema (assoc (Foo. :foo 1) :bar 2))
+    #+clj (is (= '(record schema.core_test.Foo {:x Any,  (optional-key :y) Int})
+                 (s/explain schema)))))
 
 (deftest record-with-extra-keys-test
   (let [schema (s/record Foo {:x s/Any
@@ -301,23 +266,93 @@
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
 
-;;; Explains
 
-(sm/defrecord Explainer
-    [^s/Int foo ^s/Keyword bar]
-  {(s/optional-key :baz) s/Keyword})
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Function Schemas
 
-(deftest explain-test
-  (is (= (s/explain {(s/required-key 'x) s/Int
-                     s/Keyword [(s/one s/Int "foo") (s/maybe Explainer)]})
-         `{~'(required-key x) ~'Int
-           ~'Keyword [(~'one ~'Int "foo")
-                      (~'maybe
-                       (~'record
-                        #+clj Explainer #+cljs schema.core-test/Explainer
-                        {:foo ~'Int
-                         :bar ~'Keyword
-                         (~'optional-key :baz) ~'Keyword}))]})))
+(deftest single-arity-fn-schema-test
+  (let [schema (sm/=> s/Keyword s/Int s/Int)]
+    (valid! schema (fn [x y] (keyword (str (+ x y)))))
+    (valid! schema (fn [])) ;; we don't actually validate what the function does
+    (invalid! schema {} "(not (fn? {}))")
+    (is (= '(=> Keyword Int Int) (s/explain schema)))))
+
+(deftest single-arity-and-more-fn-schema-test
+  (let [schema (sm/=> s/Keyword s/Int s/Int & [s/Keyword])]
+    (valid! schema (fn [])) ;; we don't actually validate what the function does
+    (invalid! schema {} "(not (fn? {}))")
+    (is (= '(=> Keyword Int Int & [Keyword]) (s/explain schema)))))
+
+(deftest multi-arity-fn-schema-test
+  (let [schema (sm/=>* s/Keyword [s/Int] [s/Int & [s/Keyword]])]
+    (valid! schema (fn [])) ;; we don't actually validate what the function does
+    (invalid! schema {} "(not (fn? {}))")
+    (is (= '(=>* Keyword [Int] [Int & [Keyword]]) (s/explain schema)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Cross-platform Schema leaves, for writing Schemas that are valid in both clj and cljs.
+
+(deftest leaf-string-test
+  (valid! s/String "asdf")
+  (invalid! s/String nil "(not (instance? java.lang.String nil))")
+  (invalid! s/String :a "(not (instance? java.lang.String :a))")
+  #+clj (is (= 'java.lang.String (s/explain s/String))))
+
+(deftest leaf-number-test
+  (valid! s/Number 1)
+  (valid! s/Number 1.2)
+  (valid! s/Number (/ 1 2))
+  (invalid! s/Number nil "(not (instance? java.lang.Number nil))")
+  (invalid! s/Number "1" "(not (instance? java.lang.Number \"1\"))")
+  #+clj (is (= 'java.lang.Number (s/explain s/Number))))
+
+(deftest leaf-int-test
+  (valid! s/Int 1)
+  (invalid! s/Int 1.2 "(not (integer? 1.2))")
+  #+clj (invalid! s/Int 1.0 "(not (integer? 1.0))")
+  (invalid! s/Int nil "(not (integer? nil))")
+  (is (= 'Int (s/explain s/Int))))
+
+(deftest leaf-keyword-test
+  (valid! s/Keyword :a)
+  (valid! s/Keyword ::a)
+  (invalid! s/Keyword nil "(not (keyword? nil))")
+  (invalid! s/Keyword ":a" "(not (keyword? \":a\"))")
+  (is (= 'Keyword (s/explain s/Keyword))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Platform-specific Schemas
+
+#+clj
+(do
+  (deftest class-test
+    (valid! String "a")
+    (invalid! String nil "(not (instance? java.lang.String nil))")
+    (invalid! String :a "(not (instance? java.lang.String :a))")
+    (is (= 'java.lang.String (s/explain String))))
+
+  (deftest primitive-test
+    (valid! double 1.0)
+    (invalid! double (float 1.0) "(not (instance? java.lang.Double 1.0))")
+    (is (= 'double (s/explain double)))
+    (valid! float (float 1.0))
+    (invalid! float 1.0)
+    (valid! long 1)
+    (invalid! long (byte 1))
+    (valid! boolean true)
+    (invalid! boolean 1)
+    (doseq [f [byte char short int]]
+      (valid! f (f 1))
+      (invalid! f 1)))
+
+  (deftest array-test
+    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
+    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
+    (valid! (Class/forName "[D") (double-array [1.0]))
+    (invalid! (Class/forName "[D") (into-array Double [1.0]))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -651,3 +686,37 @@
           (is (thrown? Exception (f 4))))
 
         (is (= 5 (f 4)))))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Composite Schemas (test a few combinations of above)
+
+;; TODO: most of the invalid! cases above should be replaced with
+;; explicit checks on the error returned by check?
+(deftest nice-error-test
+  (let [schema {:a #{[s/Int]}
+                :b [(s/one s/Keyword "k") s/Int]
+                :c s/Any}]
+    (valid! schema {:a #{[1 2 3 4] [] [1 2]}
+                    :b [:k 1 2 3]
+                    :c :whatever})
+    (invalid! schema {:a #{[1 2 3 4] [] [1 2] [:a :b]}
+                      :b [1 :a]}
+              "{:a #{[(not (integer? :a)) (not (integer? :b))]}, :b [(not (keyword? 1)) (not (integer? :a))], :c missing-required-key}")))
+
+(sm/defrecord Explainer
+    [^s/Int foo ^s/Keyword bar]
+  {(s/optional-key :baz) s/Keyword})
+
+(deftest fancy-explain-test
+  (is (= (s/explain {(s/required-key 'x) s/Int
+                     s/Keyword [(s/one s/Int "foo") (s/maybe Explainer)]})
+         `{~'(required-key x) ~'Int
+           ~'Keyword [(~'one ~'Int "foo")
+                      (~'maybe
+                       (~'record
+                        #+clj Explainer #+cljs schema.core-test/Explainer
+                        {:foo ~'Int
+                         :bar ~'Keyword
+                         (~'optional-key :baz) ~'Keyword}))]})))

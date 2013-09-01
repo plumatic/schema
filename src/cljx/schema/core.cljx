@@ -302,7 +302,8 @@
 ;; integer, an optional key :b mapping to a String, and no other keys.
 
 ;; There can also be a single additional key, itself a schema, mapped to the schema for
-;; corresponding values.
+;; corresponding values, which applies to all key-value pairs not covered by an explicit
+;; key.
 ;; For example, {Int String} is a mapping from integers to strings, and
 ;; {:a Int Int String} is a mapping from :a to an integer, plus zero or more additional
 ;; mappings from integers to strings.
@@ -414,12 +415,30 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Sequence schemata
+;;; Set schemas
+
+;; A set schema is a Clojure set with a single element, a schema that all values must satisfy
+
+(extend-protocol Schema
+  #+clj clojure.lang.APersistentSet
+  #+cljs cljs.core.PersistentHashSet
+  (check [this x]
+    (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
+    (or (when-not (set? x)
+          (macros/validation-error this x (list 'set? (utils/value-name x))))
+        (when-let [out (seq (keep #(check (first this) %) x))]
+          (set out))))
+  (explain [this] (set [(explain (first this))])))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Sequence Schemas
 
 ;; A sequence schema looks like [one* optional* rest-schema?].
-;; one matches a single required element.  Then optional matches a single
-;; optional element (with arguments always matching the earliest optional schema).
-;; Finally, rest-schema must match any remaining elements.
+;; one matches a single required element, and must be the output of 'one' below.
+;; optional matches a single optional element, and must be the output of 'optional' below.
+;; Finally, rest-schema is any schema, which must match any remaining elements.
+;; (if optional elements are present, they must be matched before the rest-schema is applied).
 
 (defrecord One [schema optional? name])
 
@@ -459,7 +478,10 @@
                    out
                    (conj out
                          (macros/validation-error
-                          (vec singles) nil (list 'has-enough-elts? (count singles)))))
+                          (vec singles)
+                          nil
+                          (list 'has-enough-elts?
+                                (count (take-while #(not (.-optional? ^One %)) singles))))))
                  (recur more-singles
                         (rest x)
                         (conj out (check (.-schema first-single) (first x)))))
@@ -480,28 +502,14 @@
         (when multi
           [(explain multi)]))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Set schemas
-
-;; Set schemas should look like the key half of map schemas
-;; with the exception that required entires don't really make sense
-;; as a result, they can have at most *one* schema for elements
-;; which roughly corresponds to the 'more-keys' part of map schemas
-
-(extend-protocol Schema
-  #+clj clojure.lang.APersistentSet
-  #+cljs cljs.core.PersistentHashSet
-  (check [this x]
-    (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
-    (or (when-not (set? x)
-          (macros/validation-error this x (list 'set? (utils/value-name x))))
-        (when-let [out (seq (keep #(check (first this) %) x))]
-          (macros/validation-error this x (set out)))))
-  (explain [this] (set [(explain (first this))])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Record schemata
+;;; Record Schemas
+
+;; A Record schema describes a value that must have the correct type, and its body must
+;; also satisfy a map schema.  An optional :extra-validator-fn can also be passed to do
+;; additional validation.
 
 (defrecord Record [klass schema]
   Schema
@@ -515,7 +523,7 @@
     (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
 (defn record
-  "A schema for record with class klass and map schema schema"
+  "A Record instance of type klass, whose elements match map schema 'schema'."
   [klass schema]
   #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
   (macros/assert-iae (map? schema) "Expected map, got %s" (utils/type-of schema))
@@ -523,39 +531,55 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Function schemata
+;;; Function Schemas
 
-;; These are purely descriptive at this point, and carry no validation.
-;; We make the assumption that for sanity, a function can only have a single output schema,
-;; over all arities.
+;; A function schema describes a function of one or more arities.
+;; The function can only have a single output schema (across all arities), and each input
+;; schema is a sequence schema describing the argument vector.
 
-(def +infinite-arity+
-  #+clj Long/MAX_VALUE
-  #+cljs js/Number.MAX_VALUE)
+;; Currently function schemas are purely descriptive, and do not carry any validation logic.
+
+(defn explain-input-schema [input-schema]
+  (let [[required more] (split-with #(instance? One %) input-schema)]
+    (concat (map #(explain (.-schema ^One %)) required)
+            (when (seq more)
+              ['& (mapv explain more)]))))
 
 (defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
-  (check [this x] nil) ;; TODO?
+  (check [this x] nil
+    (when-not (fn? x)
+      (macros/validation-error this x (list 'fn? (utils/value-name x)))))
   (explain [this]
     (if (> (count input-schemas) 1)
-      (list* '=>* (explain output-schema) (map explain input-schemas))
-      (list* '=> (explain output-schema) (explain (first input-schemas))))))
+      (list* '=>* (explain output-schema) (map explain-input-schema input-schemas))
+      (list* '=> (explain output-schema) (explain-input-schema (first input-schemas))))))
 
-(defn arity [input-schema]
+(defn- arity [input-schema]
   (if (seq input-schema)
     (if (instance? One (last input-schema))
       (count input-schema)
-      +infinite-arity+)
+      #+clj Long/MAX_VALUE #+cljs js/Number.MAX_VALUE)
     0))
 
-(defn make-fn-schema [output-schema input-schemas]
+(defn make-fn-schema
+  "A function outputting a value in output schema, whose argument vector must match one of
+   input-schemas, each of which should be a sequence schema.
+   Currently function schemas are purely descriptive; they validate against any function,
+   regargless of actual input and output types."
+  [output-schema input-schemas]
   (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
   (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
   (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
+;; => and =>* are convenience macros for making function schemas.
+;; Clojurescript users must use them from schema.macros, but Clojure users can get them here.
+#+clj (potemkin/import-vars macros/=> macros/=>*)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Cross-platform schema leaves, for writing Schemas that are valid in both clj and cljs.
+;;; Cross-platform Schema leaves, for writing Schemas that are valid in both clj and cljs.
 
 #+clj (ns-unmap *ns* 'String)
 (def String
@@ -576,10 +600,12 @@
   "A keyword"
   (pred keyword? 'keyword?))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
 
-;; On JVM, a Class itself is a schema
+;; On the JVM, a Class itself is a schema, and the primitive coercion functions (double, long,
+;; etc) match only instances of that concrete type (identical to Double, Long, etc).
 #+clj
 (do
   (defn- check-class [schema class value]
@@ -634,7 +660,9 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized functions
+;;; Schematized records and functions
+
+;; TODO: describe the binding syntax here.
 
 ;; Metadata syntax is the same as for schema/defrecord.
 
