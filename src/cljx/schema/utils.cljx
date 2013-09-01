@@ -59,3 +59,31 @@
 (def defrecord
   #+clj 'potemkin/defrecord+
   #+cljs 'clojure.core/defrecord)
+
+#+clj
+(definterface PSimpleCell
+  (get_cell ^boolean [])
+  (set_cell [^boolean x]))
+
+#+cljs
+(clojure.core/defprotocol PSimpleCell
+  (get_cell [this])
+  (set_cell [this x]))
+
+
+;; adds ~5% overhead compared to no check
+(deftype SimpleVCell [^:volatile-mutable ^boolean q]
+  PSimpleCell
+  (get_cell [this] q)
+  (set_cell [this x] (set! q x)))
+
+(def ^schema.utils.PSimpleCell use-fn-validation
+  "Turn on run-time function validation for functions compiled when
+   *compile-function-validation* was true -- has no effect for functions compiled
+   when it is false."
+  (SimpleVCell. false))
+
+#+cljs
+(do
+  (aset use-fn-validation "get_cell" (partial get_cell use-fn-validation))
+  (aset use-fn-validation "set_cell" (partial set_cell use-fn-validation)))

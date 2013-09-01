@@ -1,9 +1,10 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
   (:refer-clojure :exclude [defrecord defn fn])
-  (:require [clojure.data :as data]
-            [schema.utils :as utils]
-            potemkin))
+  (:require
+   [clojure.data :as data]
+   [schema.utils :as utils]
+   potemkin))
 
 ;; TODO(ah) make assert!
 (defmacro assert-iae
@@ -180,9 +181,9 @@
 
 (defmacro with-fn-validation [& body]
   `(do
-     (.set_cell schema.core/use-fn-validation true)
+     (.set_cell schema.utils/use-fn-validation true)
      ~@body
-     (.set_cell schema.core/use-fn-validation false)))
+     (.set_cell schema.utils/use-fn-validation false)))
 
 (clojure.core/defn split-rest-arg [env bind]
   (let [[pre-& [_ rest-arg :as post-&]] (split-with #(not= % '&) bind)]
@@ -250,7 +251,7 @@
                         metad-bind-syms)
                       `(let ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
                                    (when rest-arg [rest-arg rest-sym]))
-                         (let [validate# (.get_cell ~'ufv)]
+                         (let [validate# (.get_cell ~'ufv__)]
                            (when validate#
                              (schema.core/validate
                               ~input-schema-sym
@@ -279,7 +280,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
-     :fn-form `(let [^schema.core.PSimpleCell ~'ufv schema.core/use-fn-validation]
+     :fn-form `(let [^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
                  (clojure.core/fn ~name
                    ~@fn-forms))}))
 
@@ -323,7 +324,7 @@
 
    When compile-fn-validation is true (at compile-time), also automatically
    generates pre- and post-conditions on each arity that validate the input and output
-   schemata whenever *use-fn-validation* is true (at run-time).
+   schemata whenever use-fn-validation is true (at run-time).
 
    Current limitations / notable differences from clojure.core/defn:
     - Return type metadata always goes on the fn name.  Primitive hints will be propagated

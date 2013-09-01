@@ -51,8 +51,7 @@
    #+clj potemkin
    #+clj [schema.macros :as macros]
    [schema.utils :as utils])
-  #+cljs
-  (:require-macros [schema.macros :as macros]))
+  #+cljs (:require-macros [schema.macros :as macros]))
 
 #+clj (set! *warn-on-reflection* true)
 
@@ -643,33 +642,8 @@
   [f]
   (.-output-schema (fn-schema f)))
 
-#+clj
-(definterface PSimpleCell
-  (get_cell ^boolean [])
-  (set_cell [^boolean x]))
-
-#+cljs
-(defprotocol PSimpleCell
-  (get_cell [this])
-  (set_cell [this x]))
-
-;; adds ~5% overhead compared to no check
-(deftype SimpleVCell [^:volatile-mutable ^boolean q]
-  PSimpleCell
-  (get_cell [this] q)
-  (set_cell [this x] (set! q x)))
-
-(def ^schema.core.PSimpleCell use-fn-validation
-  "Turn on run-time function validation for functions compiled when
-   *compile-function-validation* was true -- has no effect for functions compiled
-   when it is false."
-  (SimpleVCell. false))
-
-#+cljs
-(do
-  (aset use-fn-validation "get_cell" (partial get_cell use-fn-validation))
-  (aset use-fn-validation "set_cell" (partial set_cell use-fn-validation)))
-
+;; TODO: fn versions of => here, describe macros.
+;; TODO: schema.test
 
 ;; In Clojure, we can keep the defn/defrecord macros in this file
 ;; In ClojureScript, you have to use from clj schema.macros
