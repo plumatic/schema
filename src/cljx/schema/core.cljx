@@ -46,6 +46,7 @@
    These forms are all compatible and can be mixed and matched
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
+  (:refer-clojure :exclude [Keyword])
   (:require
    [clojure.string :as str]
    #+clj potemkin
