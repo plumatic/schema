@@ -6,6 +6,9 @@
    [schema.utils :as utils]
    potemkin))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Helpers used in schema.core.
+
 ;; TODO(ah) make assert!
 (defmacro assert-iae
   "Like assert, but throws an IllegalArgumentException and takes args to format"
@@ -13,7 +16,15 @@
   `(when-not ~form
      (utils/error! ~@format-args)))
 
-;; cljs only, since satisfies? is a macro in clojurescript, we have to do something sneaky.
+(defmacro validation-error [schema value expectation & [fail-explanation]]
+  `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Protocol Schemas for cljs
+
+;;; The clojure version is a function in schema.core, this must be here for cljs because
+;;; satisfies? is a macro that must have access to the protocol at compile-time.
 (defmacro protocol
   "A value that must satsify? protocol p"
   [p]
@@ -23,8 +34,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map schemata
-(defmacro validation-error [schema value expectation & [fail-explanation]]
-  `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
 
 (clojure.core/defn maybe-split-first [pred s]
   (if (pred (first s))
