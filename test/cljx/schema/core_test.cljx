@@ -245,6 +245,14 @@
     (is (= '[(one (maybe Int) "maybe-long") (optional Keyword "str") Int] (s/explain schema)))))
 
 
+(deftest pair-test
+  (let [schema (s/pair s/String "user-name" s/Int "count")]
+    (valid! schema ["user1" 42])
+    (invalid! schema ["user2" 42.1])
+    (invalid! schema [42 "user1"])
+    (invalid! schema ["user1" 42 42])
+    (valid! schema ["user2" 41]) ))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
 

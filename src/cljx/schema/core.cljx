@@ -503,6 +503,11 @@
         (when multi
           [(explain multi)]))))))
 
+(defn pair
+  "A schema for a pair of schemas and their names"
+  [first-schema first-name second-schema second-name]
+  [(one first-schema first-name)
+   (one second-schema second-name)])
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
