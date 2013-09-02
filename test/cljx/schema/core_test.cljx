@@ -244,7 +244,6 @@
     (invalid! schema [] "[(not (has-enough-elts? 1))]")
     (is (= '[(one (maybe Int) "maybe-long") (optional Keyword "str") Int] (s/explain schema)))))
 
-
 (deftest pair-test
   (let [schema (s/pair s/String "user-name" s/Int "count")]
     (valid! schema ["user1" 42])
@@ -363,7 +362,7 @@
     (invalid! (Class/forName "[D") (into-array Double [1.0]))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
 (defmacro test-normalized-meta [symbol ex-schema desired-meta]
@@ -513,10 +512,9 @@
   (invalid! OddSum (OddSum. 1 3)))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
 
-;; helpers
 #+clj
 (deftest split-rest-arg-test
   (is (= (schema.macros/split-rest-arg {} ['a '& 'b])
@@ -700,8 +698,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
 
-;; TODO: most of the invalid! cases above should be replaced with
-;; explicit checks on the error returned by check?
 (deftest nice-error-test
   (let [schema {:a #{[s/Int]}
                 :b [(s/one s/Keyword "k") s/Int]
