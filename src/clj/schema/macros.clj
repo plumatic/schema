@@ -19,19 +19,6 @@
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Protocol Schemas for cljs
-
-;;; The clojure version is a function in schema.core, this must be here for cljs because
-;;; satisfies? is a macro that must have access to the protocol at compile-time.
-(defmacro protocol
-  "A value that must satsify? protocol p"
-  [p]
-  `(with-meta (schema.core/->Protocol ~p)
-     {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
 
@@ -388,3 +375,20 @@
      (.set_cell schema.utils/use-fn-validation true)
      ~@body
      (.set_cell schema.utils/use-fn-validation false)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Other public macros
+
+;;; The clojure version is a function in schema.core, this must be here for cljs because
+;;; satisfies? is a macro that must have access to the protocol at compile-time.
+(defmacro protocol
+  "A value that must satsify? protocol p"
+  [p]
+  `(with-meta (schema.core/->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
+
+(defmacro defschema
+  "Convenience macro to make it clear to reader that body is mean to be used as a schema"
+  [name body]
+  `(def ~name ~body))

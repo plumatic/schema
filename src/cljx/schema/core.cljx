@@ -46,6 +46,7 @@
    These forms are all compatible and can be mixed and matched
    within a single s/defn (although we wouldn't recommend that for
    readability's sake)."
+  (:refer-clojure :exclude [Keyword])
   (:require
    [clojure.string :as str]
    #+clj potemkin
@@ -502,6 +503,11 @@
         (when multi
           [(explain multi)]))))))
 
+(defn pair
+  "A schema for a pair of schemas and their names"
+  [first-schema first-name second-schema second-name]
+  [(one first-schema first-name)
+   (one second-schema second-name)])
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -709,8 +715,6 @@
   [f]
   (.-output-schema (fn-schema f)))
 
-;; TODO: schema.test
-
 ;; In Clojure, we can keep the defn/defrecord macros in this file
 ;; In ClojureScript, you have to use from clj schema.macros
 #+clj
@@ -725,5 +729,6 @@
    macros/=>*
    macros/defrecord
    macros/fn
-   macros/defn)
+   macros/defn
+   macros/defschema)
   (set! *warn-on-reflection* false))
