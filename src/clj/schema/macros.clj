@@ -19,21 +19,8 @@
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Protocol Schemas for cljs
-
-;;; The clojure version is a function in schema.core, this must be here for cljs because
-;;; satisfies? is a macro that must have access to the protocol at compile-time.
-(defmacro protocol
-  "A value that must satsify? protocol p"
-  [p]
-  `(with-meta (schema.core/->Protocol ~p)
-     {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Map schemata
+;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
 
 (clojure.core/defn maybe-split-first [pred s]
   (if (pred (first s))
@@ -55,8 +42,6 @@
             `(schema.core/protocol (deref ~v)))))
       tag))
 
-
-
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
 
@@ -66,7 +51,7 @@
 (clojure.core/defn normalized-metadata
   "Take an object with optional metadata, which may include a :tag and/or explicit
    :schema/:s/:s?/:tag data, plus an optional explicit schema, and normalize the
-   object to have a valid Clojure :tag plus a :schema field."
+   object to have a valid Clojure :tag plus a :schema field. :s? is deprecated."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
     (assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
@@ -82,6 +67,12 @@
                                      (when (valid-tag? env t)
                                        t))))))))
 
+(clojure.core/defn extract-schema-form
+  "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
+  [symbol]
+  (let [s (:schema (meta symbol))]
+    (assert-iae s "%s is missing a schema" symbol)
+    s))
 
 (clojure.core/defn extract-arrow-schematized-element
   "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
@@ -105,98 +96,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized defrecord
-
-
-(clojure.core/defn extract-schema-form
-  "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
-  [symbol]
-  (let [s (:schema (meta symbol))]
-    (assert-iae s "%s is missing a schema" symbol)
-    s))
-
-(def ^:dynamic *use-potemkin* (atom false))
-
-
-(defmacro defrecord
-  "Define a defrecord 'name' using a modified map schema format.
-
-   field-schema looks just like an ordinary defrecord field binding, except that you
-   can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints
-   to fields.
-   e.g., [^long foo  ^{:schema {:a double}} bar]
-   defines a record with two base keys foo and bar.
-   You can also use ^{:s? schema} as shorthand for {:s (maybe schema)},
-   or ^+schema+ to refer to a var/local defining a schema (note that this form
-   is not legal on an ordinary defrecord, however, unlike all the others).
-
-   extra-key-schema? is an optional map schema that defines additional optional
-   keys (and/or a key-schemas) -- without it, the schema specifies that extra
-   keys are not allowed in the record.
-
-   extra-validator-fn? is an optional additional function that validates the record
-   value.
-
-   and opts+specs is passed through to defrecord, i.e., protocol/interface
-   definitions, etc."
-  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
-  [name field-schema & more-args]
-  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
-        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (process-arrow-schematized-args &env field-schema)]
-    `(do
-       (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
-                                         (keys ~extra-key-schema?)))]
-         (utils/error! (str "extra-key-schema? can not contain required keys: "
-                            (vec bad-keys#))))
-       (when ~extra-validator-fn?
-         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                     (class ~extra-validator-fn?)))
-       (~(if @*use-potemkin*
-           `potemkin/defrecord+
-           `clojure.core/defrecord)
-        ~name ~field-schema ~@more-args)
-       (utils/declare-class-schema!
-        ~name
-        (utils/assoc-when
-         (schema.core/record
-          ~name
-          (merge ~(into {}
-                        (for [k field-schema]
-                          [(keyword (clojure.core/name k))
-                           (do (assert-iae (symbol? k)
-                                           "Non-symbol in record binding form: %s" k)
-                               (extract-schema-form k))]))
-                 ~extra-key-schema?))
-         :extra-validator-fn ~extra-validator-fn?))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
-                   " slower than ->x like the clojure.core version")
-             [~map-sym]
-             (let [base# (new ~(symbol (str name))
-                              ~@(map (clojure.core/fn [s] `(get ~map-sym ~(keyword s))) field-schema))
-                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
-               (if (seq remaining#)
-                 (merge base# remaining#)
-                 base#))))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
-                   " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym & [drop-extra-keys?#]]
-             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (utils/error! "Record has wrong set of keys: %s"
-                             (data/diff (set (keys ~map-sym))
-                                        ~(set (map keyword field-schema)))))
-             (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
-
-(defmacro with-fn-validation [& body]
-  `(do
-     (.set_cell schema.utils/use-fn-validation true)
-     ~@body
-     (.set_cell schema.utils/use-fn-validation false)))
+;;; Helpers for schematized fn/defn
 
 (clojure.core/defn split-rest-arg [env bind]
   (let [[pre-& [_ rest-arg :as post-&]] (split-with #(not= % '&) bind)]
@@ -307,6 +207,92 @@
                       "An arity with & must be followed by a single sequence schema")
           (into fixed (second more))))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public: schematized defrecord
+
+(def ^:dynamic *use-potemkin*
+  "Should we generate records based on potemkin/defrecord+, rather than Clojure's defrecord?"
+  (atom false))
+
+(defmacro defrecord
+  "Define a defrecord 'name' using a modified map schema format.
+
+   field-schema looks just like an ordinary defrecord field binding, except that you
+   can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints
+   to fields.
+   e.g., [^long foo  ^{:schema {:a double}} bar]
+   defines a record with two base keys foo and bar.
+   You can also use ^{:s? schema} as shorthand for {:s (maybe schema)},
+   or ^+schema+ to refer to a var/local defining a schema (note that this form
+   is not legal on an ordinary defrecord, however, unlike all the others).
+
+   extra-key-schema? is an optional map schema that defines additional optional
+   keys (and/or a key-schemas) -- without it, the schema specifies that extra
+   keys are not allowed in the record.
+
+   extra-validator-fn? is an optional additional function that validates the record
+   value.
+
+   and opts+specs is passed through to defrecord, i.e., protocol/interface
+   definitions, etc."
+  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  [name field-schema & more-args]
+  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
+        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
+        field-schema (process-arrow-schematized-args &env field-schema)]
+    `(do
+       (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
+                                         (keys ~extra-key-schema?)))]
+         (utils/error! (str "extra-key-schema? can not contain required keys: "
+                            (vec bad-keys#))))
+       (when ~extra-validator-fn?
+         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                     (class ~extra-validator-fn?)))
+       (~(if @*use-potemkin*
+           `potemkin/defrecord+
+           `clojure.core/defrecord)
+        ~name ~field-schema ~@more-args)
+       (utils/declare-class-schema!
+        ~name
+        (utils/assoc-when
+         (schema.core/record
+          ~name
+          (merge ~(into {}
+                        (for [k field-schema]
+                          [(keyword (clojure.core/name k))
+                           (do (assert-iae (symbol? k)
+                                           "Non-symbol in record binding form: %s" k)
+                               (extract-schema-form k))]))
+                 ~extra-key-schema?))
+         :extra-validator-fn ~extra-validator-fn?))
+       ~(let [map-sym (gensym "m")]
+          `(clojure.core/defn ~(symbol (str 'map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
+                   " slower than ->x like the clojure.core version")
+             [~map-sym]
+             (let [base# (new ~(symbol (str name))
+                              ~@(map (clojure.core/fn [s] `(get ~map-sym ~(keyword s))) field-schema))
+                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
+               (if (seq remaining#)
+                 (merge base# remaining#)
+                 base#))))
+       ~(let [map-sym (gensym "m")]
+          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
+                   " keys are required, and no extra keys are allowed.  Even faster than map->")
+             [~map-sym & [drop-extra-keys?#]]
+             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
+               (utils/error! "Record has wrong set of keys: %s"
+                             (data/diff (set (keys ~map-sym))
+                                        ~(set (map keyword field-schema)))))
+             (new ~(symbol (str name))
+                  ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public: schematized functions
+
 (defmacro =>*
   "Produce a function schema from an output schema and a list of arity input schema specs,
    each of which is a vector of argument schemas, ending with an optional '& more-schema'
@@ -318,7 +304,7 @@
   `(schema.core/make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
 
 (defmacro =>
-  "Convenience function for defining functions with a single arity; like =>*, but
+  "Convenience function for defining function schemas with a single arity; like =>*, but
    there is no vector around the argument schemas for this arity."
   [output-schema & arg-schemas]
   `(=>* ~output-schema ~(vec arg-schemas)))
@@ -380,6 +366,27 @@
                                           t))))
          ~fn-form)
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
+
+(defmacro with-fn-validation
+  "Execute body with input and ouptut schema validation turned on for all s/defn and s/fn
+   instances."
+  [& body]
+  `(do
+     (.set_cell schema.utils/use-fn-validation true)
+     ~@body
+     (.set_cell schema.utils/use-fn-validation false)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Other public macros
+
+;;; The clojure version is a function in schema.core, this must be here for cljs because
+;;; satisfies? is a macro that must have access to the protocol at compile-time.
+(defmacro protocol
+  "A value that must satsify? protocol p"
+  [p]
+  `(with-meta (schema.core/->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
 
 (defmacro defschema
   "Convenience macro to make it clear to reader that body is mean to be used as a schema"

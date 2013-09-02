@@ -1,11 +1,12 @@
 (ns schema.utils
-  (:refer-clojure :exclude [defrecord defprotocol])
-  #+clj (:require potemkin))
+  "Private utilities used in schema implementation.")
 
-;; TODO(ah) copied from plumbing. explain why
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Miscellaneous helpers
 
 (defn assoc-when
-  "Like assoc but only assocs when value is truthy"
+  "Like assoc but only assocs when value is truthy.  Copied from plumbing.core so that
+   schema need not depend on plumbing."
   [m & kvs]
   (assert (even? (count kvs)))
   (into (or m {})
@@ -16,6 +17,22 @@
 (clojure.core/defn type-of [x]
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
+
+(defn error! [& format-args]
+  #+clj  (throw (RuntimeException. ^String (apply format format-args)))
+  #+cljs (throw (js/Error (apply format format-args))))
+
+(defn value-name
+  "Provide a descriptive short name for a value."
+  [value]
+  (let [t (type-of value)]
+    (if (< (count (str value)) 20)
+      value
+      (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Registry for attaching schemas to classes, used for defn and defrecord
 
 #+clj
 (let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
@@ -44,21 +61,8 @@
     (aget klass "schema$utils$schema")))
 
 
-(defn error! [& format-args]
-  #+clj  (throw (RuntimeException. ^String (apply format format-args)))
-  #+cljs (throw (js/Error (apply format format-args))))
-
-(defn value-name
-  "Provide a descriptive short name for a value."
-  [value]
-  (let [t (type-of value)]
-    (if (< (count (str value)) 20)
-      value
-      (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
-
-(def defrecord
-  #+clj 'potemkin/defrecord+
-  #+cljs 'clojure.core/defrecord)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Utilities for fast-as-possible reference to use to turn fn schema validation on/off
 
 #+clj
 (definterface PSimpleCell
@@ -66,7 +70,7 @@
   (set_cell [^boolean x]))
 
 #+cljs
-(clojure.core/defprotocol PSimpleCell
+(defprotocol PSimpleCell
   (get_cell [this])
   (set_cell [this x]))
 
