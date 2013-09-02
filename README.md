@@ -1,4 +1,4 @@
-# Schema: Clojure(Script) data shape declaration and validation
+<img src="resources/logo.png" width="270" />
 
 A Clojure(Script) library for declaring and validating that data matches a specified 'schema'. 
 

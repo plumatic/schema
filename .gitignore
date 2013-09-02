@@ -1,3 +1,5 @@
 target/**
 .lein**
 *~
+pom.xml
+*.asc
