@@ -1,8 +1,11 @@
 (defproject prismatic/schema "0.0.4-SNAPSHOT"
 
-  :url "http://example.com/FIXME"
+  :url "http://github.com/prismatic/schema"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+
+  :scm {:url "git@github.com:prismatic/schema.git"}
+
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
@@ -14,6 +17,9 @@
 
   :source-paths ["target/generated/src/clj" "src/clj"]
   :test-paths ["target/generated/test/clj" "test/clj"]
+
+  :lein-release {:deploy-via :shell
+                 :shell ["lein" "deploy" "clojars"]}
 
   :cljx {:builds [{:source-paths ["src/cljx"]
                    :output-path "target/generated/src/clj"
