@@ -31,6 +31,21 @@
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
 
+;; A leaf schema validation error, describing the schema and value and why it failed to
+;; match the schema.  In Clojure, prints like a form describing the failure that would
+;; return true.
+(deftype ValidationError [schema value expectation-delay fail-explanation])
+
+(defn ->ValidationError
+  "for cljs sake"
+  [schema value expectation-delay fail-explanation]
+  (ValidationError. schema value expectation-delay fail-explanation))
+
+#+clj ;; Validation errors print like forms that would return false
+(defmethod print-method ValidationError [^ValidationError err writer]
+  (print-method (list (or (.fail-explanation err) 'not) @(.expectation-delay err)) writer))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Registry for attaching schemas to classes, used for defn and defrecord
 

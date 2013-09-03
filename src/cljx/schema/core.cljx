@@ -58,15 +58,6 @@
 
 ;; TODO: better error messages for fn schema validation
 
-;; A leaf schema validation error, describing the schema and value and why it failed to
-;; match the schema.  In Clojure, prints like a form describing the failure that would
-;; return true.
-(deftype ValidationError [schema value expectation-delay fail-explanation])
-
-#+clj ;; Validation errors print like forms that would return false
-(defmethod print-method ValidationError [^ValidationError err writer]
-  (print-method (list (or (.fail-explanation err) 'not) @(.expectation-delay err)) writer))
-
 ;; Allow the file to be reloaded in Clojure, undoing some weirdness below
 #+clj (do (ns-unmap *ns* 'String) (ns-unmap *ns* 'Number)
           (import 'java.lang.String 'java.lang.Number))

@@ -17,7 +17,7 @@
      (utils/error! ~@format-args)))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
-  `(ValidationError. ~schema ~value (delay ~expectation) ~fail-explanation))
+  `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
