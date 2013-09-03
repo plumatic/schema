@@ -37,13 +37,22 @@
 (deftype ValidationError [schema value expectation-delay fail-explanation])
 
 (defn ->ValidationError
-  "for cljs sake"
+  "for cljs sake (easier than normalizing imports in macros.clj)"
   [schema value expectation-delay fail-explanation]
   (ValidationError. schema value expectation-delay fail-explanation))
 
 #+clj ;; Validation errors print like forms that would return false
 (defmethod print-method ValidationError [^ValidationError err writer]
   (print-method (list (or (.fail-explanation err) 'not) @(.expectation-delay err)) writer))
+
+;; Attach a name to an error from a named schema.
+(deftype NamedError [name error])
+
+(defn ->NamedError [name error] (NamedError. name error))
+
+#+clj ;; Validation errors print like forms that would return false
+(defmethod print-method NamedError [^NamedError err writer]
+  (print-method (list 'named (.error err) (.name err)) writer))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

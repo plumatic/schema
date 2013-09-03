@@ -3,8 +3,9 @@
 
    Uses helpers defined in schema.test-macros (for cljs sake):
     - (valid! s x) asserts that (s/check s x) returns nil
-    - (invalid!
-"
+    - (invalid! s x) asserts that (s/check s x) returns a validation failure
+      - The optional last argument also checks the printed Clojure representation of the error.
+    - (invalid-call! s x) asserts that calling the function throws an error."
   #+clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:use-macros
           [cljs-test.macros :only [is is= deftest]]
@@ -36,10 +37,10 @@
     (is (= '(maybe Int) (s/explain schema)))))
 
 (deftest named-test
-  (let [schema (s/named s/Int "score")]
+  (let [schema (s/named s/Int :score)]
     (valid! schema 12)
-    (invalid! schema :a "(not (integer? :a))")
-    (is (= '(named Int "score") (s/explain schema)))))
+    (invalid! schema :a "(named (not (integer? :a)) :score)")
+    (is (= '(named Int :score) (s/explain schema)))))
 
 (deftest eq-test
   (let [schema (s/eq 10)]
@@ -231,18 +232,18 @@
     (invalid! schema [1 1])))
 
 (deftest combo-seq-test
-  (let [schema [(s/one (s/maybe s/Int) "maybe-long")
-                (s/optional s/Keyword "str")
+  (let [schema [(s/one (s/maybe s/Int) :maybe-long)
+                (s/optional s/Keyword :key)
                 s/Int]]
     (valid! schema [1])
     (valid! schema [1 :a])
     (valid! schema [1 :a 1 2 3])
     (valid! schema [nil :b 1 2 3])
     (invalid! schema {} "(not (not (map? {})))")
-    (invalid! schema [nil 1 1 2 3] "[nil (not (keyword? 1)) nil nil nil]")
-    (invalid! schema [1.4 :A 2 3] "[(not (integer? 1.4)) nil nil nil]")
-    (invalid! schema [] "[(not (has-enough-elts? 1))]")
-    (is (= '[(one (maybe Int) "maybe-long") (optional Keyword "str") Int] (s/explain schema)))))
+    (invalid! schema [nil 1 1 2 3] "[nil (named (not (keyword? 1)) :key) nil nil nil]")
+    (invalid! schema [1.4 :A 2 3] "[(named (not (integer? 1.4)) :maybe-long) nil nil nil]")
+    (invalid! schema [] "[(not (present? :maybe-long))]")
+    (is (= '[(one (maybe Int) :maybe-long) (optional Keyword :key) Int] (s/explain schema)))))
 
 (deftest pair-test
   (let [schema (s/pair s/String "user-name" s/Int "count")]
@@ -532,8 +533,14 @@
 
 (deftest simple-validated-meta-test
   (let [f (sm/fn ^s/String foo [^OddLong arg0 arg1])]
-    (def s2 (s/fn-schema f))
     (is (= +test-fn-schema+ (s/fn-schema f)))))
+
+(deftest no-schema-fn-test
+  (let [f (sm/fn [arg0 arg1] (+ arg0 arg1))]
+    (is (= (sm/=> s/Any s/Any s/Any) (s/fn-schema f)))
+    (sm/with-fn-validation
+      (is (= 4 (f 1 3))))
+    (is (= 4 (f 1 3)))))
 
 (deftest simple-validated-fn-test
   (let [f (sm/fn test-fn :- (s/pred even?)
@@ -556,7 +563,7 @@
   #+cljs (js/parseInt x))
 
 (deftest destructured-validated-fn-test
-  (let [LongPair [(s/one s/Int "x") (s/one s/Int "y")]
+  (let [LongPair [(s/one s/Int 'x) (s/one s/Int 'y)]
         f (sm/fn foo :- s/Int
             [^LongPair [x y] ^s/Int arg1]
             (+ x y arg1))]
@@ -591,7 +598,7 @@
   (testing "no schema"
     (let [f (sm/fn foo :- s/Int
               [^s/Int arg0 & [rest0]] (+ arg0 (or rest0 2)))]
-      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Any "rest0")]])
+      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Any 'rest0)]])
              (s/fn-schema f)))
       (sm/with-fn-validation
         (is (= 6 (f 4)))
@@ -600,7 +607,7 @@
   (testing "arg schema"
     (let [f (sm/fn foo :- s/Int
               [^s/Int arg0 & [rest0 :- s/Int]] (+ arg0 (or rest0 2)))]
-      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Int "rest0")]])
+      (is (= (sm/=>* s/Int [s/Int & [(s/optional s/Int 'rest0)]])
              (s/fn-schema f)))
       (sm/with-fn-validation
         (is (= 6 (f 4)))
@@ -700,14 +707,14 @@
 
 (deftest nice-error-test
   (let [schema {:a #{[s/Int]}
-                :b [(s/one s/Keyword "k") s/Int]
+                :b [(s/one s/Keyword :k) s/Int]
                 :c s/Any}]
     (valid! schema {:a #{[1 2 3 4] [] [1 2]}
                     :b [:k 1 2 3]
                     :c :whatever})
     (invalid! schema {:a #{[1 2 3 4] [] [1 2] [:a :b]}
                       :b [1 :a]}
-              "{:a #{[(not (integer? :a)) (not (integer? :b))]}, :b [(not (keyword? 1)) (not (integer? :a))], :c missing-required-key}")))
+              "{:a #{[(not (integer? :a)) (not (integer? :b))]}, :b [(named (not (keyword? 1)) :k) (not (integer? :a))], :c missing-required-key}")))
 
 (sm/defrecord Explainer
     [^s/Int foo ^s/Keyword bar]

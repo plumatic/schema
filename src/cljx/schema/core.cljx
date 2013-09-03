@@ -56,8 +56,6 @@
 
 #+clj (set! *warn-on-reflection* true)
 
-;; TODO: better error messages for fn schema validation
-
 ;; Allow the file to be reloaded in Clojure, undoing some weirdness below
 #+clj (do (ns-unmap *ns* 'String) (ns-unmap *ns* 'Number)
           (import 'java.lang.String 'java.lang.Number))
@@ -94,9 +92,9 @@
     (prefer-method print-method schema.core.Schema java.util.Map)
     (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
 
-(defn validate [schema value]
+(defn validate [schema value & [value-name]]
   (when-let [error (check schema value)]
-    (utils/error! "Value does not match schema: %s" (pr-str error))))
+    (utils/error! "%s does not match schema: %s" (or value-name "Value") (pr-str error))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -140,7 +138,9 @@
 
 (defrecord NamedSchema [schema name]
   Schema
-  (check [this x] (check schema x))
+  (check [this x]
+    (when-let [err (check schema x)]
+      (utils/->NamedError name err)))
   (explain [this] (list 'named (explain schema) name)))
 
 (defn named
@@ -477,11 +477,15 @@
                          (macros/validation-error
                           (vec singles)
                           nil
-                          (list 'has-enough-elts?
-                                (count (take-while #(not (.-optional? ^One %)) singles))))))
+                          (list* 'present?
+                                 (for [^One single singles
+                                       :while (not (.-optional? single))]
+                                   (.-name single))))))
                  (recur more-singles
                         (rest x)
-                        (conj out (check (.-schema first-single) (first x)))))
+                        (conj out
+                              (when-let [err (check (.-schema first-single) (first x))]
+                                (utils/->NamedError (.-name first-single) err)))))
                (cond multi
                      (into out (map #(check multi %) x))
 

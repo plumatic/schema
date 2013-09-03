@@ -117,8 +117,8 @@
   `(~(if rest? `schema.core/optional `schema.core/one)
     ~(extract-schema-form arg)
     ~(if (symbol? arg)
-       (name arg)
-       (str (if rest? "rest" "arg") index))))
+       `'~arg
+       `'~(symbol (str (if rest? "rest" "arg") index)))))
 
 (clojure.core/defn simple-arglist-schema-form [rest? regular-args]
   (mapv (partial single-arg-schema-form rest?) (map-indexed vector regular-args)))
@@ -146,7 +146,7 @@
    tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
-  [env output-schema-sym bind-meta [bind & body]]
+  [env fn-name output-schema-sym bind-meta [bind & body]]
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
     (utils/error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
@@ -170,9 +170,11 @@
                               ~input-schema-sym
                               ~(if rest-arg
                                  `(list* ~@bind-syms ~rest-sym)
-                                 bind-syms)))
+                                 bind-syms)
+                              (format "Input to %s" '~fn-name)))
                            (let [o# (do ~@body)]
-                             (when validate# (schema.core/validate ~output-schema-sym o#))
+                             (when validate#
+                               (schema.core/validate ~output-schema-sym o# (format "Output of %s" '~fn-name)))
                              o#)))))
                    (cons bind body))}))
 
@@ -185,7 +187,7 @@
                         (when (primitive-sym? t)
                           {:tag t}))
                       {})
-        processed-arities (map (partial process-fn-arity env output-schema-sym bind-meta)
+        processed-arities (map (partial process-fn-arity env name output-schema-sym bind-meta)
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
@@ -200,7 +202,7 @@
 (defn- parse-arity-spec [spec]
   (assert-iae (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
-        fixed (mapv (clojure.core/fn [i s] `(schema.core/one ~s ~(str "arg" i))) (range) init)]
+        fixed (mapv (clojure.core/fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
     (if (empty? more)
       fixed
       (do (assert-iae (and (= (count more) 2) (vector? (second more)))
@@ -339,7 +341,7 @@
   [& fn-args]
   (let [[name more-fn-args] (if (symbol? (first fn-args))
                               (extract-arrow-schematized-element &env fn-args)
-                              ["fn" fn-args])
+                              [(with-meta 'fn {:schema `schema.core/Any}) fn-args])
         {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-fn-args)]
     `(let ~schema-bindings
        (with-meta ~fn-form ~{:schema schema-form}))))
