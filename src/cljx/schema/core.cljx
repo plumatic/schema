@@ -381,13 +381,6 @@
     (when (seq errors)
       (into {} errors))))
 
-(defn safe-get
-  "Like get but throw an exception if not found"
-  [m k]
-  (if-let [pair (find m k)]
-    (val pair)
-    (utils/error! "Key %s not found in %s" k m)))
-
 
 ;;; Extending the Schema protocol to Clojure maps.
 
@@ -406,7 +399,7 @@
                  k
                  (list (cond (instance? RequiredKey k) 'required-key
                              (instance? OptionalKey k) 'optional-key)
-                       (safe-get k :k)))
+                       (utils/safe-get k :k)))
                (explain k))
              (explain v)]))))
 
@@ -700,7 +693,7 @@
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/type-of f))
-      (safe-get (meta f) :schema)))
+      (utils/safe-get (meta f) :schema)))
 
 (defn input-schema
   "Convenience method for fns with single arity"

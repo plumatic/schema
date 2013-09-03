@@ -289,7 +289,7 @@
                              (data/diff (set (keys ~map-sym))
                                         ~(set (map keyword field-schema)))))
              (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(schema.core/safe-get ~map-sym ~(keyword s))) field-schema)))))))
+                  ~@(map (clojure.core/fn [s] `(utils/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

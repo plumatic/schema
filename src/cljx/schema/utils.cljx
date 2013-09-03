@@ -22,6 +22,13 @@
   #+clj  (throw (RuntimeException. ^String (apply format format-args)))
   #+cljs (throw (js/Error (apply format format-args))))
 
+(defn safe-get
+  "Like get but throw an exception if not found"
+  [m k]
+  (if-let [pair (find m k)]
+    (val pair)
+    (error! "Key %s not found in %s" k m)))
+
 (defn value-name
   "Provide a descriptive short name for a value."
   [value]
