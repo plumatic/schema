@@ -58,7 +58,9 @@
 
 ;; TODO: better error messages for fn schema validation
 
-;; TODO(jw): describe this.
+;; A leaf schema validation error, describing the schema and value and why it failed to
+;; match the schema.  In Clojure, prints like a form describing the failure that would
+;; return true.
 (deftype ValidationError [schema value expectation-delay fail-explanation])
 
 #+clj ;; Validation errors print like forms that would return false
@@ -95,8 +97,11 @@
      {:a Keyword, :b [Int]}"))
 
 #+clj ;; Schemas print as their explains
-(defmethod print-method Schema [s writer]
-  (print-method (explain s) writer))
+(do (defmethod print-method schema.core.Schema [s writer]
+      (print-method (explain s) writer))
+    (prefer-method print-method schema.core.Schema clojure.lang.IRecord)
+    (prefer-method print-method schema.core.Schema java.util.Map)
+    (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
 
 (defn validate [schema value]
   (when-let [error (check schema value)]
