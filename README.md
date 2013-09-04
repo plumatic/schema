@@ -106,6 +106,8 @@ Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, 
   (StampedNames. (str (System/currentTimeMillis)) names))
 ```
 
+Here, `x :- y` means that `x` must satisfy schema `y`, replacing the more familiar metadata hints (like `^y x` -- which are also supported, but clunkier for complex schemas -- see `(doc schema.core)` for details).  
+
 As you can see, these type hints are precise, easy to read, and shorter than the comments they replace.  Moreover, they produce Schemas that are *data*, and can be inspected, manipulated, and used for validation on-demand (did you spot the bug in `stamped-names`?)
 
 ```clojure
