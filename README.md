@@ -153,7 +153,7 @@ Longer-term, we have lots more in store for Schema.  Just a few of the crazy ide
 
 ## More examples
 
-(`schema.core`)[https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx] provides a wealth of extra tools for defining schemas, which are described in docstrings and well-tested in `schema.core-test`.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
+[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides a wealth of extra tools for defining schemas, which are described in docstrings and well-tested in [`schema.core-test`](https://github.com/Prismatic/schema/blob/master/test/cljx/schema/core_test.cljx).  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
 
 ### Map schema details
 
@@ -208,7 +208,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-`schema.core` provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `either`, `both`, `pred`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `either`, `both`, `pred`, and more.  Here are a few of our favorites:
 
 ```clojure
 
