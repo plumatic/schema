@@ -153,7 +153,7 @@ Longer-term, we have lots more in store for Schema.  Just a few of the crazy ide
 
 ## More examples
 
-`schema.core` provides a wealth of extra tools for defining schemas, which are described in docstrings and well-tested in `schema.core-test`.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
+(`schema.core`)[https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx] provides a wealth of extra tools for defining schemas, which are described in docstrings and well-tested in `schema.core-test`.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
 
 ### Map schema details
 
