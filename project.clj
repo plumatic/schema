@@ -36,6 +36,8 @@
 
   :source-paths ["target/generated/src/clj" "src/clj"]
 
+  :resource-paths ["target/generated/src/cljs"]
+
   :test-paths ["target/generated/test/clj" "test/clj"]
 
   :cljsbuild {:builds
