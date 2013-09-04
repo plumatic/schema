@@ -121,7 +121,7 @@ As you can see, these type hints are precise, easy to read, and shorter than the
 ;; And you can turn on validation to catch bugs in your functions and schemas  
 (s/with-fn-validation 
   (stamped-names ["bob"]))
-==> RuntimeException Output of stamped-names does not match schema: 
+==> RuntimeException: Output of stamped-names does not match schema: 
      {:date (not (instance? java.lang.Long "1378267311501"))} 
      
 ;; Oops, I guess we should remove that `str` from `stamped-names`.     
@@ -141,7 +141,7 @@ After documentation, the next-most important benefit is validation.  Thus far, w
 (use-fixtures :once schema.test/validate-schemata)
 ```
 
-As long as your tests cover all call boundaries, this means you will should catch any `type`-like bugs in your code at test time. 
+As long as your tests cover all call boundaries, this means you will should catch any 'type-like' bugs in your code at test time. 
 
 Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.
 
