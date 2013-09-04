@@ -145,7 +145,7 @@ As long as your tests cover all call boundaries, this means you will should catc
 
 Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.
 
-Longer-term, we have lots more in store with Schema.  Just a few of the crazy ideas we have brewing are:
+Longer-term, we have lots more in store for Schema.  Just a few of the crazy ideas we have brewing are:
  - Automatically generate API client libraries based on API schemas
  - Automatically generate test data from schemas
  - Compile to `core.typed` annotations for more typey goodness, if that's your thing
