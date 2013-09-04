@@ -14,7 +14,7 @@ One of the difficulties with bringing Clojure into a team is the overhead of und
 
 ## Meet Schema
 
-A Schema is just a Clojure(Script) data structure describing a data shape, which can be used to document and validate functions and data.  The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM and prototypes (in ClojureScript):
+A Schema is just a Clojure(Script) data structure describing a data shape, which can be used to document and validate functions and data.  The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM) and prototypes (in ClojureScript):
 
 ```clojure
 (ns schema-examples
@@ -24,7 +24,7 @@ A Schema is just a Clojure(Script) data structure describing a data shape, which
 
 (s/validate s/Number 42)  
 (throws? (s/validate s/Number "42"))  
-;; RuntimeException Value does not match schema: (not (instance java.lang.Number "42")) 
+;; RuntimeException: Value does not match schema: (not (instance java.lang.Number "42")) 
 
 (s/validate s/Keyword :whoa)  
 (throws? (s/validate s/Keyword 123))
