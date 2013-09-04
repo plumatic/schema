@@ -1,7 +1,6 @@
 <img src="https://raw.github.com/wiki/prismatic/schema/images/logo.png" width="270" />
 
 A Clojure(Script) library for declarative data description and validation.
-
 --
 
 One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings versus, nested map from long to string to double) that a function expects and returns. While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas. 
