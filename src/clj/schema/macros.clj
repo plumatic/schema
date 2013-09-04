@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord defn fn])
+  (:refer-clojure :exclude [defrecord fn defn])
   (:require
    [clojure.data :as data]
    [schema.utils :as utils]
@@ -211,33 +211,81 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public: miscellaneous macros
+
+(defmacro defschema
+  "Convenience macro to make it clear to reader that body is meant to be used as a schema"
+  [name body]
+  `(def ~name ~body))
+
+;;; The clojure version is a function in schema.core, this must be here for cljs because
+;;; satisfies? is a macro that must have access to the protocol at compile-time.
+(defmacro protocol
+  "A value that must satsify? protocol p"
+  [p]
+  `(with-meta (schema.core/->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
+
+(defmacro =>*
+  "Produce a function schema from an output schema and a list of arity input schema specs,
+   each of which is a vector of argument schemas, ending with an optional '& more-schema'
+   specification where more-schema must be a sequence schema.
+
+   Currently function schemas are purely descriptive; there is no validation except for
+   functions defined directly by s/fn or s/defn"
+  [output-schema & arity-schema-specs]
+  `(schema.core/make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
+
+(defmacro =>
+  "Convenience function for defining function schemas with a single arity; like =>*, but
+   there is no vector around the argument schemas for this arity."
+  [output-schema & arg-schemas]
+  `(=>* ~output-schema ~(vec arg-schemas)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized defrecord
 
 (def ^:dynamic *use-potemkin*
-  "Should we generate records based on potemkin/defrecord+, rather than Clojure's defrecord?"
+  "Should we generate records based on potemkin/defrecord+, rather than Clojure's
+   defrecord? Turned on by default for Clojure at the bottom of schema.core."
   (atom false))
 
 (defmacro defrecord
-  "Define a defrecord 'name' using a modified map schema format.
+  "Define a record with a schema.  If *use-potemkin* is true, the resulting record
+   is a potemkin/defrecord+, otherwise it is a clojure.core/defrecord.
 
-   field-schema looks just like an ordinary defrecord field binding, except that you
-   can use ^{:s/:schema +schema+} forms to give non-primitive, non-class schema hints
-   to fields.
-   e.g., [^long foo  ^{:schema {:a double}} bar]
-   defines a record with two base keys foo and bar.
-   You can also use ^{:s? schema} as shorthand for {:s (maybe schema)},
-   or ^+schema+ to refer to a var/local defining a schema (note that this form
-   is not legal on an ordinary defrecord, however, unlike all the others).
+   In addition to the ordinary behavior of defrecord, this macro produces a schema
+   for the Record, which will automatically be used when validating instances of
+   the Record class:
 
-   extra-key-schema? is an optional map schema that defines additional optional
-   keys (and/or a key-schemas) -- without it, the schema specifies that extra
-   keys are not allowed in the record.
+   (sm/defrecord FooBar
+    [foo :- Int
+     bar :- String])
 
-   extra-validator-fn? is an optional additional function that validates the record
-   value.
+   (schema.utils/class-schema FooBar)
+   ==> (record user.FooBar {:foo Int, :bar java.lang.String})
 
-   and opts+specs is passed through to defrecord, i.e., protocol/interface
-   definitions, etc."
+   (s/check FooBar (FooBar. 1.2 :not-a-string))
+   ==> {:foo (not (integer? 1.2)), :bar (not (instance? java.lang.String :not-a-string))}
+
+   See (doc schema.core) for details of the :- syntax for record elements.
+
+   Moreover, optional arguments extra-key-schema? and extra-validator-fn? can be
+   passed to augment the record schema.
+    - extra-key-schema is a map schema that defines validation for additional
+      key-value pairs not in the record base (the default is to not allow extra
+       mappings).
+    - extra-validator-fn? is an additional predicate that will be used as part
+      of validating the record value.
+
+   The remaining opts+specs (i.e., protocol and interface implementations) are
+   passed through directly to defrecord.
+
+   Finally, this macro replaces Clojure's map->name constructor with one that is
+   more than an order of magnitude faster (as of Clojure 1.5), and provides a
+   new strict-map->name constructor that throws or drops extra keys not in the
+   record base."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
@@ -295,49 +343,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized functions
 
-(defmacro =>*
-  "Produce a function schema from an output schema and a list of arity input schema specs,
-   each of which is a vector of argument schemas, ending with an optional '& more-schema'
-   specification where more-schema must be a sequence schema.
-
-   Currently function schemas are purely descriptive; there is no validation except for
-   functions defined directly by s/fn or s/defn"
-  [output-schema & arity-schema-specs]
-  `(schema.core/make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
-
-(defmacro =>
-  "Convenience function for defining function schemas with a single arity; like =>*, but
-   there is no vector around the argument schemas for this arity."
-  [output-schema & arg-schemas]
-  `(=>* ~output-schema ~(vec arg-schemas)))
-
-(ns-unmap *ns* 'fn)
-
 (defmacro fn
-  "Like clojure.core/fn, except that schema-style typehints can be given on the argument
-   symbols and on the function name (for the return value).  The rules for typehints are
-   the same as for defrecord.
+  "sm/fn : sm/defn :: clojure.core/fn : clojure.core/defn
 
-   This produces a fn that you can call fn-schema on to get a schema back.
-   This is currently done using metadata for fns, which currently causes
-   clojure to wrap the fn in an outer non-primitive layer, so you may pay double
-   function call cost and lose the benefits of primitive type hints.
+   See (doc schema.macros/defn) for details.
 
-   When compile-fn-validation is true (at compile-time), also automatically
-   generates pre- and post-conditions on each arity that validate the input and output
-   schemata whenever use-fn-validation is true (at run-time).
-
-   Current limitations / notable differences from clojure.core/defn:
-    - Return type metadata always goes on the fn name.  Primitive hints will be propagated
-    to the arg vector automatically.  All arities must share the same return schema
-    - Schema metadata is only processed on top-level arguments.  I.e., you can use
-    destructing, but you must put schema metadata on the top-level arguments, not the
-    destructured variables
-    - Only a specific subset of rest-arg destructuring is supported:
-      - & rest works as expected, with for any number of extra args
-      - & [a b] works, with schemas for individual elements parsed out of the binding,
-        or an overall schema on the vector
-      - & {} is not supported."
+   Additional gotchas and limitations:
+    - Like s/defn, the output schema must go on the fn name.  If you want an
+      output schema, your function must have a name.
+    - Unlike s/defn, the function schema is stored in metadata on the fn.
+      Clojure's implementation for metadata on fns currently produces a
+      wrapper fn, which will decrease performance and negate the benefits
+      of primitive type hints compared to clojure.core/fn."
   [& fn-args]
   (let [[name more-fn-args] (if (symbol? (first fn-args))
                               (extract-arrow-schematized-element &env fn-args)
@@ -347,12 +364,52 @@
        (with-meta ~fn-form ~{:schema schema-form}))))
 
 (defmacro defn
-  "defn : clojure.core/defn :: fn : clojure.core/fn.
+  "Like clojure.core/defn, except that schema-style typehints can be given on
+   the argument symbols and on the function name (for the return value).
 
-   Notes specific to defn:
-    - fn-schema works on the class of the fn, so primitive hints are supported and there
-      is no overhead, unlike with 'fn' above
-    - Unlike clojure.core/defn, we don't support a final attr-map on multi-arity functions"
+   You can call s/fn-schema on the defined function to get its schema back, or
+   use with-fn-validation to enable runtime checking of function inputs and
+   outputs.
+
+   (sm/defn foo :- s/Number
+    [x :- s/Int
+     y :- s/Number]
+    (* x y))
+
+   (s/fn-schema foo)
+   ==> (=> java.lang.Number Int java.lang.Number)
+
+   (sm/with-fn-validation (foo 1 2))
+   ==> 2
+
+   (sm/with-fn-validation (foo 1.5 2))
+   ==> Input to foo does not match schema: [(named (not (integer? 1.5)) x) nil]
+
+   See (doc schema.core) for details of the :- syntax for arguments and return
+   schemas.
+
+   The overhead for checking if run-time validation should be used is very
+   small -- about 5% of a very small fn call.  On top of that, actual
+   validation costs what it costs.
+
+   Gotchas and limitations:
+    - The output schema always goes on the fn name, not the arg vector. This
+      means that all arities must share the same output schema. Schema will
+      automatically propagate primitive hints to the arg vector and class hints
+      to the fn name, so that you get the behavior you expect from Clojure.
+    - Schema metadata is only processed on top-level arguments.  I.e., you can
+      use destructuring, but you must put schema metadata on the top-level
+      arguments, not the destructured variables.
+
+      Bad:  (sm/defn foo [{:keys [x :- s/Int]}])
+      Good: (sm/defn foo [{:keys [x]} :- {:x s/Int}])
+    - Only a specific subset of rest-arg destructuring is supported:
+      - & rest works as expected
+      - & [a b] works, with schemas for individual elements parsed out of the binding,
+        or an overall schema on the vector
+      - & {} is not supported.
+    - Unlike clojure.core/defn, a final attr-map on multi-arity functions is not
+      supported."
   [& defn-args]
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
@@ -370,27 +427,11 @@
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
 
 (defmacro with-fn-validation
-  "Execute body with input and ouptut schema validation turned on for all s/defn and s/fn
-   instances."
+  "Execute body with input and ouptut schema validation turned on for all s/defn
+   and s/fn instances."
   [& body]
   `(do
      (.set_cell schema.utils/use-fn-validation true)
-     ~@body
-     (.set_cell schema.utils/use-fn-validation false)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Other public macros
-
-;;; The clojure version is a function in schema.core, this must be here for cljs because
-;;; satisfies? is a macro that must have access to the protocol at compile-time.
-(defmacro protocol
-  "A value that must satsify? protocol p"
-  [p]
-  `(with-meta (schema.core/->Protocol ~p)
-     {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
-
-(defmacro defschema
-  "Convenience macro to make it clear to reader that body is mean to be used as a schema"
-  [name body]
-  `(def ~name ~body))
+     (let [res# (do ~@body)]
+       (.set_cell schema.utils/use-fn-validation false)
+       res#)))

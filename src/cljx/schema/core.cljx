@@ -1,51 +1,83 @@
 (ns schema.core
-  "A library for data structure schema definition and validation.
+  "A library for data shape definition and validation. A Schema is just Clojure data,
+   which can be used to document and validate Clojure functions and data.
 
    For example,
 
-   (check {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0]})
+   (def FooBar {:foo Keyword :bar [Number]}) ;; a schema
 
-   returns nil (for successful validation) but the following all return
-   truthy objects that look like the bad portions of the input object,
-   with leaf values replaced by descriptions of the validation failure:
+   (check FooBar {:foo :k :bar [1.0 2.0 3.0]})
+   ==> nil
 
-   (check {:foo long :bar [double]} {:bar [1.0 2.0 3.0]})
+   representing successful validation, but the following all return helpful errors
+   describing how the provided data fails to measure up to schema FooBar's standards.
+
+   (check FooBar {:bar [1.0 2.0 3.0]})
    ==> {:foo missing-required-key}
 
-   (check {:foo long :bar [double]} {:foo \"1\" :bar [1.0 2.0 3.0]})
-   ==> {:foo (not (instance? java.lang.Long \"1\"))}
+   (check FooBar {:foo 1 :bar [1.0 2.0 3.0]})
+   ==> {:foo (not (keyword? 1))}
 
-   (check {:foo long :bar [double]} {:foo 1 :bar [1.0 2.0 3.0] :baz 1})
+   (check FooBar {:foo :k :bar [1.0 2.0 3.0] :baz 1})
    ==> {:baz disallowed-key}
 
-   Schemas are also supported as field/argument metadata in special
-   defrecord/fn/defn replacements, using standard ^long ^Class ^Record
-   syntax for classes and primitives as usual.  For more complex
-   schemata, you must use a map like:
+   Schema lets you describe your leaf values using the Any, Keyword, Number, String,
+   and Int definitions below, or (in Clojure) you can use arbitrary Java classes or
+   primitive casts to describe simple values.
 
-   ^{:schema +a-schema+} or ^{:s +a-schema+} for short, or
+   From there, you can build up schemas for complex types using Clojure syntax
+   (map literals for maps, set literals for sets, vector literals for sequences,
+   with details described below), plus helpers below that provide optional values,
+   enumerations, arbitrary predicates, and more.
 
-   ^{:s? +a-schema+} as shorthand for ^{:s (s/maybe +a-schema+)}.
+   Schema also provides macros (defined in schema.macros, and imported into this ns
+   in Clojure) for defining records with schematized elements (sm/defrecord), and
+   named or anonymous functions (sm/fn and sm/defn) with schematized inputs and
+   return values.  In addition to producing better-documented records and functions,
+   these macros allow you to retrieve the schema associated with the defined record
+   or function.  Moreover, functions include optional *validation*, which will throw
+   an error if the inputs or outputs do not match the provided schemas:
 
-   This metadata is bakwards compatible, and is ignored by usual
-   Clojure forms.
+   (sm/defrecord FooBar
+    [foo :- Int
+     bar :- String])
 
-   The new forms are also able to directly accept hints of the form
-   ^+a-schema+ where +a-schema+ is a symbol referencing a schema,
-   and ^AProtocol where AProtocol is a protocol but these hints are
-   not backwards compatible with ordinary
-   defrecord/ defn/etc.
+   (sm/defn quux :- Int
+    [foobar :- Foobar
+     mogrifier :- Number]
+    (* mogrifier (+ (:foo foobar) (Long/parseLong (:bar foobar)))))
 
-   As an alternative, you can also provide schemas in s/defrecord
-    and s/defn using the following syntax:
+   (quux (FooBar. 10 \"5\") 2)
+   ==> 30
 
-   (s/defn foo :- return-schema
-     [a :- a-schema
-      b :- b-schema] ...)
+   (fn-schema quux)
+   ==> (=> Int (record user.FooBar {:foo Int, :bar java.lang.String}) java.lang.Number)
 
-   These forms are all compatible and can be mixed and matched
-   within a single s/defn (although we wouldn't recommend that for
-   readability's sake)."
+   (sm/with-fn-validation (quux (FooBar. 10.2 \"5\") 2))
+   ==> Input to quux does not match schema: [(named {:foo (not (integer? 10.2))} foobar) nil]
+
+   As you can see, the preferred syntax for providing type hints to schema's defrecord,
+   fn, and defn macros is to follow each element, argument, or function name with a
+   :- schema.  Symbols without schemas default to a schema of Any.  In Clojure,
+   class (e.g., clojure.lang.String) and primitive schemas (long, double) are also
+   propagated to tag metadata to ensure you get the type hinting and primitive
+   behavior you ask for.
+
+   If you don't like this style, standard Clojure-style typehints are also supported:
+
+   (fn-schema (sm/fn [^String x]))
+   ==> (=> Any java.lang.String)
+
+   You can directly type hint a symbol as a class, primitive, protocol, or simple
+   schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
+   the schema in a {:s schema} map like so:
+
+   (fn-schema (sm/fn [^{:s [String]} x]))
+   (=> Any [java.lang.String])
+
+   (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
+   of defrecord, fn, and defn in schema.macros for more details about how to use
+   these macros."
   (:refer-clojure :exclude [Keyword])
   (:require
    [clojure.string :as str]
@@ -284,6 +316,9 @@
   (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
                         [(if (= pred :else) (constantly true) pred) schema])))
 
+
+;; Equivalent to def, useful for documenting that a def is a schema.
+#+clj (potemkin/import-vars macros/defschema)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
@@ -661,67 +696,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized records and functions
 
-;; TODO: describe the binding syntax here.
-
-;; Metadata syntax is the same as for schema/defrecord.
-
-;; Currently, there is zero overhead with compile-fn-validation off,
-;; since we're sneaky and apply the schema metadata to the fn class
-;; rather than using metadata (which seems to yield wrapping in a
-;; non-primitive AFn wrapper of some sort, giving 2x slowdown).
-
-;; For fns we're stuck with this 2x slowdown for now, and
-;; no primitives, unless we can figure out how to pull a similar trick
-
-;; The overhead for checking if run-time validation should be used
-;; is very small -- about 5% of a very small fn call.  On top of that,
-;; actual validation costs what it costs.
-
-
-;; Clojure has a bug that makes it impossible to extend a protocol and define
-;; your own fn in the same namespace [1], so we have to be sneaky about
-;; defining fn -- we can't :exclude it above, but we can unmap and then def
-;; it at the last minute down here, once we've already done our extending
-;; [1] http://dev.clojure.org/jira/browse/CLJ-1195
-
+;; In Clojure, we can suck the defrecord/fn/defn macros into this namespace
+;; In ClojureScript, you have to use them from clj schema.macros
+#+clj
+(do
+  (doseq [s ['fn 'defn 'defrecord]] (ns-unmap *ns* s))
+  (potemkin/import-vars
+   macros/defrecord
+   macros/fn
+   macros/defn
+   macros/with-fn-validation)
+  (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
+  (set! *warn-on-reflection* false))
 
 (defn ^FnSchema fn-schema
-  "Produce the schema for a fn.  Since storing metadata on fns currently
-   destroys their primitive-ness, and also adds an extra layer of fn call
-   overhead, we store the schema on the class when we can (for defns)
-   and on metadata otherwise (for fns)."
+  "Produce the schema for a function defined with s/fn or s/defn."
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/type-of f))
       (utils/safe-get (meta f) :schema)))
-
-(defn input-schema
-  "Convenience method for fns with single arity"
-  [f]
-  (let [input-schemas (.-input-schemas (fn-schema f))]
-    (macros/assert-iae (= 1 (count input-schemas))
-                       "Expected single arity fn, got %s" (count input-schemas))
-    (first input-schemas)))
-
-(defn output-schema
-  "Convenience method for fns with single arity"
-  [f]
-  (.-output-schema (fn-schema f)))
-
-;; In Clojure, we can keep the defn/defrecord macros in this file
-;; In ClojureScript, you have to use from clj schema.macros
-#+clj
-(do
-  (doseq [s ['fn 'defn 'defrecord]] (ns-unmap *ns* s))
-  ;; schema.core/defrecord gens
-  ;; potemkin records on JVM
-  (reset! macros/*use-potemkin* true)
-  (potemkin/import-vars
-   macros/with-fn-validation
-   macros/=>
-   macros/=>*
-   macros/defrecord
-   macros/fn
-   macros/defn
-   macros/defschema)
-  (set! *warn-on-reflection* false))
