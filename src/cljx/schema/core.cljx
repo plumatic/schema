@@ -316,6 +316,10 @@
   (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
                         [(if (= pred :else) (constantly true) pred) schema])))
 
+(clojure.core/defn if
+  "if the predicate returns truthy, use the if-schema, otherwise use the else-schema"
+  [pred if-schema else-schema]
+  (conditional pred if-schema (constantly true) else-schema))
 
 ;; Equivalent to def, useful for documenting that a def is a schema.
 #+clj (potemkin/import-vars macros/defschema)
