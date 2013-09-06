@@ -114,8 +114,8 @@
 
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
-                 {:type (s/eq :foo) :baz Long}
-                 {:type (s/eq :bar) :baz String})]
+                 {:type (s/eq :foo) :baz s/Number}
+                 {:type (s/eq :bar) :baz s/String})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
