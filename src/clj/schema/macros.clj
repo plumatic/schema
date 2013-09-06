@@ -431,7 +431,5 @@
    and s/fn instances."
   [& body]
   `(do
-     (.set_cell schema.utils/use-fn-validation true)
-     (let [res# (do ~@body)]
-       (.set_cell schema.utils/use-fn-validation false)
-       res#)))
+     (.set_cell utils/use-fn-validation true)
+     (try ~@body (finally (.set_cell utils/use-fn-validation false)))))

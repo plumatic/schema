@@ -701,6 +701,9 @@
         (is (= 5 (f 4)))))))
 
 
+(deftest with-fn-validation-error-test
+  (is (thrown? RuntimeException (sm/with-fn-validation (throw (RuntimeException.)))))
+  (is (false? (.get_cell utils/use-fn-validation))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
