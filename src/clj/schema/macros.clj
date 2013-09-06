@@ -214,9 +214,10 @@
 ;;; Public: miscellaneous macros
 
 (defmacro defschema
-  "Convenience macro to make it clear to reader that body is meant to be used as a schema"
+  "Convenience macro to make it clear to reader that body is meant to be used as a schema.
+   Returns a NamedSchema with the name of the schema."
   [name body]
-  `(def ~name ~body))
+  `(def ~name (schema.core/named ~body '~name)))
 
 ;;; The clojure version is a function in schema.core, this must be here for cljs because
 ;;; satisfies? is a macro that must have access to the protocol at compile-time.
