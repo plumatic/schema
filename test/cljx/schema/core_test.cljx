@@ -740,3 +740,12 @@
                         {:foo ~'Int
                          :bar ~'Keyword
                          (~'optional-key :baz) ~'Keyword}))]})))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Convenience functions
+
+(sm/defschema TestFoo {:bar String})
+
+(deftest test-defschema
+  (is (= (schema.core.NamedSchema. {:bar String} 'TestFoo) TestFoo)))

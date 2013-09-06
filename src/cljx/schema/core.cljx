@@ -321,7 +321,7 @@
   [pred if-schema else-schema]
   (conditional pred if-schema (constantly true) else-schema))
 
-;; Equivalent to def, useful for documenting that a def is a schema.
+;; Useful for documenting that a def is a schema. Returns a NamedSchema.
 #+clj (potemkin/import-vars macros/defschema)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
