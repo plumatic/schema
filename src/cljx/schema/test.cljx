@@ -12,8 +12,8 @@
 
 #+clj
 (defmacro deftest
-  "A test with schema validation turned on gloally during execution of the body."
+  "A test with schema validation turned on globally during execution of the body."
   [name & body]
-  (clojure.test/deftest ~name
-    (s/with-fn-validation
-      ~@body)))
+  `(clojure.test/deftest ~name
+     (s/with-fn-validation
+       ~@body)))
