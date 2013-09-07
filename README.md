@@ -162,15 +162,16 @@ Longer-term, we have lots more in store for Schema.  Just a few of the crazy ide
 In addition to uniform maps (like String to double), map schemas can also capture maps with specific key requirements:
 
 ```clojure
-(s/validate {:foo s/String :bar s/Keyword} {:foo "f" :bar :b})
+(def FooBar {(s/required-key :foo) s/String (s/required-key :bar) s/Keyword})
+(s/validate FooBar {:foo "f" :bar :b})
 
-(throws? (s/validate {:foo s/String :bar s/Keyword} {:foo :f}))
+(throws? (s/validate FooBar {:foo :f}))
 ;; RuntimeException: Value does not match schema: 
 ;;  {:foo (not (instance? java.lang.String :f)), 
 ;;   :bar missing-required-key}
 ```
 
-You can also provide specific optional keys, and combine specific keys with generic schemas for the remaining key-value mappings:
+For the special case of keywords, you can omit the `required-key`, like `{:foo s/String :bar s/Keyword}`. You can also provide specific optional keys, and combine specific keys with generic schemas for the remaining key-value mappings:
 
 ```clojure
 
