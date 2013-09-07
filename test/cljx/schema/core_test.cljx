@@ -112,6 +112,15 @@
               "(not (matches-some-condition? a-clojure.lang.PersistentArrayMap))")
     (is (s/explain schema))))
 
+(deftest if-test
+  (let [schema (s/if #(= (:type %) :foo)
+                 {:type (s/eq :foo) :baz s/Number}
+                 {:type (s/eq :bar) :baz s/String})]
+    (valid! schema {:type :foo :baz 10})
+    (valid! schema {:type :bar :baz "10"})
+    (invalid! schema {:type :foo :baz "10"})
+    (invalid! schema {:type :bar :baz 10})
+    (invalid! schema {:type :zzz :baz 10})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
@@ -734,3 +743,12 @@
                         {:foo ~'Int
                          :bar ~'Keyword
                          (~'optional-key :baz) ~'Keyword}))]})))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Convenience functions
+
+(sm/defschema TestFoo {:bar String})
+
+(deftest test-defschema
+  (is (= (schema.core.NamedSchema. {:bar String} 'TestFoo) TestFoo)))
