@@ -496,11 +496,8 @@
   #+clj clojure.lang.APersistentVector
   #+cljs cljs.core.PersistentVector
   (check [this x]
-    (or (when (map? x)
-          (macros/validation-error this x (list 'not (list 'map? (utils/value-name x)))))
-        (try (seq x) nil
-             (catch #+clj Exception #+cljs js/Error e
-                    (macros/validation-error this x (list 'seq? (utils/value-name x)))))
+    (or (when-not (or (nil? x) (sequential? x))
+          (macros/validation-error this x (list 'sequential? (utils/value-name x))))
         (let [[singles multi] (parse-sequence-schema this)]
           (#(when (some identity %) %)
            (loop [singles singles x x out []]
