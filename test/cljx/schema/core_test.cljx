@@ -20,6 +20,10 @@
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
+
+(deftest validate-return-test
+  (is (= 1 (s/validate s/Int 1))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Schemas
 

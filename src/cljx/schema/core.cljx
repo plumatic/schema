@@ -124,9 +124,12 @@
     (prefer-method print-method schema.core.Schema java.util.Map)
     (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
 
-(defn validate [schema value & [value-name]]
+(defn validate
+  "Throw an exception if value does not satisfy schema; otherwise, return value."
+  [schema value & [value-name]]
   (when-let [error (check schema value)]
-    (utils/error! "%s does not match schema: %s" (or value-name "Value") (pr-str error))))
+    (utils/error! "%s does not match schema: %s" (or value-name "Value") (pr-str error)))
+  value)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
