@@ -751,4 +751,4 @@
 (sm/defschema TestFoo {:bar String})
 
 (deftest test-defschema
-  (is (= (schema.core.NamedSchema. {:bar String} 'TestFoo) TestFoo)))
+  (is (= 'TestFoo (:name (meta TestFoo)))))
