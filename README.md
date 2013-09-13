@@ -34,7 +34,7 @@ A Schema is just a Clojure(Script) data structure describing a data shape, which
 (s/validate java.lang.String "schema")
 
 ;; On JS, you can use prototype functions 
-(s/validate Element document.getElementById("some-div-id"))
+(s/validate Element (js/document.getElementById "some-div-id"))
 ```
 
 From these simple building blocks, we can build up more complex schemas that look like the data they describe.  Taking the examples above:
