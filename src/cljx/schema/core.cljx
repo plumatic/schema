@@ -321,9 +321,6 @@
   [pred if-schema else-schema]
   (conditional pred if-schema (constantly true) else-schema))
 
-;; Useful for documenting that a def is a schema. Returns a NamedSchema.
-#+clj (potemkin/import-vars macros/defschema)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
@@ -709,9 +706,7 @@
    macros/defrecord
    macros/fn
    macros/defn
-   macros/with-fn-validation
-   macros/schema-name
-   macros/schema-with-name)
+   macros/with-fn-validation)
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
@@ -721,3 +716,17 @@
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/type-of f))
       (utils/safe-get (meta f) :schema)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Helpers for defining schemas (used in in-progress work, explanation coming soon)
+
+(defn schema-with-name [schema name]
+  "Records name in schema's metadata."
+  (with-meta schema {:name name}))
+
+(defn schema-name [schema]
+  "Returns the name of a schema attached via schema-with-name (or defschema)."
+  (-> schema meta :name))
+
+#+clj (potemkin/import-vars macros/defschema)
