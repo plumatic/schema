@@ -751,9 +751,18 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Convenience functions
+;;;  Helpers for defining schemas (used in in-progress work, expanlation coming soon)
 
-(sm/defschema TestFoo {:bar String})
+(sm/defschema TestFoo {:bar s/String})
 
 (deftest test-defschema
-  (is (= (schema.core.NamedSchema. {:bar String} 'TestFoo) TestFoo)))
+  (is (= 'TestFoo (:name (meta TestFoo)))))
+
+(deftest schema-with-name-test
+  (let [schema (s/schema-with-name {:baz s/Number} 'Baz)]
+    (valid! schema {:baz 123})
+    (invalid! schema {:baz "abc"})
+    (is (= 'Baz (s/schema-name schema)))))
+
+(deftest schema-name-test
+  (is (= 'TestFoo (s/schema-name TestFoo))))
