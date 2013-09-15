@@ -752,3 +752,12 @@
 
 (deftest test-defschema
   (is (= 'TestFoo (:name (meta TestFoo)))))
+
+(deftest schema-with-name-test
+  (let [schema (sm/schema-with-name {:baz Number} 'Baz)]
+    (valid! schema {:baz 123})
+    (invalid! schema {:baz "abc"})
+    (is (= 'Baz (-> schema meta :name)))))
+
+(deftest schema-name-test
+  (is (= 'TestFoo (sm/schema-name TestFoo))))

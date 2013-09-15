@@ -211,13 +211,21 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Public: miscellaneous macros
+;;; Public: miscellaneous macros and helpers
+
+(clojure.core/defn schema-with-name [schema name]
+  "Records name in schema's metadata."
+  (with-meta schema {:name name}))
+
+(clojure.core/defn schema-name [schema]
+  "Returns the name of a schema defined via defschema."
+  (-> schema meta :name))
 
 (defmacro defschema
   "Convenience macro to make it clear to reader that body is meant to be used as a schema.
-   Returns a NamedSchema with the name of the schema."
+   The name of the schema is recorded in the metadata."
   [name form]
-  `(def ~name (with-meta ~form {:name '~name})))
+  `(def ~name (schema-with-name ~form '~name)))
 
 ;;; The clojure version is a function in schema.core, this must be here for cljs because
 ;;; satisfies? is a macro that must have access to the protocol at compile-time.

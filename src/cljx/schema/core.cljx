@@ -709,7 +709,9 @@
    macros/defrecord
    macros/fn
    macros/defn
-   macros/with-fn-validation)
+   macros/with-fn-validation
+   macros/schema-name
+   macros/schema-with-name)
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
