@@ -166,15 +166,18 @@
                                    (when rest-arg [rest-arg rest-sym]))
                          (let [validate# (.get_cell ~'ufv__)]
                            (when validate#
-                             (schema.core/validate
-                              ~input-schema-sym
-                              ~(if rest-arg
-                                 `(list* ~@bind-syms ~rest-sym)
-                                 bind-syms)
-                              (format "Input to %s" '~fn-name)))
+                             (when-let [error# (schema.core/check
+                                                ~input-schema-sym
+                                                ~(if rest-arg
+                                                   `(list* ~@bind-syms ~rest-sym)
+                                                   bind-syms))]
+                               (utils/error! "Input to %s does not match schema: %s"
+                                             '~fn-name (pr-str error#))))
                            (let [o# (do ~@body)]
                              (when validate#
-                               (schema.core/validate ~output-schema-sym o# (format "Output of %s" '~fn-name)))
+                               (when-let [error# (schema.core/check ~output-schema-sym o#)]
+                                 (utils/error! "Output of %s does not match schema: %s"
+                                               '~fn-name (pr-str error#))))
                              o#)))))
                    (cons bind body))}))
 
@@ -193,11 +196,12 @@
                                  fn-body))
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
-    {:schema-bindings (vec (apply concat [output-schema-sym output-schema] schema-bindings))
+    {:outer-bindings (vec (apply concat
+                                 `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
+                                 [output-schema-sym output-schema]
+                                 schema-bindings))
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
-     :fn-form `(let [^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
-                 (clojure.core/fn ~name
-                   ~@fn-forms))}))
+     :fn-body fn-forms}))
 
 (defn- parse-arity-spec [spec]
   (assert-iae (vector? spec) "An arity spec must be a vector")
@@ -360,9 +364,9 @@
   (let [[name more-fn-args] (if (symbol? (first fn-args))
                               (extract-arrow-schematized-element &env fn-args)
                               [(with-meta 'fn {:schema `schema.core/Any}) fn-args])
-        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-fn-args)]
-    `(let ~schema-bindings
-       (with-meta ~fn-form ~{:schema schema-form}))))
+        {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
+    `(let ~outer-bindings
+       (with-meta (clojure.core/fn ~name ~@fn-body) ~{:schema schema-form}))))
 
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on
@@ -415,16 +419,16 @@
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [schema-bindings schema-form fn-form]} (process-fn- &env name more-defn-args)]
-    `(let ~schema-bindings
-       (def ~(with-meta name
-               (utils/assoc-when (or attr-map? {})
-                                 :doc doc-string?
-                                 :schema schema-form
-                                 :tag (let [t (:tag (meta name))]
-                                        (when-not (primitive-sym? t)
-                                          t))))
-         ~fn-form)
+        {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-defn-args)]
+    `(let ~outer-bindings
+       (clojure.core/defn ~(with-meta name
+                             (utils/assoc-when (or attr-map? {})
+                                               :doc doc-string?
+                                               :schema schema-form
+                                               :tag (let [t (:tag (meta name))]
+                                                      (when-not (primitive-sym? t)
+                                                        t))))
+         ~@fn-body)
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
 
 (defmacro with-fn-validation
@@ -434,3 +438,5 @@
   `(do
      (.set_cell utils/use-fn-validation true)
      (try ~@body (finally (.set_cell utils/use-fn-validation false)))))
+
+(schema.core/defn foo :- String [x] x)

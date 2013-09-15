@@ -126,9 +126,9 @@
 
 (defn validate
   "Throw an exception if value does not satisfy schema; otherwise, return value."
-  [schema value & [value-name]]
+  [schema value]
   (when-let [error (check schema value)]
-    (utils/error! "%s does not match schema: %s" (or value-name "Value") (pr-str error)))
+    (utils/error! "Value does not match schema: %s" (pr-str error)))
   value)
 
 

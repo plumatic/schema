@@ -18,9 +18,11 @@
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
 
-(defn error! [& format-args]
-  #+clj  (throw (RuntimeException. ^String (apply format format-args)))
-  #+cljs (throw (js/Error (apply format format-args))))
+#+clj (defmacro error! [& format-args]
+        `(throw (RuntimeException. ^String (format ~@format-args))))
+
+#+cljs (defn error! [& format-args]
+         (throw (js/Error (apply format format-args))))
 
 (defn safe-get
   "Like get but throw an exception if not found"
