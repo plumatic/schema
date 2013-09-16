@@ -14,7 +14,7 @@
   "Like assert, but throws an IllegalArgumentException and takes args to format"
   [form & format-args]
   `(when-not ~form
-     (utils/error! ~@format-args)))
+     (utils/error! (apply format ~format-args))))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
@@ -171,13 +171,13 @@
                                                 ~(if rest-arg
                                                    `(list* ~@bind-syms ~rest-sym)
                                                    bind-syms))]
-                               (utils/error! "Input to %s does not match schema: %s"
-                                             '~fn-name (pr-str error#))))
+                               (utils/error! (format "Input to %s does not match schema: %s"
+                                                     '~fn-name (pr-str error#)))))
                            (let [o# (do ~@body)]
                              (when validate#
                                (when-let [error# (schema.core/check ~output-schema-sym o#)]
-                                 (utils/error! "Output of %s does not match schema: %s"
-                                               '~fn-name (pr-str error#))))
+                                 (utils/error! (format "Output of %s does not match schema: %s"
+                                                       '~fn-name (pr-str error#)))))
                              o#)))))
                    (cons bind body))}))
 
@@ -338,9 +338,9 @@
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
              [~map-sym & [drop-extra-keys?#]]
              (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (utils/error! "Record has wrong set of keys: %s"
-                             (data/diff (set (keys ~map-sym))
-                                        ~(set (map keyword field-schema)))))
+               (utils/error! (format "Record has wrong set of keys: %s"
+                                     (data/diff (set (keys ~map-sym))
+                                                ~(set (map keyword field-schema))))))
              (new ~(symbol (str name))
                   ~@(map (clojure.core/fn [s] `(utils/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
@@ -438,5 +438,3 @@
   `(do
      (.set_cell utils/use-fn-validation true)
      (try ~@body (finally (.set_cell utils/use-fn-validation false)))))
-
-(schema.core/defn foo :- String [x] x)

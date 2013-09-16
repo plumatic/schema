@@ -128,7 +128,7 @@
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
   (when-let [error (check schema value)]
-    (utils/error! "Value does not match schema: %s" (pr-str error)))
+    (utils/error! (format "Value does not match schema: %s" (pr-str error))))
   value)
 
 
@@ -289,7 +289,7 @@
   ([p?] (pred p? p?))
   ([p? pred-name]
      (when-not (fn? p?)
-       (utils/error! "Not a function: %s" p?))
+       (utils/error! (format "Not a function: %s" p?)))
      (Predicate. p? pred-name)))
 
 
@@ -372,7 +372,7 @@
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
         (instance? OptionalKey ks) (.-k ^OptionalKey ks)
-        :else (utils/error! "Bad explicit key: %s" ks)))
+        :else (utils/error! (format "Bad explicit key: %s" ks))))
 
 (defn- specific-key? [ks]
   (or (required-key? ks)
@@ -710,7 +710,7 @@
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
-(defn ^FnSchema fn-schema
+(clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
@@ -721,11 +721,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for defining schemas (used in in-progress work, explanation coming soon)
 
-(defn schema-with-name [schema name]
+(clojure.core/defn schema-with-name [schema name]
   "Records name in schema's metadata."
   (with-meta schema {:name name}))
 
-(defn schema-name [schema]
+(clojure.core/defn schema-name [schema]
   "Returns the name of a schema attached via schema-with-name (or defschema)."
   (-> schema meta :name))
 

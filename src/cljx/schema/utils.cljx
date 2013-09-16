@@ -14,22 +14,22 @@
               :when v]
           [k v])))
 
-(clojure.core/defn type-of [x]
+(defn type-of [x]
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
 
-#+clj (defmacro error! [& format-args]
-        `(throw (RuntimeException. ^String (format ~@format-args))))
+#+clj (defmacro error! [s]
+        `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String}))))
 
-#+cljs (defn error! [& format-args]
-         (throw (js/Error (apply format format-args))))
+#+cljs (defn error! [s]
+         (throw (js/Error s)))
 
 (defn safe-get
   "Like get but throw an exception if not found"
   [m k]
   (if-let [pair (find m k)]
     (val pair)
-    (error! "Key %s not found in %s" k m)))
+    (error! (format "Key %s not found in %s" k m))))
 
 (defn value-name
   "Provide a descriptive short name for a value."
