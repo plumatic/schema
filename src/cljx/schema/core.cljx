@@ -128,7 +128,7 @@
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
   (when-let [error (check schema value)]
-    (utils/error! (format "Value does not match schema: %s" (pr-str error))))
+    (utils/error! (utils/format* "Value does not match schema: %s" (pr-str error))))
   value)
 
 
@@ -289,7 +289,7 @@
   ([p?] (pred p? p?))
   ([p? pred-name]
      (when-not (fn? p?)
-       (utils/error! (format "Not a function: %s" p?)))
+       (utils/error! (utils/format* "Not a function: %s" p?)))
      (Predicate. p? pred-name)))
 
 
@@ -372,7 +372,7 @@
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
         (instance? OptionalKey ks) (.-k ^OptionalKey ks)
-        :else (utils/error! (format "Bad explicit key: %s" ks))))
+        :else (utils/error! (utils/format* "Bad explicit key: %s" ks))))
 
 (defn- specific-key? [ks]
   (or (required-key? ks)

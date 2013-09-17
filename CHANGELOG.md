@@ -1,3 +1,6 @@
+## 0.1.3
+ * Fix compatibility with Clojurescript 1889 (removal of format)
+
 ## 0.1.2
  * Validate returns the value on success
  * Sequence schemas only match sequential? things, to match map and set

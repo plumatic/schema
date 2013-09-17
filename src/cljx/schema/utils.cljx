@@ -1,5 +1,6 @@
 (ns schema.utils
-  "Private utilities used in schema implementation.")
+  "Private utilities used in schema implementation."
+  #+cljs (:require goog.string.format [goog.string :as gstring]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
@@ -24,12 +25,15 @@
 #+cljs (defn error! [s]
          (throw (js/Error s)))
 
+(defn format* [fmt & args]
+  (apply #+clj format #+cljs gstring/format fmt args))
+
 (defn safe-get
   "Like get but throw an exception if not found"
   [m k]
   (if-let [pair (find m k)]
     (val pair)
-    (error! (format "Key %s not found in %s" k m))))
+    (error! (format* "Key %s not found in %s" k m))))
 
 (defn value-name
   "Provide a descriptive short name for a value."
@@ -78,7 +82,7 @@
    schema only applies to instances of the concrete type passed, i.e.,
    (= (class x) klass), not (instance? klass x)."
     (assert (class? klass)
-            (format "Cannot declare class schema for non-class %s" (class klass)))
+            (format* "Cannot declare class schema for non-class %s" (class klass)))
     (.put +class-schemata+ klass schema))
 
   (defn class-schema [klass]
