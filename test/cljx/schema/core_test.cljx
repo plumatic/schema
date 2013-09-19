@@ -126,6 +126,10 @@
     (invalid! schema {:type :bar :baz 10})
     (invalid! schema {:type :zzz :baz 10})))
 
+(deftest regex-test
+  (valid! s/Regex #".*")
+  (invalid! s/Regex ".*"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
