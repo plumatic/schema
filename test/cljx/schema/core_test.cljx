@@ -716,8 +716,8 @@
 
 
 (deftest with-fn-validation-error-test
-  (is (thrown? #+clj RuntimeException #+cljs nil
-               (sm/with-fn-validation (throw #+clj (RuntimeException.) #+cljs "foo"))))
+  (is (thrown? #+clj RuntimeException #+cljs js/Error
+               (sm/with-fn-validation (throw #+clj (RuntimeException.) #+cljs (js/Error "error")))))
   (is (false? (.get_cell utils/use-fn-validation))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
