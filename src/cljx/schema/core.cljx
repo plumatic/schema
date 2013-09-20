@@ -635,6 +635,9 @@
   "A keyword"
   (pred keyword? 'keyword?))
 
+(def Regex
+  "Any Regular Expression"
+  #+clj java.util.regex.Pattern #+cljs js/RegExp)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
