@@ -1,3 +1,6 @@
+## 0.1.4
+ * Added Regex as a primitive schema type
+
 ## 0.1.3
  * Fix compatibility with Clojurescript 1889 (removal of format)
 
