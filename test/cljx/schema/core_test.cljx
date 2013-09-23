@@ -347,6 +347,13 @@
   (valid! s/Regex #".*")
   (invalid! s/Regex ".*"))
 
+(deftest leaf-inst-test
+  (valid! s/Inst #inst "2013-01-01T01:15:01.840-00:00")
+  (invalid! s/Inst "2013-01-01T01:15:01.840-00:00"))
+
+(deftest leaf-uuid-test
+  (valid! s/Uuid #uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf")
+  (invalid! s/Uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
