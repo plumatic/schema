@@ -639,6 +639,14 @@
   "Any Regular Expression"
   #+clj java.util.regex.Pattern #+cljs js/RegExp)
 
+(def Inst
+  "The local representation of #inst ..."
+  #+clj java.util.Date #+cljs js/Date)
+
+(def Uuid
+  "The local representation of #uuid ..."
+  #+clj java.util.UUID #+cljs cljs.core/UUID)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
 
