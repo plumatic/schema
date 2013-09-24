@@ -3,6 +3,7 @@
   (:refer-clojure :exclude [defrecord fn defn])
   (:require
    [clojure.data :as data]
+   [clojure.string :as str]
    [schema.utils :as utils]
    potemkin))
 
@@ -424,14 +425,16 @@
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
         [f & more] defn-args
-        return-type? (when (= (first more) :-) (second more))
         {:keys [outer-bindings schema-form fn-body arglists]} (process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
        (clojure.core/defn ~name
-         ~(utils/assoc-when (or attr-map? {})
-           :doc  (str (when return-type? (str "\nReturns: " return-type?))
-                      (when (and return-type? doc-string?) "\n\n  ")
-                      doc-string?)
+         ~(utils/assoc-when
+           (or attr-map? {})
+           :doc (->> [(when-let [return-type (when (= (first more) :-) (second more))]
+                        (str "Returns: " return-type))
+                      doc-string?]
+                     (remove nil?)
+                     (str/join "\n\n  "))
            :arglists (list 'quote arglists)
            :schema schema-form
            :tag (let [t (:tag (meta name))]

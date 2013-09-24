@@ -680,14 +680,17 @@
 
 #+clj
 (deftest simple-validated-defn-test
+  (is (= "I am a simple schema fn"
+         (:doc (meta #'simple-validated-defn))))
+  (is (= '([arg0]) (:arglists (meta #'simple-validated-defn))))
+  (is (= "Returns: OddLongString\n\n  I am a simple schema fn"
+         (:doc (meta #'simple-validated-defn-new))))
+  (is (= '([arg0 :- OddLong]) (:arglists (meta #'simple-validated-defn-new))))
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
-      (let [{:keys [tag schema doc arglists metadata]} (meta v)]
+      (let [{:keys [tag schema metadata]} (meta v)]
         #+clj (is (= tag s/String))
         (is (= +simple-validated-defn-schema+ schema))
-        (is (= doc "I am a simple schema fn"))
-        (is (or (= arglists '([arg0 :- OddLong]))
-                (= arglists '([arg0]))))
         (is (= metadata :bla)))
       (is (= +simple-validated-defn-schema+ (s/fn-schema @v)))
 
