@@ -423,11 +423,15 @@
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
+        [f & more] defn-args
+        return-type? (when (= (first more) :-) (second more))
         {:keys [outer-bindings schema-form fn-body arglists]} (process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
        (clojure.core/defn ~name
          ~(utils/assoc-when (or attr-map? {})
-           :doc doc-string?
+           :doc  (str (when return-type? (str "\nReturns: " return-type?))
+                      (when (and return-type? doc-string?) "\n\n  ")
+                      doc-string?)
            :arglists (list 'quote arglists)
            :schema schema-form
            :tag (let [t (:tag (meta name))]
