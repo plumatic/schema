@@ -150,10 +150,12 @@
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
     (utils/error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
-  (let [bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
+  (let [original-arglist bind
+        bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
+     :arglist original-arglist
      :arity-form (if true
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
@@ -194,12 +196,14 @@
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
+        arglists (map :arglist processed-arities)
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (apply concat
                                  `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
                                  [output-schema-sym output-schema]
                                  schema-bindings))
+     :arglists arglists
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-body fn-forms}))
 
@@ -419,15 +423,20 @@
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-defn-args)]
+        [f & more] defn-args
+        return-type? (when (= (first more) :-) (second more))
+        {:keys [outer-bindings schema-form fn-body arglists]} (process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
-       (clojure.core/defn ~(with-meta name
-                             (utils/assoc-when (or attr-map? {})
-                                               :doc doc-string?
-                                               :schema schema-form
-                                               :tag (let [t (:tag (meta name))]
-                                                      (when-not (primitive-sym? t)
-                                                        t))))
+       (clojure.core/defn ~name
+         ~(utils/assoc-when (or attr-map? {})
+           :doc  (str (when return-type? (str "\nReturns: " return-type?))
+                      (when (and return-type? doc-string?) "\n\n  ")
+                      doc-string?)
+           :arglists (list 'quote arglists)
+           :schema schema-form
+           :tag (let [t (:tag (meta name))]
+                  (when-not (primitive-sym? t)
+                    t)))
          ~@fn-body)
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
 
