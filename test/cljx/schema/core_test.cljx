@@ -780,9 +780,3 @@
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;  Arglist Test
-
-(deftest simple-arglist-test
-  (is (= 'TestFoo (s/schema-name TestFoo))))
