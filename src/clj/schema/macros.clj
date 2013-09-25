@@ -448,5 +448,5 @@
    and s/fn instances."
   [& body]
   `(do
-     (.set_cell utils/use-fn-validation true)
-     (try ~@body (finally (.set_cell utils/use-fn-validation false)))))
+     (schema.core/set-fn-validation! true)
+     (try ~@body (finally (schema.core/set-fn-validation! false)))))

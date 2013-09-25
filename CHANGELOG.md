@@ -1,6 +1,7 @@
 ## 0.1.4
  * Added Regex, Inst, and Uuid as primitive schema types (thanks [jwhitlark](https://github.com/jwhitlark))
  * Add annotated arglists to functions defined with `s/defn` (thanks [danielneal](https://github.com/danielneal))
+ * Add `set-fn-validation!` to schema.core, to globally turn validation on or off.
 
 ## 0.1.3
  * Fix compatibility with Clojurescript 1889 (removal of format)
