@@ -443,6 +443,7 @@
                  (when-let [ret (when (= (first more) :-) (second more))]
                    (str "\n  Returns: " ret))
                  (when doc-string? (str  "\n\n  " doc-string?)))
+           :raw-arglists (list 'quote raw-arglists)
            :arglists (list 'quote arglists)
            :schema schema-form
            :tag (let [t (:tag (meta name))]
