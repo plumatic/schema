@@ -537,6 +537,32 @@
   (valid! OddSum (OddSum. 1 2))
   (invalid! OddSum (OddSum. 1 3)))
 
+#+clj
+(do (sm/defrecord RecordWithPrimitive [x :- long])
+    (deftest record-with-primitive-test
+      (valid! RecordWithPrimitive (RecordWithPrimitive. 1))
+      (is (thrown? Exception (RecordWithPrimitive. "a")))
+      (is (thrown? Exception (RecordWithPrimitive. nil)))))
+
+(deftest map->record-test
+  (let [subset {:foo 1 :bar "a"}
+        exact (assoc subset :zoo :zoo)
+        superset (assoc exact :baz :baz)]
+    (testing "map->record"
+      (is (= (assoc subset :zoo nil)
+             (into {} (map->BarNewStyle subset))))
+      (is (= exact
+             (into {} (map->BarNewStyle exact))))
+      (is (= superset
+             (into {} (map->BarNewStyle superset)))))
+
+    (testing "strict-map->record"
+      (is (thrown? Exception (strict-map->BarNewStyle subset)))
+      (is (= exact (into {} (strict-map->BarNewStyle exact))))
+      (is (= exact (into {} (strict-map->BarNewStyle exact true))))
+      (is (thrown? Exception (strict-map->BarNewStyle superset)))
+      (is (= exact (into {} (strict-map->BarNewStyle superset true)))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized functions
