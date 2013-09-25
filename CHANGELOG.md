@@ -1,8 +1,6 @@
 ## 0.1.4
- * Added Regex as a primitive schema type
- * Added Inst as a primitive schema type
- * Added Uuid as a primitive schema type
- * Add annotated arglists to functions defined with `s/defn` (fixes #18)
+ * Added Regex, Inst, and Uuid as primitive schema types (thanks [jwhitlark](https://github.com/jwhitlark))
+ * Add annotated arglists to functions defined with `s/defn` (thanks [danielneal](https://github.com/danielneal))
 
 ## 0.1.3
  * Fix compatibility with Clojurescript 1889 (removal of format)
