@@ -4,12 +4,12 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[prismatic/cljs-test "0.0.6"]
-                 [potemkin "0.3.2"]]
+  :dependencies [[potemkin "0.3.2"]]
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.5.1"]
                                   [org.clojure/clojurescript "0.0-1889"]
-                                  [com.keminglabs/cljx "0.3.0"]]
+                                  [com.keminglabs/cljx "0.3.0"]
+                                  [prismatic/cljs-test "0.0.6"]]
                    :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
                                                      cljx.repl-middleware/wrap-cljx]}}}
 
