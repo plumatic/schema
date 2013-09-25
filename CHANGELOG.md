@@ -1,3 +1,5 @@
+## 0.1.5
+
 ## 0.1.4
  * Added Regex, Inst, and Uuid as primitive schema types (thanks [jwhitlark](https://github.com/jwhitlark))
  * Add annotated arglists to functions defined with `s/defn` (thanks [danielneal](https://github.com/danielneal))
