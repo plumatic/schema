@@ -167,7 +167,9 @@
                         metad-bind-syms)
                       `(let ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
                                    (when rest-arg [rest-arg rest-sym]))
-                         (let [validate# (.get_cell ~'ufv__)]
+                         (let [validate# ~(if (:always-validate (meta fn-name))
+                                            `true
+                                            `(.get_cell ~'ufv__))]
                            (when validate#
                              (when-let [error# (schema.core/check
                                                 ~input-schema-sym
@@ -401,6 +403,9 @@
    The overhead for checking if run-time validation should be used is very
    small -- about 5% of a very small fn call.  On top of that, actual
    validation costs what it costs.
+
+   You can also turn on validation unconditionally for this fn only by
+   putting ^:always-validate metadata on the fn name.
 
    Gotchas and limitations:
     - The output schema always goes on the fn name, not the arg vector. This

@@ -609,6 +609,14 @@
     (is (= 5 (f 2 {:foo 3})))  ;; return not even?
     ))
 
+(deftest always-validated-fn-test
+  (let [f (sm/fn ^:always-validate test-fn :- (s/pred even?)
+            [x :- (s/pred pos?)]
+            (inc x))]
+    (is (= 2 (f 1)))
+    (invalid-call! f 2)
+    (invalid-call! f -1)))
+
 (defn parse-long [x]
   #+clj (Long/parseLong x)
   #+cljs (js/parseInt x))
@@ -726,6 +734,15 @@
         (invalid-call! @v "a"))
 
       (is (= "4" (@v 4))))))
+
+(sm/defn ^:always-validate always-validated-defn :- (s/pred even?)
+  [x :- (s/pred pos?)]
+  (inc x))
+
+(deftest always-validated-defn-test
+  (is (= 2 (always-validated-defn 1)))
+  (invalid-call! always-validated-defn 2)
+  (invalid-call! always-validated-defn -1))
 
 ;; Primitive validation testing for JVM
 #+clj
