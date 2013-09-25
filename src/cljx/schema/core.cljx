@@ -721,6 +721,11 @@
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
+(defn set-fn-validation!
+  "Globally turn on schema validation for all s/fn and s/defn instances."
+  [on?]
+  (.set_cell utils/use-fn-validation on?))
+
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
