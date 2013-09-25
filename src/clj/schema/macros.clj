@@ -156,7 +156,8 @@
         [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
-     :arglist original-arglist
+     :arglist bind
+     :raw-arglist original-arglist
      :arity-form (if true
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
@@ -199,14 +200,14 @@
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
-        arglists (map :arglist processed-arities)
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (apply concat
                                  `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
                                  [output-schema-sym output-schema]
                                  schema-bindings))
-     :arglists arglists
+     :arglists (map :arglist processed-arities)
+     :raw-arglists (map :raw-arglist processed-arities)
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-body fn-forms}))
 
@@ -430,16 +431,18 @@
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
         [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
         [f & more] defn-args
-        {:keys [outer-bindings schema-form fn-body arglists]} (process-fn- &env name more-defn-args)]
+        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
        (clojure.core/defn ~name
          ~(utils/assoc-when
            (or attr-map? {})
-           :doc (->> [(when-let [return-type (when (= (first more) :-) (second more))]
-                        (str "Returns: " return-type))
-                      doc-string?]
-                     (remove nil?)
-                     (str/join "\n\n  "))
+           :doc (str
+                 (str "Inputs: " (if (= 1 (count raw-arglists))
+                                   (first raw-arglists)
+                                   raw-arglists))
+                 (when-let [ret (when (= (first more) :-) (second more))]
+                   (str "\n  Returns: " ret))
+                 (when doc-string? (str  "\n\n  " doc-string?)))
            :arglists (list 'quote arglists)
            :schema schema-form
            :tag (let [t (:tag (meta name))]

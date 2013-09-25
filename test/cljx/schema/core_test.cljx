@@ -714,12 +714,12 @@
 
 #+clj
 (deftest simple-validated-defn-test
-  (is (= "I am a simple schema fn"
+  (is (= "Inputs: [arg0]\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn))))
   (is (= '([arg0]) (:arglists (meta #'simple-validated-defn))))
-  (is (= "Returns: OddLongString\n\n  I am a simple schema fn"
+  (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn-new))))
-  (is (= '([arg0 :- OddLong]) (:arglists (meta #'simple-validated-defn-new))))
+  (is (= '([arg0]) (:arglists (meta #'simple-validated-defn-new))))
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema metadata]} (meta v)]
@@ -755,7 +755,7 @@
     [^long ^{:s OddLong} arg0]
     (inc arg0))
 
-  (sm/defn ^long primitive-validated-defn-new :- long
+  (sm/defn primitive-validated-defn-new :- long
     [^long arg0 :- OddLong]
     (inc arg0))
 
@@ -771,7 +771,15 @@
           (is (= 4 (.invokePrim f 3)))
           (is (thrown? Exception (f 4))))
 
-        (is (= 5 (f 4)))))))
+        (is (= 5 (f 4))))))
+
+  (sm/defn another-primitive-fn :- double
+    [^long arg0]
+    1.0)
+
+  (deftest another-primitive-fn-test
+    (is ((ancestors (class another-primitive-fn)) clojure.lang.IFn$LD))
+    (is (= 1.0 (another-primitive-fn 10)))))
 
 
 (deftest with-fn-validation-error-test
