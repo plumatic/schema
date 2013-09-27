@@ -558,11 +558,12 @@
     (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
 (defn record
-  "A Record instance of type klass, whose elements match map schema 'schema'."
-  [klass schema]
-  #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
-  (macros/assert-iae (map? schema) "Expected map, got %s" (utils/type-of schema))
-  (Record. klass schema))
+  "A Record instance of type klass, whose elements match an optional map schema 'schema'."
+  ([klass] (record klass {Any Any}))
+  ([klass schema]
+     #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
+     (macros/assert-iae (map? schema) "Expected map, got %s" (utils/type-of schema))
+     (Record. klass schema)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
