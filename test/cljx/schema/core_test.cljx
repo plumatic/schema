@@ -280,6 +280,14 @@
     #+clj (is (= '(record schema.core_test.Foo {:x Any,  (optional-key :y) Int})
                  (s/explain schema)))))
 
+(deftest record-test-only-type
+  (let [schema (s/record Foo)]
+    (valid! schema (Foo. :foo 1))
+    (invalid! schema {:x :foo :y 1})
+    (valid! schema (assoc (Foo. :foo 1) :bar 2))
+    #+clj (is (= '(record schema.core_test.Foo {Any Any})
+                 (s/explain schema)))))
+
 (deftest record-with-extra-keys-test
   (let [schema (s/record Foo {:x s/Any
                               :y s/Int
