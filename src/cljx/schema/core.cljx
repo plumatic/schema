@@ -647,6 +647,26 @@
   "The local representation of #uuid ..."
   #+clj java.util.UUID #+cljs cljs.core/UUID)
 
+
+;;; Extending the Schema protocol to java.util.regex.Pattern
+
+(defn- explain-regex [regex]
+  #+clj (symbol (str "#\"" regex "\""))
+  #+cljs (symbol (str "#\"" (.slice (str regex) 1 -1) "\"")) )
+
+(extend-protocol Schema
+  #+clj java.util.regex.Pattern
+  #+cljs js/RegExp
+  (check [this x]
+    (if-not (string? x)
+      (macros/validation-error this x (list 'string? (utils/value-name x)))
+      (when-not (re-find this x)
+        (macros/validation-error this x (list 're-find
+                                              (explain-regex this)
+                                              (utils/value-name x))))))
+  (explain [this]
+    (explain-regex this)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific Schemas
 
