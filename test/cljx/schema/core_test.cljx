@@ -33,6 +33,13 @@
   (valid! s/Any :whatever)
   (is (= 'Any (s/explain s/Any))))
 
+(deftest regex-test
+  (valid! #"lex" "Alex B")
+  (valid! #"lex" "lex")
+  (invalid! #"lex" nil "(not (string? nil))")
+  (invalid! #"lex" "Ale" "(not (re-find #\"lex\" \"Ale\"))")
+  (is (= (symbol "#\"lex\"") (s/explain #"lex"))))
+
 (deftest maybe-test
   (let [schema (s/maybe s/Int)]
     (valid! schema nil)
