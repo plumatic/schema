@@ -365,18 +365,20 @@
   [k]
   (OptionalKey. k))
 
+(defn optional-key? [ks]
+  (instance? OptionalKey ks))
 
 ;;; Implementation helper functions
 
 (defn- explicit-schema-key [ks]
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
-        (instance? OptionalKey ks) (.-k ^OptionalKey ks)
+        (optional-key? ks) (.-k ^OptionalKey ks)
         :else (utils/error! (utils/format* "Bad explicit key: %s" ks))))
 
 (defn- specific-key? [ks]
   (or (required-key? ks)
-      (instance? OptionalKey ks)))
+      (optional-key? ks)))
 
 (defn- find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
@@ -388,7 +390,7 @@
 (defn- check-explicit-key
   "Validate a single schema key and dissoc the value from m"
   [value [key-schema val-schema]]
-  (let [optional? (instance? OptionalKey key-schema)
+  (let [optional? (optional-key? key-schema)
         k (explicit-schema-key key-schema)
         present? (contains? value k)]
     (cond (and (not optional?) (not present?))
@@ -436,8 +438,8 @@
             [(if (specific-key? k)
                (if (keyword? k)
                  k
-                 (list (cond (instance? RequiredKey k) 'required-key
-                             (instance? OptionalKey k) 'optional-key)
+                 (list (cond (required-key? k) 'required-key
+                             (optional-key? k) 'optional-key)
                        (utils/safe-get k :k)))
                (explain k))
              (explain v)]))))
