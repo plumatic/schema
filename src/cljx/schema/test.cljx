@@ -5,7 +5,7 @@
 
 (defn validate-schemas
   "A fixture for tests: put
-   (use-fixtures :once schema.test/validate-schemata)
+   (use-fixtures :once schema.test/validate-schemas)
    in your test file to turn on schema validation globally during all test executions."
   [fn-test]
   (s/with-fn-validation (fn-test)))

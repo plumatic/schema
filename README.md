@@ -140,7 +140,7 @@ This documentation is probably the most important benefit of Schema, which is wh
 After documentation, the next-most important benefit is validation.  Thus far, we've found two key use cases for validation.  First, you can globally turn on function validation within a given test namespace by adding this line:
 
 ```clojure
-(use-fixtures :once schema.test/validate-schemata)
+(use-fixtures :once schema.test/validate-schemas)
 ```
 
 As long as your tests cover all call boundaries, this means you will should catch any 'type-like' bugs in your code at test time. 
