@@ -1,4 +1,6 @@
 ## 0.1.6
+ * Minor bugfixes (thanks various contributors)
+ * Extend schema protocol to regex (thanks [AlexBaranosky](https://github.com/AlexBaranosky)).
 
 ## 0.1.5
  * Fix regression in primitive handling introduced in 0.1.4
