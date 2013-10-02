@@ -15,7 +15,7 @@
   "Like assert, but throws an IllegalArgumentException and takes args to format"
   [form & format-args]
   `(when-not ~form
-     (utils/error! (apply format ~format-args))))
+     (utils/error! (utils/format* ~@format-args))))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
