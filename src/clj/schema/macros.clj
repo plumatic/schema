@@ -158,7 +158,7 @@
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
      :arglist bind
      :raw-arglist original-arglist
-     :arity-form (if true
+     :arity-form (if-not (:never-validate (meta fn-name))
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]

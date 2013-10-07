@@ -624,6 +624,15 @@
     (invalid-call! f 2)
     (invalid-call! f -1)))
 
+(deftest never-validated-fn-test
+  (let [f (sm/fn ^:never-validate test-fn :- (s/pred even?)
+            [x :- (s/pred pos?)]
+            (inc x))]
+    (sm/with-fn-validation
+      (is (= 2 (f 1)))
+      (is (= 3 (f 2)))
+      (is (= 0 (f -1))))))
+
 (defn parse-long [x]
   #+clj (Long/parseLong x)
   #+cljs (js/parseInt x))
