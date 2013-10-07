@@ -374,7 +374,7 @@
                               [(with-meta 'fn {:schema `schema.core/Any}) fn-args])
         {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
     `(let ~outer-bindings
-       (with-meta (clojure.core/fn ~name ~@fn-body) ~{:schema schema-form}))))
+       (schema.core/schematize-fn (clojure.core/fn ~name ~@fn-body) ~schema-form))))
 
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on

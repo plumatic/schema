@@ -352,7 +352,9 @@
 (defn required-key
   "A required key in a map"
   [k]
-  (RequiredKey. k))
+  (if (keyword? k)
+    k
+    (RequiredKey. k)))
 
 (defn required-key? [ks]
   (or (keyword? ks)
@@ -370,13 +372,13 @@
 
 ;;; Implementation helper functions
 
-(defn- explicit-schema-key [ks]
+(defn explicit-schema-key [ks]
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
         (optional-key? ks) (.-k ^OptionalKey ks)
         :else (utils/error! (utils/format* "Bad explicit key: %s" ks))))
 
-(defn- specific-key? [ks]
+(defn specific-key? [ks]
   (or (required-key? ks)
       (optional-key? ks)))
 
@@ -488,7 +490,7 @@
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert-iae
      (and (<= (count more) 1) (every? #(not (instance? One %)) more))
-     "Sequence schema must look like [one* optional* rest-schema?]")
+     "Sequence schema %s does not match [one* optional* rest-schema?]" s)
     [(concat required optional) (first more)]))
 
 (extend-protocol Schema
@@ -747,6 +749,11 @@
   "Globally turn on schema validation for all s/fn and s/defn instances."
   [on?]
   (.set_cell utils/use-fn-validation on?))
+
+(clojure.core/defn schematize-fn
+  "Attach the schema to fn f at runtime, extractable by fn-schema."
+  [f schema]
+  (with-meta f {:schema schema}))
 
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
