@@ -19,11 +19,13 @@
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
 
-#+clj (defmacro error! [s]
-        `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String}))))
+#+clj (defmacro error!
+        ([s] `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String}))))
+        ([s m] `(throw (ex-info ~(with-meta s `{:tag java.lang.String}) ~m))))
 
-#+cljs (defn error! [s]
-         (throw (js/Error s)))
+#+cljs (defn error!
+         ([s] (throw (js/Error s)))
+         ([s m] (throw (ex-info s m))))
 
 (defn format* [fmt & args]
   (apply #+clj format #+cljs gstring/format fmt args))
