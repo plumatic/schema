@@ -21,7 +21,7 @@
 
 #+clj (defmacro error!
         ([s] `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String}))))
-        ([s m] `(throw (ex-info ~(with-meta s `{:tag java.lang.String}) ~m))))
+        ([s m] `(throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m))))
 
 #+cljs (defn error!
          ([s] (throw (js/Error s)))

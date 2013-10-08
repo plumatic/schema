@@ -172,18 +172,19 @@
                                             `true
                                             `(.get_cell ~'ufv__))]
                            (when validate#
-                             (when-let [error# (schema.core/check
-                                                ~input-schema-sym
-                                                ~(if rest-arg
-                                                   `(list* ~@bind-syms ~rest-sym)
-                                                   bind-syms))]
-                               (utils/error! (format "Input to %s does not match schema: %s"
-                                                     '~fn-name (pr-str error#)))))
+                             (let [args# ~(if rest-arg
+                                            `(list* ~@bind-syms ~rest-sym)
+                                            bind-syms)]
+                               (when-let [error# (schema.core/check ~input-schema-sym args#)]
+                                 (utils/error! (format "Input to %s does not match schema: %s"
+                                                       '~fn-name (pr-str error#))
+                                               {:schema ~input-schema-sym :value args# :error error#}))))
                            (let [o# (do ~@body)]
                              (when validate#
                                (when-let [error# (schema.core/check ~output-schema-sym o#)]
                                  (utils/error! (format "Output of %s does not match schema: %s"
-                                                       '~fn-name (pr-str error#)))))
+                                                       '~fn-name (pr-str error#))
+                                               {:schema ~output-schema-sym :value o# :error error#})))
                              o#)))))
                    (cons bind body))}))
 
