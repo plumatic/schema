@@ -128,7 +128,7 @@
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
   (when-let [error (check schema value)]
-    (utils/error! (utils/format* "Value does not match schema: %s" (pr-str error))))
+    (utils/error! (utils/format* "Value does not match schema: %s" (pr-str error)) {:schema schema :value value :error error}))
   value)
 
 
