@@ -1,4 +1,4 @@
-(defproject prismatic/schema "0.1.6-SNAPSHOT"
+(defproject prismatic/schema "0.1.6"
   :description "Clojure(Script) library for declarative data description and validation"
   :url "http://github.com/prismatic/schema"
   :license {:name "Eclipse Public License"
