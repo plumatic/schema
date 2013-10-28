@@ -56,7 +56,7 @@
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
     (assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
-                "Expected single schema, got meta %s, explicit %s" (meta symbol) explicit-schema)
+                "Expected single schema, got meta %s, explicit %s" (meta imeta) explicit-schema)
     (let [schema (fix-protocol-tag
                   env
                   (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Any))]
