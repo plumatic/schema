@@ -229,8 +229,10 @@
 (defmacro defschema
   "Convenience macro to make it clear to reader that body is meant to be used as a schema.
    The name of the schema is recorded in the metadata."
-  [name form]
-  `(def ~name (schema.core/schema-with-name ~form '~name)))
+  ([name form]
+     `(defschema ~name "" ~form))
+  ([name docstring form]
+     `(def ~name ~docstring (schema.core/schema-with-name ~form '~name))))
 
 ;;; The clojure version is a function in schema.core, this must be here for cljs because
 ;;; satisfies? is a macro that must have access to the protocol at compile-time.
