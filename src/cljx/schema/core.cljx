@@ -754,7 +754,7 @@
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
   [f schema]
-  (with-meta f {:schema schema}))
+  (vary-meta f assoc :schema schema))
 
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
