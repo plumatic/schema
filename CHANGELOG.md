@@ -1,3 +1,6 @@
+## 0.1.7
+ * More small bugfixes
+
 ## 0.1.6
  * Minor bugfixes (thanks various contributors)
  * Extend schema protocol to regex (thanks [AlexBaranosky](https://github.com/AlexBaranosky)).

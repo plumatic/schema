@@ -1,5 +1,7 @@
 target/**
 .lein**
+.repl/
+out/
 *~
 pom.xml
 *.asc
