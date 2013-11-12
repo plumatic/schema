@@ -166,26 +166,26 @@
                       (if rest-arg
                         (into metad-bind-syms ['& rest-sym])
                         metad-bind-syms)
-                      `(let ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
-                                   (when rest-arg [rest-arg rest-sym]))
-                         (let [validate# ~(if (:always-validate (meta fn-name))
-                                            `true
-                                            `(.get_cell ~'ufv__))]
+                      `(let [validate# ~(if (:always-validate (meta fn-name))
+                                          `true
+                                          `(.get_cell ~'ufv__))]
+                         (when validate#
+                           (let [args# ~(if rest-arg
+                                          `(list* ~@bind-syms ~rest-sym)
+                                          bind-syms)]
+                             (when-let [error# (schema.core/check ~input-schema-sym args#)]
+                               (utils/error! (format "Input to %s does not match schema: %s"
+                                                     '~fn-name (pr-str error#))
+                                             {:schema ~input-schema-sym :value args# :error error#}))))
+                         (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
+                                               (when rest-arg [rest-arg rest-sym]))
+                                    ~@body)]
                            (when validate#
-                             (let [args# ~(if rest-arg
-                                            `(list* ~@bind-syms ~rest-sym)
-                                            bind-syms)]
-                               (when-let [error# (schema.core/check ~input-schema-sym args#)]
-                                 (utils/error! (format "Input to %s does not match schema: %s"
-                                                       '~fn-name (pr-str error#))
-                                               {:schema ~input-schema-sym :value args# :error error#}))))
-                           (let [o# (do ~@body)]
-                             (when validate#
-                               (when-let [error# (schema.core/check ~output-schema-sym o#)]
-                                 (utils/error! (format "Output of %s does not match schema: %s"
-                                                       '~fn-name (pr-str error#))
-                                               {:schema ~output-schema-sym :value o# :error error#})))
-                             o#)))))
+                             (when-let [error# (schema.core/check ~output-schema-sym o#)]
+                               (utils/error! (format "Output of %s does not match schema: %s"
+                                                     '~fn-name (pr-str error#))
+                                             {:schema ~output-schema-sym :value o# :error error#})))
+                           o#))))
                    (cons bind body))}))
 
 (clojure.core/defn process-fn-

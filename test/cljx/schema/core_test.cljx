@@ -700,6 +700,20 @@
         (is (= 9 (f 4 5 9)))
         (invalid-call! f 4 1.5)))))
 
+(deftest fn-recursion-test
+  (testing "non-tail recursion"
+    (let [f (sm/fn fib :- s/Int [n :- s/Int]
+              (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))]
+      (is (= 8 (f 6)))
+      (sm/with-fn-validation
+        (is (= 8 (f 6))))))
+  (testing "tail recursion"
+    (let [f (sm/fn fact :- s/Int [n :- s/Int ret :- s/Int]
+              (if (<= n 1) ret (recur (dec n) (* ret n))))]
+      (is (= 120 (f 5 1)))
+      (sm/with-fn-validation
+        (is (= 120 (f 5 1)))))))
+
 ;;; defn
 
 (def OddLongString
@@ -759,6 +773,23 @@
   (is (= 2 (always-validated-defn 1)))
   (invalid-call! always-validated-defn 2)
   (invalid-call! always-validated-defn -1))
+
+(sm/defn fib :- s/Int [n :- s/Int]
+  (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))
+
+(sm/defn fact :- s/Int [n :- s/Int ret :- s/Int]
+  (if (<= n 1) ret (recur (dec n) (* ret n))))
+
+
+(deftest defn-recursion-test
+  (testing "non-tail recursion"
+    (is (= 8 (fib 6)))
+    (sm/with-fn-validation
+      (is (= 8 (fib 6)))))
+  (testing "tail recursion"
+    (is (= 120 (fact 5 1)))
+    (sm/with-fn-validation
+      (is (= 120 (fact 5 1))))))
 
 ;; Primitive validation testing for JVM
 #+clj
