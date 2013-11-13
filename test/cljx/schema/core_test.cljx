@@ -20,6 +20,8 @@
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
+(deftest compiling-cljs?-test
+  (is (= #+cljs true #+clj false (sm/compiling-cljs-now?))))
 
 (deftest validate-return-test
   (is (= 1 (s/validate s/Int 1))))
@@ -700,10 +702,24 @@
         (is (= 9 (f 4 5 9)))
         (invalid-call! f 4 1.5)))))
 
+(deftest fn-recursion-test
+  (testing "non-tail recursion"
+    (let [f (sm/fn fib :- s/Int [n :- s/Int]
+              (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))]
+      (is (= 8 (f 6)))
+      (sm/with-fn-validation
+        (is (= 8 (f 6))))))
+  (testing "tail recursion"
+    (let [f (sm/fn fact :- s/Int [n :- s/Int ret :- s/Int]
+              (if (<= n 1) ret (recur (dec n) (* ret n))))]
+      (is (= 120 (f 5 1)))
+      (sm/with-fn-validation
+        (is (= 120 (f 5 1)))))))
+
 ;;; defn
 
 (def OddLongString
-  (s/both s/String (s/pred #(odd? (parse-long %)))))
+  (s/both s/String (s/pred #(odd? (parse-long %)) 'odd-str?)))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -720,13 +736,18 @@
 (def +simple-validated-defn-schema+
   (sm/=> OddLongString OddLong))
 
+(def ^String +bad-input-str+ "Input to simple-validated-defn does not match schema")
+
 #+cljs
 (deftest simple-validated-defn-test
   (doseq [f [simple-validated-defn simple-validated-defn-new]]
     (sm/with-fn-validation
       (is (= "3" (f 3)))
       (invalid-call! f 4)
-      (invalid-call! f "a"))))
+      (invalid-call! f "a")))
+  (let [e (try (sm/with-fn-validation (simple-validated-defn 2)) nil
+               (catch js/Error e e))]
+    (is (>= (.indexOf (str e) +bad-input-str+) 0))))
 
 #+clj
 (deftest simple-validated-defn-test
@@ -749,7 +770,11 @@
         (invalid-call! @v 4)
         (invalid-call! @v "a"))
 
-      (is (= "4" (@v 4))))))
+      (is (= "4" (@v 4)))))
+  (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
+    (is (.contains (.getMessage e) +bad-input-str+))
+    (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
+    (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj"))))
 
 (sm/defn ^:always-validate always-validated-defn :- (s/pred even?)
   [x :- (s/pred pos?)]
@@ -759,6 +784,23 @@
   (is (= 2 (always-validated-defn 1)))
   (invalid-call! always-validated-defn 2)
   (invalid-call! always-validated-defn -1))
+
+(sm/defn fib :- s/Int [n :- s/Int]
+  (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))
+
+(sm/defn fact :- s/Int [n :- s/Int ret :- s/Int]
+  (if (<= n 1) ret (recur (dec n) (* ret n))))
+
+
+(deftest defn-recursion-test
+  (testing "non-tail recursion"
+    (is (= 8 (fib 6)))
+    (sm/with-fn-validation
+      (is (= 8 (fib 6)))))
+  (testing "tail recursion"
+    (is (= 120 (fact 5 1)))
+    (sm/with-fn-validation
+      (is (= 120 (fact 5 1))))))
 
 ;; Primitive validation testing for JVM
 #+clj

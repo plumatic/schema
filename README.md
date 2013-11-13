@@ -23,11 +23,13 @@ A Schema is just a Clojure(Script) data structure describing a data shape, which
 ;; s/Any, s/Number, s/Keyword, s/Integer, and s/String are cross-platform schemas.
 
 (s/validate s/Number 42)  
-(throws? (s/validate s/Number "42"))  
+;; 42
+(s/validate s/Number "42")
 ;; RuntimeException: Value does not match schema: (not (instance java.lang.Number "42")) 
 
 (s/validate s/Keyword :whoa)  
-(throws? (s/validate s/Keyword 123))
+;; :whoa
+(s/validate s/Keyword 123)
 ;; RuntimeException: Value does not match schema: (not (keyword? 123))
 
 ;; On the JVM, you can use classes for instance? checks
@@ -58,11 +60,11 @@ Since schemas are just data, you can also `def` them and reuse and compose them 
 What about when things go bad?  Schema's `s/check` and `s/validate` provide meaningful errors that look like the bad parts of your data, and are (hopefully) easy to understand.
 
 ```clojure 
-(throws? (s/validate StringList ["a" :b "c"]))
+(s/validate StringList ["a" :b "c"])
 ;; RuntimeException: Value does not match schema:
 ;;  [nil (not (instance? java.lang.String :b)) nil]
 
-(throws? (s/validate StringScoreMap {1 {"2" 3.0 "3" [5.0]} 4.0 {}}))
+(s/validate StringScoreMap {1 {"2" 3.0 "3" [5.0]} 4.0 {}})
 ;; RuntimeException: Value does not match schema:
 ;;  {1 {"3" (not (instance? java.lang.Double [5.0]))}, 
 ;;   (not (instance? java.lang.Long 4.0)) invalid-key}
@@ -163,9 +165,11 @@ In addition to uniform maps (like String to double), map schemas can also captur
 
 ```clojure
 (def FooBar {(s/required-key :foo) s/String (s/required-key :bar) s/Keyword})
-(s/validate FooBar {:foo "f" :bar :b})
 
-(throws? (s/validate FooBar {:foo :f}))
+(s/validate FooBar {:foo "f" :bar :b})
+;; {:foo "f" :bar :b}
+
+(s/validate FooBar {:foo :f})
 ;; RuntimeException: Value does not match schema: 
 ;;  {:foo (not (instance? java.lang.String :f)), 
 ;;   :bar missing-required-key}
@@ -201,8 +205,9 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate FancySeq ["test"])
 (s/validate FancySeq ["test" :k])
 (s/validate FancySeq ["test" :k 1 2 3])
+;; all ok
 
-(throws? (s/validate FancySeq [1 :k 2 3 "4"]))
+(s/validate FancySeq [1 :k 2 3 "4"])
 ;; RuntimeException: Value does not match schema: 
 ;;  [(named (not (instance? java.lang.String 1)) "s") 
 ;;   nil nil nil 
@@ -225,9 +230,10 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; both and pred
 (def OddLong (s/both long (s/pred odd? 'odd?)))
 (s/validate OddLong 1)
-(throws? (s/validate OddLong 2))
+;; 1
+(s/validate OddLong 2)
 ;; RuntimeException: Value does not match schema: (not (odd? 2)) 
-(throws? (s/validate OddLong (int 3)))
+(s/validate OddLong (int 3))
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
 ```
 

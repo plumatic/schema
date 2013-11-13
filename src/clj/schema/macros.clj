@@ -10,12 +10,45 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
+(clojure.core/defn compiling-cljs?
+  "Return true if we are currently generating cljs code.  Useful because cljx does not
+         provide a hook for conditional macro expansion."
+  []
+  (boolean
+   (when-let [n (find-ns 'cljs.analyzer)]
+     (when-let [v (ns-resolve n '*cljs-file*)]
+       @v))))
+
+(defmacro compiling-cljs-now?
+  "Helper macro to test compiling-cljs?"
+  []
+  (compiling-cljs?))
+
+(defmacro error!
+  ([s]
+     (if (compiling-cljs?)
+       `(throw (js/Error ~s))
+       `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String})))))
+  ([s m]
+     (if (compiling-cljs?)
+       `(throw (ex-info ~s ~m))
+       `(throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m)))))
+
+(defmacro safe-get
+  "Like get but throw an exception if not found.  A macro just to work around cljx function
+   placement restrictions."
+  [m k]
+  `(let [m# ~m k# ~k]
+     (if-let [pair# (find m# k#)]
+       (val pair#)
+       (error! (utils/format* "Key %s not found in %s" k# m#)))))
+
 ;; TODO(ah) make assert!
 (defmacro assert-iae
   "Like assert, but throws an IllegalArgumentException and takes args to format"
   [form & format-args]
   `(when-not ~form
-     (utils/error! (utils/format* ~@format-args))))
+     (error! (utils/format* ~@format-args))))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
@@ -150,7 +183,7 @@
   [env fn-name output-schema-sym bind-meta [bind & body]]
   (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (utils/error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
+    (error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
   (let [original-arglist bind
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
@@ -166,26 +199,26 @@
                       (if rest-arg
                         (into metad-bind-syms ['& rest-sym])
                         metad-bind-syms)
-                      `(let ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
-                                   (when rest-arg [rest-arg rest-sym]))
-                         (let [validate# ~(if (:always-validate (meta fn-name))
-                                            `true
-                                            `(.get_cell ~'ufv__))]
+                      `(let [validate# ~(if (:always-validate (meta fn-name))
+                                          `true
+                                          `(.get_cell ~'ufv__))]
+                         (when validate#
+                           (let [args# ~(if rest-arg
+                                          `(list* ~@bind-syms ~rest-sym)
+                                          bind-syms)]
+                             (when-let [error# (schema.core/check ~input-schema-sym args#)]
+                               (error! (utils/format* "Input to %s does not match schema: %s"
+                                                      '~fn-name (pr-str error#))
+                                       {:schema ~input-schema-sym :value args# :error error#}))))
+                         (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
+                                               (when rest-arg [rest-arg rest-sym]))
+                                    ~@body)]
                            (when validate#
-                             (let [args# ~(if rest-arg
-                                            `(list* ~@bind-syms ~rest-sym)
-                                            bind-syms)]
-                               (when-let [error# (schema.core/check ~input-schema-sym args#)]
-                                 (utils/error! (format "Input to %s does not match schema: %s"
-                                                       '~fn-name (pr-str error#))
-                                               {:schema ~input-schema-sym :value args# :error error#}))))
-                           (let [o# (do ~@body)]
-                             (when validate#
-                               (when-let [error# (schema.core/check ~output-schema-sym o#)]
-                                 (utils/error! (format "Output of %s does not match schema: %s"
-                                                       '~fn-name (pr-str error#))
-                                               {:schema ~output-schema-sym :value o# :error error#})))
-                             o#)))))
+                             (when-let [error# (schema.core/check ~output-schema-sym o#)]
+                               (error! (utils/format* "Output of %s does not match schema: %s"
+                                                      '~fn-name (pr-str error#))
+                                       {:schema ~output-schema-sym :value o# :error error#})))
+                           o#))))
                    (cons bind body))}))
 
 (clojure.core/defn process-fn-
@@ -310,8 +343,8 @@
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
                                          (keys ~extra-key-schema?)))]
-         (utils/error! (str "extra-key-schema? can not contain required keys: "
-                            (vec bad-keys#))))
+         (error! (str "extra-key-schema? can not contain required keys: "
+                      (vec bad-keys#))))
        (when ~extra-validator-fn?
          (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                      (class ~extra-validator-fn?)))
@@ -349,11 +382,11 @@
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
              [~map-sym & [drop-extra-keys?#]]
              (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (utils/error! (format "Record has wrong set of keys: %s"
-                                     (data/diff (set (keys ~map-sym))
-                                                ~(set (map keyword field-schema))))))
+               (error! (utils/format* "Record has wrong set of keys: %s"
+                                      (data/diff (set (keys ~map-sym))
+                                                 ~(set (map keyword field-schema))))))
              (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(utils/safe-get ~map-sym ~(keyword s))) field-schema)))))))
+                  ~@(map (clojure.core/fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

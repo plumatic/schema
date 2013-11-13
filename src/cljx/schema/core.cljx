@@ -117,7 +117,8 @@
      user> (s/explain {:a s/Keyword :b [s/Int]} )
      {:a Keyword, :b [Int]}"))
 
-#+clj ;; Schemas print as their explains
+;; Schemas print as their explains
+#+clj
 (do (defmethod print-method schema.core.Schema [s writer]
       (print-method (explain s) writer))
     (prefer-method print-method schema.core.Schema clojure.lang.IRecord)
@@ -128,8 +129,8 @@
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
   (when-let [error (check schema value)]
-    (utils/error! (utils/format* "Value does not match schema: %s" (pr-str error))
-                  {:schema schema :value value :error error}))
+    (macros/error! (utils/format* "Value does not match schema: %s" (pr-str error))
+                   {:schema schema :value value :error error}))
   value)
 
 
@@ -290,7 +291,7 @@
   ([p?] (pred p? p?))
   ([p? pred-name]
      (when-not (fn? p?)
-       (utils/error! (utils/format* "Not a function: %s" p?)))
+       (macros/error! (utils/format* "Not a function: %s" p?)))
      (Predicate. p? pred-name)))
 
 
@@ -377,7 +378,7 @@
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
         (optional-key? ks) (.-k ^OptionalKey ks)
-        :else (utils/error! (utils/format* "Bad explicit key: %s" ks))))
+        :else (macros/error! (utils/format* "Bad explicit key: %s" ks))))
 
 (defn specific-key? [ks]
   (or (required-key? ks)
@@ -443,7 +444,7 @@
                  k
                  (list (cond (required-key? k) 'required-key
                              (optional-key? k) 'optional-key)
-                       (utils/safe-get k :k)))
+                       (explicit-schema-key k)))
                (explain k))
              (explain v)]))))
 
@@ -761,7 +762,7 @@
   [f]
   (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/type-of f))
-      (utils/safe-get (meta f) :schema)))
+      (macros/safe-get (meta f) :schema)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
