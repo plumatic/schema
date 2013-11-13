@@ -5,15 +5,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
 
-#+clj (defn compiling-cljs?
-        "Return true if we are currently generating cljs code.  Useful because cljx does not
-         provide a hook for conditional macro expansion."
-        []
-        (boolean
-         (when-let [n (find-ns 'cljs.analyzer)]
-           (when-let [v (ns-resolve n '*cljs-file*)]
-             @v))))
-
 (defn assoc-when
   "Like assoc but only assocs when value is truthy.  Copied from plumbing.core so that
    schema need not depend on plumbing."
@@ -28,23 +19,8 @@
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
 
-#+clj (defmacro error!
-        ([s] `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String}))))
-        ([s m] `(throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m))))
-
-#+cljs (defn error!
-         ([s] (throw (js/Error s)))
-         ([s m] (throw (ex-info s m))))
-
 (defn format* [fmt & args]
   (apply #+clj format #+cljs gstring/format fmt args))
-
-(defn safe-get
-  "Like get but throw an exception if not found"
-  [m k]
-  (if-let [pair (find m k)]
-    (val pair)
-    (error! (format* "Key %s not found in %s" k m))))
 
 (defn value-name
   "Provide a descriptive short name for a value."
@@ -58,7 +34,16 @@
 ;; A leaf schema validation error, describing the schema and value and why it failed to
 ;; match the schema.  In Clojure, prints like a form describing the failure that would
 ;; return true.
-(deftype ValidationError [schema value expectation-delay fail-explanation])
+
+(declare validation-error-explain)
+
+(deftype ValidationError [schema value expectation-delay fail-explanation]
+  #+cljs IPrintWithWriter
+  #+cljs (-pr-writer [this writer opts]
+           (-pr-writer (validation-error-explain this) writer opts)))
+
+(defn validation-error-explain [^ValidationError err]
+  (list (or (.-fail-explanation err) 'not) @(.-expectation-delay err)))
 
 (defn ->ValidationError
   "for cljs sake (easier than normalizing imports in macros.clj)"
@@ -66,17 +51,25 @@
   (ValidationError. schema value expectation-delay fail-explanation))
 
 #+clj ;; Validation errors print like forms that would return false
-(defmethod print-method ValidationError [^ValidationError err writer]
-  (print-method (list (or (.fail-explanation err) 'not) @(.expectation-delay err)) writer))
+(defmethod print-method ValidationError [err writer]
+  (print-method (validation-error-explain err) writer))
 
 ;; Attach a name to an error from a named schema.
-(deftype NamedError [name error])
+(declare named-error-explain)
+
+(deftype NamedError [name error]
+  #+cljs IPrintWithWriter
+  #+cljs (-pr-writer [this writer opts]
+           (-pr-writer (named-error-explain this) writer opts)))
+
+(defn named-error-explain [^NamedError err]
+  (list 'named (.-error err) (.-name err)))
 
 (defn ->NamedError [name error] (NamedError. name error))
 
 #+clj ;; Validation errors print like forms that would return false
-(defmethod print-method NamedError [^NamedError err writer]
-  (print-method (list 'named (.error err) (.name err)) writer))
+(defmethod print-method NamedError [err writer]
+  (print-method (named-error-explain err) writer))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

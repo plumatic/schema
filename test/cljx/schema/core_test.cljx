@@ -21,7 +21,7 @@
    #+cljs cljs-test.core))
 
 (deftest compiling-cljs?-test
-  (is (= #+cljs true #+clj false (sm/compiling-cljs?))))
+  (is (= #+cljs true #+clj false (sm/compiling-cljs-now?))))
 
 (deftest validate-return-test
   (is (= 1 (s/validate s/Int 1))))
@@ -719,7 +719,7 @@
 ;;; defn
 
 (def OddLongString
-  (s/both s/String (s/pred #(odd? (parse-long %)))))
+  (s/both s/String (s/pred #(odd? (parse-long %)) 'odd-str?)))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -736,13 +736,18 @@
 (def +simple-validated-defn-schema+
   (sm/=> OddLongString OddLong))
 
+(def ^String +bad-input-str+ "Input to simple-validated-defn does not match schema")
+
 #+cljs
 (deftest simple-validated-defn-test
   (doseq [f [simple-validated-defn simple-validated-defn-new]]
     (sm/with-fn-validation
       (is (= "3" (f 3)))
       (invalid-call! f 4)
-      (invalid-call! f "a"))))
+      (invalid-call! f "a")))
+  (let [e (try (sm/with-fn-validation (simple-validated-defn 2)) nil
+               (catch js/Error e e))]
+    (is (>= (.indexOf (str e) +bad-input-str+) 0))))
 
 #+clj
 (deftest simple-validated-defn-test
@@ -766,8 +771,8 @@
         (invalid-call! @v "a"))
 
       (is (= "4" (@v 4)))))
-  (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn "2")) nil (catch Exception e e))]
-    (is (.contains (.getMessage e) "Input to simple-validated-defn does not match schema"))
+  (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
+    (is (.contains (.getMessage e) +bad-input-str+))
     (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
     (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj"))))
 

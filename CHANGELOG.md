@@ -1,5 +1,6 @@
 ## 0.1.7
  * More small bugfixes
+ * Better validation error messages in cljs
 
 ## 0.1.6
  * Minor bugfixes (thanks various contributors)
