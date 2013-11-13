@@ -763,7 +763,11 @@
         (invalid-call! @v 4)
         (invalid-call! @v "a"))
 
-      (is (= "4" (@v 4))))))
+      (is (= "4" (@v 4)))))
+  (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn "2")) nil (catch Exception e e))]
+    (is (.contains (.getMessage e) "Input to simple-validated-defn does not match schema"))
+    (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
+    (is (= "core_test.cljx" (.getFileName ^StackTraceElement (first (.getStackTrace e)))))))
 
 (sm/defn ^:always-validate always-validated-defn :- (s/pred even?)
   [x :- (s/pred pos?)]
