@@ -20,6 +20,8 @@
    #+clj [schema.macros :as sm]
    #+cljs cljs-test.core))
 
+(deftest compiling-cljs?-test
+  (is (= #+cljs true #+clj false (sm/compiling-cljs?))))
 
 (deftest validate-return-test
   (is (= 1 (s/validate s/Int 1))))
@@ -767,7 +769,7 @@
   (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn "2")) nil (catch Exception e e))]
     (is (.contains (.getMessage e) "Input to simple-validated-defn does not match schema"))
     (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
-    (is (= "core_test.cljx" (.getFileName ^StackTraceElement (first (.getStackTrace e)))))))
+    (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj"))))
 
 (sm/defn ^:always-validate always-validated-defn :- (s/pred even?)
   [x :- (s/pred pos?)]

@@ -10,6 +10,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
+(defmacro compiling-cljs?
+  "Helper macro to test schema.utils/compiling-cljs?"
+  []
+  (utils/compiling-cljs?))
+
 ;; TODO(ah) make assert!
 (defmacro assert-iae
   "Like assert, but throws an IllegalArgumentException and takes args to format"

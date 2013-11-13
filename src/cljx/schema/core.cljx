@@ -443,7 +443,7 @@
                  k
                  (list (cond (required-key? k) 'required-key
                              (optional-key? k) 'optional-key)
-                       (utils/safe-get k :k)))
+                       (explicit-schema-key k)))
                (explain k))
              (explain v)]))))
 

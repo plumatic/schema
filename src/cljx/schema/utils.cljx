@@ -5,6 +5,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
 
+#+clj (defn compiling-cljs?
+        "Return true if we are currently generating cljs code.  Useful because cljx does not
+         provide a hook for conditional macro expansion."
+        []
+        (boolean
+         (when-let [n (find-ns 'cljs.analyzer)]
+           (when-let [v (ns-resolve n '*cljs-file*)]
+             @v))))
+
 (defn assoc-when
   "Like assoc but only assocs when value is truthy.  Copied from plumbing.core so that
    schema need not depend on plumbing."
