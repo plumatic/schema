@@ -25,6 +25,7 @@
   (compiling-cljs?))
 
 (defmacro error!
+  "Generate a cross-platform exception in client (non-compilation) code."
   ([s]
      (if (compiling-cljs?)
        `(throw (js/Error ~s))
@@ -36,19 +37,26 @@
 
 (defmacro safe-get
   "Like get but throw an exception if not found.  A macro just to work around cljx function
-   placement restrictions."
+   placement restrictions.  Only valid in client (non-compilation) code."
   [m k]
   `(let [m# ~m k# ~k]
      (if-let [pair# (find m# k#)]
        (val pair#)
        (error! (utils/format* "Key %s not found in %s" k# m#)))))
 
-;; TODO(ah) make assert!
-(defmacro assert-iae
-  "Like assert, but throws an IllegalArgumentException and takes args to format"
+(defmacro assert!
+  "Like assert, but throws a RuntimeException and takes args to format.  Only
+   for use in client-code."
   [form & format-args]
   `(when-not ~form
      (error! (utils/format* ~@format-args))))
+
+(defmacro assert-c!
+  "Like assert! but throws a RuntimeException and takes args to format.  Only
+   for use during compilation."
+  [form & format-args]
+  `(when-not ~form
+     (throw (RuntimeException. (format ~@format-args)))))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
@@ -88,8 +96,8 @@
    object to have a valid Clojure :tag plus a :schema field. :s? is deprecated."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
-    (assert-iae (< (count (remove nil? [s s? schema explicit-schema])) 2)
-                "Expected single schema, got meta %s, explicit %s" (meta imeta) explicit-schema)
+    (assert-c! (< (count (remove nil? [s s? schema explicit-schema])) 2)
+               "Expected single schema, got meta %s, explicit %s" (meta imeta) explicit-schema)
     (let [schema (fix-protocol-tag
                   env
                   (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Any))]
@@ -105,7 +113,7 @@
   "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
   [symbol]
   (let [s (:schema (meta symbol))]
-    (assert-iae s "%s is missing a schema" symbol)
+    (assert-c! s "%s is missing a schema" symbol)
     s))
 
 (clojure.core/defn extract-arrow-schematized-element
@@ -135,11 +143,11 @@
 (clojure.core/defn split-rest-arg [env bind]
   (let [[pre-& [_ rest-arg :as post-&]] (split-with #(not= % '&) bind)]
     (if (seq post-&)
-      (do (assert-iae (= (count post-&) 2) "& must be followed by a single binding" (vec post-&))
-          (assert-iae (or (symbol? rest-arg)
-                          (and (vector? rest-arg)
-                               (not-any? #{'&} rest-arg)))
-                      "Bad & binding form: currently only bare symbols and vectors supported" (vec post-&))
+      (do (assert-c! (= (count post-&) 2) "& must be followed by a single binding" (vec post-&))
+          (assert-c! (or (symbol? rest-arg)
+                         (and (vector? rest-arg)
+                              (not-any? #{'&} rest-arg)))
+                     "Bad & binding form: currently only bare symbols and vectors supported" (vec post-&))
 
           [(vec pre-&)
            (if (vector? rest-arg)
@@ -163,7 +171,7 @@
       (if (vector? arg)
         (simple-arglist-schema-form true arg)
         [`schema.core/Any])
-      (do (assert-iae (vector? s) "Expected seq schema for rest args, got %s" s)
+      (do (assert-c! (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 
 (clojure.core/defn input-schema-form [regular-args rest-arg]
@@ -181,9 +189,9 @@
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation."
   [env fn-name output-schema-sym bind-meta [bind & body]]
-  (assert-iae (vector? bind) "Got non-vector binding form %s" bind)
+  (assert-c! (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (error! (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))
+    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
   (let [original-arglist bind
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
@@ -246,13 +254,13 @@
      :fn-body fn-forms}))
 
 (defn- parse-arity-spec [spec]
-  (assert-iae (vector? spec) "An arity spec must be a vector")
+  (assert-c! (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
         fixed (mapv (clojure.core/fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
     (if (empty? more)
       fixed
-      (do (assert-iae (and (= (count more) 2) (vector? (second more)))
-                      "An arity with & must be followed by a single sequence schema")
+      (do (assert-c! (and (= (count more) 2) (vector? (second more)))
+                     "An arity with & must be followed by a single sequence schema")
           (into fixed (second more))))))
 
 
@@ -343,11 +351,11 @@
     `(do
        (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
                                          (keys ~extra-key-schema?)))]
-         (error! (str "extra-key-schema? can not contain required keys: "
-                      (vec bad-keys#))))
+         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
+                                        (vec bad-keys#)))))
        (when ~extra-validator-fn?
-         (assert-iae (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                     (class ~extra-validator-fn?)))
+         (assert-c! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                    (class ~extra-validator-fn?)))
        (~(if @*use-potemkin*
            `potemkin/defrecord+
            `clojure.core/defrecord)
@@ -360,8 +368,8 @@
           (merge ~(into {}
                         (for [k field-schema]
                           [(keyword (clojure.core/name k))
-                           (do (assert-iae (symbol? k)
-                                           "Non-symbol in record binding form: %s" k)
+                           (do (assert-c! (symbol? k)
+                                          "Non-symbol in record binding form: %s" k)
                                (extract-schema-form k))]))
                  ~extra-key-schema?))
          :extra-validator-fn ~extra-validator-fn?))
