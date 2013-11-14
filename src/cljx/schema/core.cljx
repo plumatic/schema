@@ -268,7 +268,7 @@
 (defn protocol
   "A value that must satsify? protocol p"
   [p]
-  (macros/assert-iae (:on p) "Cannot make protocol schema for non-protocol %s" p)
+  (macros/assert! (:on p) "Cannot make protocol schema for non-protocol %s" p)
   (Protocol. p))
 
 
@@ -316,8 +316,8 @@
    :else may be used as a final condition in the place of (constantly true).
    More efficient than either, since only one schema must be checked."
   [& preds-and-schemas]
-  (macros/assert-iae (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
-                     "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
+  (macros/assert! (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
+                  "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
   (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
                         [(if (= pred :else) (constantly true) pred) schema])))
 
@@ -386,9 +386,9 @@
 
 (defn- find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
-    (macros/assert-iae (< (count key-schemata) 2)
-                       "More than one non-optional/required key schemata: %s"
-                       (vec key-schemata))
+    (macros/assert! (< (count key-schemata) 2)
+                    "More than one non-optional/required key schemata: %s"
+                    (vec key-schemata))
     (first key-schemata)))
 
 (defn- check-explicit-key
@@ -465,7 +465,7 @@
   #+clj clojure.lang.APersistentSet
   #+cljs cljs.core.PersistentHashSet
   (check [this x]
-    (macros/assert-iae (= (count this) 1) "Set schema must have exactly one element")
+    (macros/assert! (= (count this) 1) "Set schema must have exactly one element")
     (or (when-not (set? x)
           (macros/validation-error this x (list 'set? (utils/value-name x))))
         (when-let [out (seq (keep #(check (first this) %) x))]
@@ -497,7 +497,7 @@
 (defn- parse-sequence-schema [s]
   (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
-    (macros/assert-iae
+    (macros/assert!
      (and (<= (count more) 1) (every? #(not (instance? One %)) more))
      "Sequence schema %s does not match [one* optional* rest-schema?]" s)
     [(concat required optional) (first more)]))
@@ -573,8 +573,8 @@
 (defn record
   "A Record instance of type klass, whose elements match map schema 'schema'."
   [klass schema]
-  #+clj (macros/assert-iae (class? klass) "Expected record class, got %s" (utils/type-of klass))
-  (macros/assert-iae (map? schema) "Expected map, got %s" (utils/type-of schema))
+  #+clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass))
+  (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
   (Record. klass schema))
 
 
@@ -616,9 +616,9 @@
    Currently function schemas are purely descriptive; they validate against any function,
    regargless of actual input and output types."
   [output-schema input-schemas]
-  (macros/assert-iae (seq input-schemas) "Function must have at least one input schema")
-  (macros/assert-iae (every? vector? input-schemas) "Each arity must be a vector.")
-  (macros/assert-iae (apply distinct? (map arity input-schemas)) "Arities must be distinct")
+  (macros/assert! (seq input-schemas) "Function must have at least one input schema")
+  (macros/assert! (every? vector? input-schemas) "Each arity must be a vector.")
+  (macros/assert! (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
 ;; => and =>* are convenience macros for making function schemas.
@@ -767,7 +767,7 @@
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
-  (macros/assert-iae (fn? f) "Non-function %s" (utils/type-of f))
+  (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/type-of f))
       (macros/safe-get (meta f) :schema)))
 
