@@ -16,7 +16,7 @@
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
-                 :shell ["lein" "deploy" "clojars"]}
+                 :shell ["lein" "with-profile" "dev" "deploy" "clojars"]}
 
   :cljx {:builds [{:source-paths ["src/cljx"]
                    :output-path "target/generated/src/clj"
