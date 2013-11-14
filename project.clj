@@ -9,14 +9,14 @@
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.5.1"]
                                   [org.clojure/clojurescript "0.0-2030"]
                                   [prismatic/cljs-test "0.0.6"]]
-                   :plugins [[com.cemerick/austin "0.1.3"]
-                             [lein-cljsbuild "1.0.0-alpha2"]
-                             [com.keminglabs/cljx "0.3.1"]]}}
+                   :plugins [[com.cemerick/austin "0.1.3"]]}}
 
+  :plugins [[lein-cljsbuild "1.0.0-alpha2"]
+            [com.keminglabs/cljx "0.3.1"]]
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
-                 :shell ["lein" "with-profile" "dev" "deploy" "clojars"]}
+                 :shell ["lein" "deploy" "clojars"]}
 
   :cljx {:builds [{:source-paths ["src/cljx"]
                    :output-path "target/generated/src/clj"
