@@ -1,3 +1,6 @@
+## 0.1.8
+ * Works with advanced compilation in cljs (at least sometimes)
+
 ## 0.1.7
  * More small bugfixes
  * Better validation error messages in cljs
