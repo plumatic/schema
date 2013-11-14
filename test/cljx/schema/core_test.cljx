@@ -147,14 +147,16 @@
     (is (= '{Keyword Int} (s/explain {s/Keyword s/Int})))))
 
 (deftest simple-specific-key-map-test
-  (let [schema {:foo s/Keyword
-                :bar s/Int}]
-    (valid! schema {:foo :a :bar 2})
-    (invalid! schema [[:foo :a] [:bar 2]] "(not (map? a-clojure.lang.PersistentVector))")
-    (invalid! schema {:foo :a} "{:bar missing-required-key}")
-    (invalid! schema {:foo :a :bar 2 :baz 1} "{:baz disallowed-key}")
-    (invalid! schema {:foo :a :bar 1.5} "{:bar (not (integer? 1.5))}")
-    (is (= '{:foo Keyword, :bar Int} (s/explain schema)))))
+  (let [schema-args [:foo s/Keyword :bar s/Int]]
+    (doseq [[t schema] {"hash-map" (apply hash-map schema-args)
+                        "array-map" (apply array-map schema-args)}]
+      (testing t
+        (valid! schema {:foo :a :bar 2})
+        (invalid! schema [[:foo :a] [:bar 2]] "(not (map? a-clojure.lang.PersistentVector))")
+        (invalid! schema {:foo :a} "{:bar missing-required-key}")
+        (invalid! schema {:foo :a :bar 2 :baz 1} "{:baz disallowed-key}")
+        (invalid! schema {:foo :a :bar 1.5} "{:bar (not (integer? 1.5))}")
+        (is (= '{:foo Keyword, :bar Int} (s/explain schema)))))))
 
 (deftest fancier-map-schema-test
   (let [schema {:foo s/Int

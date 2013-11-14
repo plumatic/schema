@@ -429,24 +429,31 @@
 
 ;;; Extending the Schema protocol to Clojure maps.
 
+(defn- map-check [this x]
+  (if-not (map? x)
+    (macros/validation-error this x (list 'map? (utils/value-name x)))
+    (check-map this x)))
+
+(defn- map-explain [this]
+  (into {}
+        (for [[k v] this]
+          [(if (specific-key? k)
+             (if (keyword? k)
+               k
+               (list (cond (required-key? k) 'required-key
+                           (optional-key? k) 'optional-key)
+                     (explicit-schema-key k)))
+             (explain k))
+           (explain v)])))
+
 (extend-protocol Schema
   #+clj clojure.lang.APersistentMap
   #+cljs cljs.core.PersistentArrayMap
-  (check [this x]
-    (if-not (map? x)
-      (macros/validation-error this x (list 'map? (utils/value-name x)))
-      (check-map this x)))
-  (explain [this]
-    (into {}
-          (for [[k v] this]
-            [(if (specific-key? k)
-               (if (keyword? k)
-                 k
-                 (list (cond (required-key? k) 'required-key
-                             (optional-key? k) 'optional-key)
-                       (explicit-schema-key k)))
-               (explain k))
-             (explain v)]))))
+  (check [this x] (map-check this x))
+  (explain [this] (map-explain this))
+  #+cljs cljs.core.PersistentHashMap
+  #+cljs (check [this x] (map-check this x))
+  #+cljs (explain [this] (map-explain this)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
