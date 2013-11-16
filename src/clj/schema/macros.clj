@@ -356,7 +356,7 @@
        (when ~extra-validator-fn?
          (assert-c! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                     (class ~extra-validator-fn?)))
-       (~(if @*use-potemkin*
+       (~(if (and @*use-potemkin* (not (compiling-cljs?)))
            `potemkin/defrecord+
            `clojure.core/defrecord)
         ~name ~field-schema ~@more-args)
