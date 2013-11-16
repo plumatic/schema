@@ -415,7 +415,7 @@
   [& fn-args]
   (let [[name more-fn-args] (if (symbol? (first fn-args))
                               (extract-arrow-schematized-element &env fn-args)
-                              [(with-meta 'fn {:schema `schema.core/Any}) fn-args])
+                              [(with-meta (gensym "fn") {:schema `schema.core/Any}) fn-args])
         {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
     `(let ~outer-bindings
        (schema.core/schematize-fn (clojure.core/fn ~name ~@fn-body) ~schema-form))))
