@@ -735,6 +735,13 @@
   [arg0 :- OddLong]
   (str arg0))
 
+(sm/defn validated-pre-post-defn :- OddLong
+  "I have pre/post conditions"
+  [arg0 :- s/Number]
+  {:pre  [(odd? arg0) (> 10 arg0)]
+   :post [(odd? %)    (<  5 %)]}
+  arg0)
+
 (def +simple-validated-defn-schema+
   (sm/=> OddLongString OddLong))
 
@@ -747,6 +754,12 @@
       (is (= "3" (f 3)))
       (invalid-call! f 4)
       (invalid-call! f "a")))
+  (sm/with-fn-validation
+    (is (= 7 (validated-pre-post-defn 7)))
+    (is (thrown? AssertionError (validated-pre-post-defn 0)))
+    (is (thrown? AssertionError (validated-pre-post-defn 11)))
+    (is (thrown? AssertionError (validated-pre-post-defn 1)))
+    (invalid-call! validated-pre-post-defn "a"))
   (let [e (try (sm/with-fn-validation (simple-validated-defn 2)) nil
                (catch js/Error e e))]
     (is (>= (.indexOf (str e) +bad-input-str+) 0))))
@@ -759,6 +772,16 @@
   (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn-new))))
   (is (= '([arg0]) (:arglists (meta #'simple-validated-defn-new))))
+  (sm/with-fn-validation
+    (testing "pre/post"
+      (is (= 7 (validated-pre-post-defn 7)))
+      (is (thrown-with-msg? AssertionError #"Assert failed: \(odd\? arg0\)"
+                            (validated-pre-post-defn 0)))
+      (is (thrown-with-msg? AssertionError #"Assert failed: \(> 10 arg0\)"
+                            (validated-pre-post-defn 11)))
+      (is (thrown-with-msg? AssertionError #"Assert failed: \(< 5 %\)"
+                            (validated-pre-post-defn 1)))
+      (invalid-call! validated-pre-post-defn "a")))
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema metadata]} (meta v)]

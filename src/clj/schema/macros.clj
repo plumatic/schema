@@ -202,7 +202,25 @@
      :arity-form (if-not (:never-validate (meta fn-name))
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
-                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
+                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)
+                         ;; pre/post logic lifted from clojure.core/fn
+                         conds (when (and (next body) (map? (first body)))
+                                 (first body))
+                         body (if conds (next body) body)
+                         conds (or conds (meta bind))
+                         pre (:pre conds)
+                         post (:post conds)
+                         body (if post
+                                `((let [~'% ~(if (< 1 (count body))
+                                               `(do ~@body)
+                                               (first body))]
+                                    ~@(map (fn* [c] `(assert ~c)) post)
+                                    ~'%))
+                                body)
+                         body (if pre
+                                (concat (map (fn* [c] `(assert ~c)) pre)
+                                        body)
+                                body)]
                      (list
                       (if rest-arg
                         (into metad-bind-syms ['& rest-sym])
