@@ -8,8 +8,11 @@
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.5.1"]
                                   [org.clojure/clojurescript "0.0-2030"]
-                                  [prismatic/cljs-test "0.0.6"]]
-                   :plugins [[com.cemerick/austin "0.1.3"]]}}
+                                  [prismatic/cljs-test "0.0.6"]
+                                  [com.keminglabs/cljx "0.3.1"]]
+                   :plugins [[com.cemerick/austin "0.1.3"]]
+                   :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
+                                                     cljx.repl-middleware/wrap-cljx]}}}
 
   :plugins [[lein-cljsbuild "1.0.0-alpha2"]
             [com.keminglabs/cljx "0.3.1"]]
@@ -48,4 +51,5 @@
                                       "target/generated/src/cljs" "target/generated/test/cljs"]
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
+
                                  :pretty-print true}}}})
