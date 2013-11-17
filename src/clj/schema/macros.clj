@@ -478,8 +478,8 @@
       - & [a b] works, with schemas for individual elements parsed out of the binding,
         or an overall schema on the vector
       - & {} is not supported.
-    - Unlike clojure.core/defn, pre/post-condition maps are not supported, and a final
-      attr-map on multi-arity functions is also not supported."
+    - Unlike clojure.core/defn, a final attr-map on multi-arity functions
+      is not supported."
   [& defn-args]
   (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
         [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
