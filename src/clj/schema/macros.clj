@@ -180,6 +180,16 @@
       (vec (concat base (rest-arg-schema-form rest-arg)))
       base)))
 
+(clojure.core/defn apply-prepost-conditions
+  "Replicate pre/postcondition logic from clojure.core/fn."
+  [body]
+  (let [[conds body] (maybe-split-first #(and (map? %) (next body)) body)]
+    (concat (map (clojure.core/fn [c] `(assert ~c)) (:pre conds))
+            (if-let [post (:post conds)]
+              `((let [~'% (do ~@body)]
+                  ~@(map (clojure.core/fn [c] `(assert ~c)) post)
+                  ~'%))
+              body))))
 
 (clojure.core/defn process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
@@ -202,25 +212,7 @@
      :arity-form (if-not (:never-validate (meta fn-name))
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
-                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)
-                         ;; pre/post logic lifted from clojure.core/fn
-                         conds (when (and (next body) (map? (first body)))
-                                 (first body))
-                         body (if conds (next body) body)
-                         conds (or conds (meta bind))
-                         pre (:pre conds)
-                         post (:post conds)
-                         body (if post
-                                `((let [~'% ~(if (< 1 (count body))
-                                               `(do ~@body)
-                                               (first body))]
-                                    ~@(map (fn* [c] `(assert ~c)) post)
-                                    ~'%))
-                                body)
-                         body (if pre
-                                (concat (map (fn* [c] `(assert ~c)) pre)
-                                        body)
-                                body)]
+                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
                      (list
                       (if rest-arg
                         (into metad-bind-syms ['& rest-sym])
@@ -238,7 +230,7 @@
                                        {:schema ~input-schema-sym :value args# :error error#}))))
                          (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
                                                (when rest-arg [rest-arg rest-sym]))
-                                    ~@body)]
+                                    ~@(apply-prepost-conditions body))]
                            (when validate#
                              (when-let [error# (schema.core/check ~output-schema-sym o#)]
                                (error! (utils/format* "Output of %s does not match schema: %s"
