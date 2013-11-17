@@ -1,3 +1,7 @@
+## 0.1.9
+ * Support for pre/postcondition maps in `s/defn`
+ * Records work properly with advanced compilation in cljs
+
 ## 0.1.8
  * Works with advanced compilation in cljs (at least sometimes)
 

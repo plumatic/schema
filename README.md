@@ -252,10 +252,12 @@ Please feel free to join the Plumbing [mailing list](https://groups.google.com/f
 
 For announcements of new releases, you can also follow on [@PrismaticEng](http://twitter.com/prismaticeng) on Twitter.
 
+We welcome contributions in the form of bug reports and pull requests; please see `CONTRIBUTING.md` in the repo root for guidelines. 
+
 ## Supported Clojure versions
 
 Schema is currently supported on 1.5.1 and the latest version of ClojureScript.
 
 ## License
 
-Copyright (C) 2013 Prismatic.  Distributed under the Eclipse Public License, the same as Clojure.
+Copyright (C) 2013 Prismatic and Contributors.  Distributed under the Eclipse Public License, the same as Clojure.
