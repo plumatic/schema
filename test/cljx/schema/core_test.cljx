@@ -871,6 +871,43 @@
   (is (false? (.get_cell utils/use-fn-validation))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Recursive schemas (Clojure only).
+
+#+clj
+(do
+  ;; Recursively defined nested vector example
+  (def NestedVecs
+    [(s/one s/Number "Node ID")
+     (s/recursive #'NestedVecs)])
+ 
+  ;; Recursively defined nested map example
+  (def NestedMaps
+    {:node-id s/Number
+     (s/optional-key :children) [(s/recursive #'NestedMaps)]})
+
+  (deftest test-recursive
+
+    (valid! NestedVecs [1 [2 [3 [4]]]])
+    (invalid! NestedVecs [1 [2 ["invalid-id" [4]]]])
+    (invalid! NestedVecs [1 [2 [3 "invalid-content"]]])
+    
+    (valid! NestedMaps 
+                {:node-id 1 
+                 :children [{:node-id 1 
+                             :children [{:node-id 4}]}
+                            {:node-id 3}]})
+    (invalid! NestedMaps 
+            {:node-id 1 
+             :children [{:invalid-node-id 1 
+                         :children [{:node-id 4}]}
+                        {:node-id 3}]})
+    (invalid! NestedMaps 
+            {:node-id 1 
+             :children [{:node-id 1 
+                         :children [{:node-id 4}]}
+                        {:node-id "invalid-id"}]})))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
 
 (deftest nice-error-test
