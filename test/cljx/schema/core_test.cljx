@@ -135,6 +135,50 @@
     (invalid! schema {:type :bar :baz 10})
     (invalid! schema {:type :zzz :baz 10})))
 
+
+#+clj
+(do (def NestedVecs
+      [(s/one s/Number "Node ID")
+       (s/recursive #'NestedVecs)])
+
+    (def NestedMaps
+      {:node-id s/Number
+       (s/optional-key :children) [(s/recursive #'NestedMaps)]})
+
+    (declare BlackNode)
+    (def RedNode {(s/optional-key :red) (s/recursive #'BlackNode)})
+    (def BlackNode {:black RedNode})
+
+    (deftest recursive-test
+      (valid! NestedVecs [1 [2 [3 [4]]]])
+      (invalid! NestedVecs [1 [2 ["invalid-id" [4]]]])
+      (invalid! NestedVecs [1 [2 [3 "invalid-content"]]])
+
+      (valid! NestedMaps
+              {:node-id 1
+               :children [{:node-id 1
+                           :children [{:node-id 4}]}
+                          {:node-id 3}]})
+      (invalid! NestedMaps
+                {:node-id 1
+                 :children [{:invalid-node-id 1
+                             :children [{:node-id 4}]}
+                            {:node-id 3}]})
+      (invalid! NestedMaps
+                {:node-id 1
+                 :children [{:node-id 1
+                             :children [{:node-id 4}]}
+                            {:node-id "invalid-id"}]})
+
+      (valid! BlackNode {:black {}})
+      (valid! BlackNode {:black {:red {:black {}}}})
+      (invalid! BlackNode {:black {:black {}}})
+      (invalid! BlackNode {:black {:red {}}})
+
+      (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/BlackNode))}}
+             (s/explain BlackNode)))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
@@ -776,11 +820,11 @@
     (testing "pre/post"
       (is (= 7 (validated-pre-post-defn 7)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(odd\? arg0\)"
-                            (validated-pre-post-defn 0)))
+            (validated-pre-post-defn 0)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(> 10 arg0\)"
-                            (validated-pre-post-defn 11)))
+            (validated-pre-post-defn 11)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(< 5 %\)"
-                            (validated-pre-post-defn 1)))
+            (validated-pre-post-defn 1)))
       (invalid-call! validated-pre-post-defn "a")))
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
@@ -869,6 +913,7 @@
   (is (thrown? #+clj RuntimeException #+cljs js/Error
                (sm/with-fn-validation (throw #+clj (RuntimeException.) #+cljs (js/Error "error")))))
   (is (false? (.get_cell utils/use-fn-validation))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)

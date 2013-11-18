@@ -326,6 +326,31 @@
   [pred if-schema else-schema]
   (conditional pred if-schema (constantly true) else-schema))
 
+
+;;; Recursive schemas (Clojure only)
+;; Supports recursively defined schemas by using the level of indirection offered by by
+;; Clojure (but not ClojureScript) vars.
+
+#+clj
+(do (defn var-name [v]
+      (let [{:keys [ns name]} (meta v)]
+        (symbol (str (ns-name ns) "/" name))))
+
+    (defrecord Recursive [schema-var]
+      Schema
+      (check [this x]
+        (check @schema-var x))
+      (explain [this]
+        (list 'recursive (list 'var (var-name schema-var)))))
+
+    (defn recursive
+      "Support for (mutually) recursive schemas by passing a var that points to a schema,
+       e.g (recursive #'ExampleRecursiveSchema)."
+      [schema-var]
+      (when-not (var? schema-var)
+        (macros/error! (utils/format* "Not a var: %s" schema-var)))
+      (Recursive. schema-var)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
@@ -620,6 +645,7 @@
   (macros/assert! (every? vector? input-schemas) "Each arity must be a vector.")
   (macros/assert! (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
+
 
 ;; => and =>* are convenience macros for making function schemas.
 ;; Clojurescript users must use them from schema.macros, but Clojure users can get them here.
