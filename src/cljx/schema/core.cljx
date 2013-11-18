@@ -621,6 +621,38 @@
   (macros/assert! (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Recursive schema support (Clojure only)
+
+;; Add support for recursively defined schemas by deref-ing a Clojure var as needed.
+;; This is not currently supported in ClojureScript because it does not support reified vars.
+;; This section is placed above the cross-platform schema leaves to avoid a conflict with the 
+;; defrecord macro.
+
+#+clj
+(do
+
+  (defrecord Recursive [schema-var]
+    Schema
+    (check [this x]
+      (check @schema-var x))
+    (explain [this]
+      ;; Simply print the string form to avoid infinite recursion.
+      (str schema-var)))
+  
+  (defn recursive 
+    "Support for recursives schema by providing a var that
+     points to a schema. This is only supported in Clojure; ClojureScript support
+     is not available since this requires reified vars.
+
+     To use this, simply pass in a var to this function, e.g (recursive #'ExampleRecursiveSchema)."
+    [schema-var]
+    (when-not (var? schema-var)
+      (macros/error! (utils/format* "Not a var: %s" schema-var)))
+    (Recursive. schema-var)))
+
+
 ;; => and =>* are convenience macros for making function schemas.
 ;; Clojurescript users must use them from schema.macros, but Clojure users can get them here.
 #+clj (potemkin/import-vars macros/=> macros/=>*)
