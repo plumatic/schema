@@ -1,5 +1,6 @@
 ## 0.1.9
  * Support for pre/postcondition maps in `s/defn`
+ * Support for recursive schemas in Clojure
  * Records work properly with advanced compilation in cljs
 
 ## 0.1.8
