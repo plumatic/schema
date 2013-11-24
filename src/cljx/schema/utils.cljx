@@ -130,5 +130,5 @@
 
 #+cljs
 (do
-  (aset use-fn-validation "get_cell" (partial get_cell use-fn-validation))
-  (aset use-fn-validation "set_cell" (partial set_cell use-fn-validation)))
+  (set! (.-get_cell use-fn-validation) (partial get_cell use-fn-validation))
+  (set! (.-set_cell use-fn-validation) (partial set_cell use-fn-validation)))
