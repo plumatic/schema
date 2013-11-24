@@ -359,13 +359,13 @@
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
         field-schema (process-arrow-schematized-args &env field-schema)]
     `(do
-       (when-let [bad-keys# (seq (filter #(schema.core/required-key? %)
-                                         (keys ~extra-key-schema?)))]
-         (throw (RuntimeException. (str "extra-key-schema? can not contain required keys: "
-                                        (vec bad-keys#)))))
+       (let [bad-keys# (seq (filter #(schema.core/required-key? %)
+                                    (keys ~extra-key-schema?)))]
+         (assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
+                  (vec bad-keys#)))
        (when ~extra-validator-fn?
-         (assert-c! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                    (class ~extra-validator-fn?)))
+         (assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                  (class ~extra-validator-fn?)))
        (~(if (and @*use-potemkin* (not (compiling-cljs?)))
            `potemkin/defrecord+
            `clojure.core/defrecord)
