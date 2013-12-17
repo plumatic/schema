@@ -10,29 +10,28 @@
                                   [org.clojure/clojurescript "0.0-2030"]
                                   [prismatic/cljs-test "0.0.6"]
                                   [com.keminglabs/cljx "0.3.1"]]
-                   :plugins [[com.cemerick/austin "0.1.3"]]
+                   :plugins [[com.cemerick/austin "0.1.3"]
+                             [lein-cljsbuild "1.0.0-alpha2"]
+                             [com.keminglabs/cljx "0.3.1"]]
                    :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
-                                                     cljx.repl-middleware/wrap-cljx]}}}
+                                                     cljx.repl-middleware/wrap-cljx]}
+                   :cljx {:builds [{:source-paths ["src/cljx"]
+                                    :output-path "target/generated/src/clj"
+                                    :rules :clj}
+                                   {:source-paths ["src/cljx"]
+                                    :output-path "target/generated/src/cljs"
+                                    :rules :cljs}
+                                   {:source-paths ["test/cljx"]
+                                    :output-path "target/generated/test/clj"
+                                    :rules :clj}
+                                   {:source-paths ["test/cljx"]
+                                    :output-path "target/generated/test/cljs"
+                                    :rules :cljs}]}}}
 
-  :plugins [[lein-cljsbuild "1.0.0-alpha2"]
-            [com.keminglabs/cljx "0.3.1"]]
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
                  :shell ["lein" "deploy" "clojars"]}
-
-  :cljx {:builds [{:source-paths ["src/cljx"]
-                   :output-path "target/generated/src/clj"
-                   :rules :clj}
-                  {:source-paths ["src/cljx"]
-                   :output-path "target/generated/src/cljs"
-                   :rules :cljs}
-                  {:source-paths ["test/cljx"]
-                   :output-path "target/generated/test/clj"
-                   :rules :clj}
-                  {:source-paths ["test/cljx"]
-                   :output-path "target/generated/test/cljs"
-                   :rules :cljs}]}
 
   :prep-tasks ["cljx" "javac" "compile"]
 

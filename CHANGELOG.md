@@ -1,3 +1,6 @@
+## 0.1.10 
+ * Remove non-dev dependency on cljx
+
 ## 0.1.9
  * Support for pre/postcondition maps in `s/defn`
  * Support for recursive schemas in Clojure
