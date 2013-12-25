@@ -914,6 +914,15 @@
                (sm/with-fn-validation (throw #+clj (RuntimeException.) #+cljs (js/Error "error")))))
   (is (false? (.get_cell utils/use-fn-validation))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Validation Errors
+
+(deftest validation-errors-test
+  (let [gen-val-e (fn [err]
+                    (sm/validation-error {} {} err 'fail-explanation))]
+    (is (= (gen-val-e :foo) (gen-val-e :foo))) 
+    (is (not= (gen-val-e :foo) (gen-val-e :bar)))
+    (is (not= (gen-val-e :foo) :not-a-validation-error))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
