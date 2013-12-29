@@ -88,28 +88,25 @@
 
 #+clj (set! *warn-on-reflection* true)
 
-;; Allow the file to be reloaded in Clojure, undoing some weirdness below
-#+clj (do (ns-unmap *ns* 'String) (ns-unmap *ns* 'Number)
-          (import 'java.lang.String 'java.lang.Number))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
 (defprotocol Schema
-  (check [this x]
-    "Check that x satisfies this schema, returning nil for success or a datum that looks
-     like the 'bad' parts of x with ValidationErrors at the leaves describing the error.
+  (walker [this subschema->walker]
+    "Produce a function that takes [data], and either returns a walked version of data
+     (by default, usually just data), or a utils/ErrorContainer containing value that looks
+     like the 'bad' parts of data with ValidationErrors at the leaves describing the failures.
 
-     Examples:
-     user> (s/check s/Keyword :a)
-     nil
+     If this is a leaf schema, subschema->walker is not called.
 
-     user> (s/check s/Keyword 'a)
-     (not (keyword? a)) ;; pretty-printed validation error in clojure
+     If this is a composite schema, should let-bind (subschema->walker sub-schema) for each
+     subschema outside the returned fn.  Within the returned fn, should break down data
+     into constituents, call the let-bound subschema walkers on each component, and then
+     reassemble the components into a walked version of the data (or an ErrorContainer
+     describing the validaiton failures).
 
-     user> (s/check {:a s/Keyword :b [s/Int]}
-                    {:a :z        :b [1 :whoops 3]})
-     {:b [nil (not (integer? :whoops)) nil]}")
+     Attempting to walk a value that already contains a utils/ErrorContainer produces undefined
+     behavior.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
      also expanding classes schematas at the leaves.  Example:
@@ -125,6 +122,23 @@
     (prefer-method print-method schema.core.Schema java.util.Map)
     (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
 
+(defn identity-walker
+  "A walker that just does pure checking/walking, with no added bells or whistles."
+  [schema]
+  (walker schema identity-walker))
+
+(defn checker
+  "Compile an efficient checker for schema, which returns nil for valid values and
+   error descriptions otherwise."
+  [schema]
+  (comp utils/error-val (identity-walker schema)))
+
+(defn check
+  "Return nil if x matches schema; otherwise, returns a value that looks like the
+   'bad' parts of x with ValidationErrors at the leaves describing the failures."
+  [schema x]
+  ((checker schema) x))
+
 (defn validate
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
@@ -133,66 +147,81 @@
                    {:schema schema :value value :error error}))
   value)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Platform-specific leaf Schemas
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Simple Schemas
+;; On the JVM, a Class itself is a schema. In JS, we treat functions as prototypes so any
+;; function prototype checks objects for compatibility.
 
-;;; The schemas here are defined as records (rather than reify), so they behave like data
-;;; and print reasonably (even when not going through print-method/explain above).
+(extend-protocol Schema
+  #+clj Class
+  #+cljs js/Function
+  (walker [this subschema->walker]
+    (let [class-walker (if-let [more-schema (utils/class-schema this)]
+                         ;; do extra validation for records and such
+                         (subschema->walker more-schema)
+                         identity)]
+      (fn [x]
+        (or (when #+clj (not (instance? this x))
+                  #+cljs (or (nil? x)
+                             (not (or (identical? this (.-constructor x))
+                                      (js* "~{} instanceof ~{}" x this))))
+                  (macros/validation-error this x (list 'instance? this (utils/value-name x))))
+            (class-walker x)))))
+  (explain [this]
+    (if-let [more-schema (utils/class-schema this)]
+      (explain more-schema)
+      #+clj (symbol (.getName ^Class this)) #+cljs this)))
 
 
-;;; Any(thing)
+;; On the JVM, the primitive coercion functions (double, long, etc)
+;; alias to the corresponding boxed number classes
+
+#+clj
+(do
+  (defmacro extend-primitive [cast-sym class-sym]
+    `(extend-protocol Schema
+       ~cast-sym
+       (walker [this# subschema->walker#]
+         (subschema->walker# ~class-sym))
+       (explain [this#]
+         (explain ~class-sym))))
+
+  (extend-primitive clojure.core$double Double)
+  (extend-primitive clojure.core$float Float)
+  (extend-primitive clojure.core$long Long)
+  (extend-primitive clojure.core$int Integer)
+  (extend-primitive clojure.core$short Short)
+  (extend-primitive clojure.core$char Character)
+  (extend-primitive clojure.core$byte Byte)
+  (extend-primitive clojure.core$boolean Boolean))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Cross-platform Schema leaves
+
+;;; Any matches anything (including nil)
 
 (defrecord AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
   ;; loses type info, which makes this unusable in schema-fn.
   ;; http://dev.clojure.org/jira/browse/CLJ-1196
   Schema
-  (check [this x] nil)
+  (walker [this _] identity)
   (explain [this] 'Any))
 
 (def Any
   "Any value, including nil."
   (AnythingSchema. nil))
 
-
-;;; maybe (nil)
-
-(defrecord Maybe [schema]
-  Schema
-  (check [this x]
-    (when-not (nil? x)
-      (check schema x)))
-  (explain [this] (list 'maybe (explain schema))))
-
-(defn maybe
-  "A value that must either be nil or satisfy schema"
-  [schema]
-  (Maybe. schema))
-
-
-;;; named (schema elements)
-
-(defrecord NamedSchema [schema name]
-  Schema
-  (check [this x]
-    (when-let [err (check schema x)]
-      (utils/->NamedError name err)))
-  (explain [this] (list 'named (explain schema) name)))
-
-(defn named
-  "A value that must satisfy schema, and has a name for documentation purposes."
-  [schema name]
-  (NamedSchema. schema name))
-
-
 ;;; eq (to a single allowed value)
 
 (defrecord EqSchema [v]
   Schema
-  (check [this x]
-    (when-not (= v x)
-      (macros/validation-error this x (list '= v (utils/value-name x)))))
+  (walker [this _]
+    (fn [x]
+      (if (= v x)
+        x
+        (macros/validation-error this x (list '= v (utils/value-name x))))))
   (explain [this] (list 'eq v)))
 
 (defn eq
@@ -205,9 +234,11 @@
 
 (defrecord EnumSchema [vs]
   Schema
-  (check [this x]
-    (when-not (contains? vs x)
-      (macros/validation-error this x (list vs (utils/value-name x)))))
+  (walker [this _]
+    (fn [x]
+      (if (contains? vs x)
+        x
+        (macros/validation-error this x (list vs (utils/value-name x))))))
   (explain [this] (cons 'enum vs)))
 
 (defn enum
@@ -216,70 +247,15 @@
   (EnumSchema. (set vs)))
 
 
-;;; either (satisfies this schema or that one)
-
-(defrecord Either [schemas]
-  Schema
-  (check [this x]
-    (when (every? #(check % x) schemas)
-      (macros/validation-error this x
-                               (list 'every? (list 'check '% (utils/value-name x)) 'schemas))))
-  (explain [this] (cons 'either (map explain schemas))))
-
-(defn either
-  "A value that must satisfy at least one schema in schemas."
-  [& schemas]
-  (Either. schemas))
-
-
-;;; both (satisfies this schema and that one)
-
-(defrecord Both [schemas]
-  Schema
-  (check [this x]
-    (when-let [errors (seq (keep #(check % x) schemas))]
-      (if (= 1 (count errors))
-        (first errors)
-        (macros/validation-error this x (list 'empty? (vec errors))))))
-  (explain [this] (cons 'both (map explain schemas))))
-
-(defn both
-  "A value that must satisfy every schema in schemas."
-  [& schemas]
-  (Both. schemas))
-
-
-;;; protocol (which value must satisfy?)
-
-(defn protocol-name [protocol]
-  #+clj (-> protocol :p :var meta :name)
-  #+cljs (-> protocol meta :proto-sym))
-
-;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
-;; and put it in metadata of the record so that equality is preserved, along with the name.
-(defrecord Protocol [p]
-  Schema
-  (check [this x]
-    (when-not #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
-              (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x)))))
-  (explain [this] (list 'protocol (protocol-name this))))
-
-#+clj ;; The cljs version is macros/protocol
-(defn protocol
-  "A value that must satsify? protocol p"
-  [p]
-  (macros/assert! (:on p) "Cannot make protocol schema for non-protocol %s" p)
-  (Protocol. p))
-
-
-;;; predicate (which must return truthy for value)
+;;; pred (matches all values for which p? returns truthy)
 
 (defrecord Predicate [p? pred-name]
   Schema
-  (check [this x]
-    (when-let [reason (try (when-not (p? x) 'not)
-                           (catch #+clj Exception #+cljs js/Error e 'throws?))]
-      (macros/validation-error this x (list pred-name (utils/value-name x)) reason)))
+  (walker [this _]
+    (fn [x]
+      (if-let [reason (macros/try-catchall (when-not (p? x) 'not) (catch e 'throws?))]
+        (macros/validation-error this x (list pred-name (utils/value-name x)) reason)
+        x)))
   (explain [this]
     (cond (= p? integer?) 'Int
           (= p? keyword?) 'Keyword
@@ -295,14 +271,180 @@
      (Predicate. p? pred-name)))
 
 
+;;; protocol (which value must `satisfies?`)
+
+(defn protocol-name [protocol]
+  #+clj (-> protocol :p :var meta :name)
+  #+cljs (-> protocol meta :proto-sym))
+
+;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
+;; and put it in metadata of the record so that equality is preserved, along with the name.
+(defrecord Protocol [p]
+  Schema
+  (walker [this _]
+    (fn [x]
+      (if #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
+          x
+          (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x))))))
+  (explain [this] (list 'protocol (protocol-name this))))
+
+#+clj ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
+(defn protocol
+  "A value that must satsify? protocol p"
+  [p]
+  (macros/assert! (:on p) "Cannot make protocol schema for non-protocol %s" p)
+  (Protocol. p))
+
+
+;;; regex (validates matching Strings)
+
+(extend-protocol Schema
+  #+clj java.util.regex.Pattern
+  #+cljs js/RegExp
+  (walker [this _]
+    (fn [x]
+      (cond (not (string? x))
+            (macros/validation-error this x (list 'string? (utils/value-name x)))
+
+            (not (re-find this x))
+            (macros/validation-error this x (list 're-find
+                                                  (explain this)
+                                                  (utils/value-name x)))
+
+            :else x)))
+  (explain [this]
+    #+clj (symbol (str "#\"" this "\""))
+    #+cljs (symbol (str "#\"" (.slice (str this) 1 -1) "\""))))
+
+
+;;; Cross-platform Schemas for atomic value types
+
+(def Str
+  "Satisfied only by String.
+   Is (pred string?) and not js/String in cljs because of keywords."
+  #+clj java.lang.String #+cljs (pred string?))
+
+(def Num
+  "Any number"
+  #+clj java.lang.Number #+cljs js/Number)
+
+(def Int
+  "Any integral number"
+  (pred integer? 'integer?))
+
+(def Keyword
+  "A keyword"
+  (pred keyword? 'keyword?))
+
+(def Regex
+  "A regular expression"
+  #+clj java.util.regex.Pattern #+cljs js/RegExp)
+
+(def Inst
+  "The local representation of #inst ..."
+  #+clj java.util.Date #+cljs js/Date)
+
+(def Uuid
+  "The local representation of #uuid ..."
+  #+clj java.util.UUID #+cljs cljs.core/UUID)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Simple composite Schemas
+
+;;; maybe (nil)
+
+(defrecord Maybe [schema]
+  Schema
+  (walker [this subschema->walker]
+    (let [sub-walker (subschema->walker schema)]
+      (fn [x]
+        (when-not (nil? x)
+          (sub-walker x)))))
+  (explain [this] (list 'maybe (explain schema))))
+
+(defn maybe
+  "A value that must either be nil or satisfy schema"
+  [schema]
+  (Maybe. schema))
+
+
+;;; named (schema elements)
+
+(defrecord NamedSchema [schema name]
+  Schema
+  (walker [this subschema->walker]
+    (let [sub-walker (subschema->walker schema)]
+      (fn [x] (utils/wrap-error-name name (sub-walker x)))))
+  (explain [this] (list 'named (explain schema) name)))
+
+(defn named
+  "A value that must satisfy schema, and has a name for documentation purposes."
+  [schema name]
+  (NamedSchema. schema name))
+
+
+;;; either (satisfies this schema or that one)
+
+(defrecord Either [schemas]
+  Schema
+  (walker [this subschema->walker]
+    (let [sub-walkers (map subschema->walker schemas)]
+      (fn [x]
+        (loop [sub-walkers (seq sub-walkers)]
+          (if-not sub-walkers
+            (macros/validation-error
+             this x
+             (list 'every? (list 'check '% (utils/value-name x)) 'schemas))
+            (let [res ((first sub-walkers) x)]
+              (if-not (utils/error? res)
+                res
+                (recur (next sub-walkers)))))))))
+  (explain [this] (cons 'either (map explain schemas))))
+
+(defn either
+  "A value that must satisfy at least one schema in schemas."
+  [& schemas]
+  (Either. schemas))
+
+
+;;; both (satisfies this schema and that one)
+
+(defrecord Both [schemas]
+  Schema
+  (walker [this subschema->walker]
+    (let [sub-walkers (map subschema->walker schemas)]
+      ;; Both doesn't really have a clean semantics for non-identity walks, but we can
+      ;; do something pretty reasonable and assume we walk in order passing the result
+      ;; of each walk to the next, and failing at the first error
+      (fn [x]
+        (loop [x x sub-walkers (seq sub-walkers)]
+          (if-not sub-walkers
+            x
+            (let [res ((first sub-walkers) x)]
+              (if (utils/error? res)
+                res
+                (recur res (next sub-walkers)))))))))
+  (explain [this] (cons 'both (map explain schemas))))
+
+(defn both
+  "A value that must satisfy every schema in schemas."
+  [& schemas]
+  (Both. schemas))
+
+
 ;;; conditional (choice of schema, based on predicates on the value)
 
 (defrecord ConditionalSchema [preds-and-schemas]
   Schema
-  (check [this x]
-    (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-schemas))]
-      (check match x)
-      (macros/validation-error this x (list 'matches-some-condition? (utils/value-name x)))))
+  (walker [this subschema->walker]
+    (let [preds-and-walkers (map (fn [[pred schema]] [pred (subschema->walker schema)])
+                                 preds-and-schemas)]
+      (fn [x]
+        (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-walkers))]
+          (match x)
+          (macros/validation-error this x (list 'matches-some-condition? (utils/value-name x)))))))
   (explain [this]
     (->> preds-and-schemas
          (mapcat (fn [[pred schema]] [pred (explain schema)]))
@@ -332,24 +474,33 @@
 ;; Clojure (but not ClojureScript) vars.
 
 #+clj
-(do (defn var-name [v]
-      (let [{:keys [ns name]} (meta v)]
-        (symbol (str (ns-name ns) "/" name))))
+(do
+  (defn var-name [v]
+    (let [{:keys [ns name]} (meta v)]
+      (symbol (str (ns-name ns) "/" name))))
 
-    (defrecord Recursive [schema-var]
-      Schema
-      (check [this x]
-        (check @schema-var x))
-      (explain [this]
-        (list 'recursive (list 'var (var-name schema-var)))))
+  ;; TODO: revisit how to do this in less horrible way.
+  (def ^:dynamic ^:private *recursive-walkers* {})
 
-    (defn recursive
-      "Support for (mutually) recursive schemas by passing a var that points to a schema,
+  (defrecord Recursive [schema-var]
+    Schema
+    (walker [this subschema->walker]
+      (if-let [a (*recursive-walkers* schema-var)]
+        (fn [x] (@a x))
+        (let [a (atom nil)]
+          (binding [*recursive-walkers* (assoc *recursive-walkers* schema-var a)]
+            (reset! a (subschema->walker @schema-var))
+            @a))))
+    (explain [this]
+      (list 'recursive (list 'var (var-name schema-var)))))
+
+  (defn recursive
+    "Support for (mutually) recursive schemas by passing a var that points to a schema,
        e.g (recursive #'ExampleRecursiveSchema)."
-      [schema-var]
-      (when-not (var? schema-var)
-        (macros/error! (utils/format* "Not a var: %s" schema-var)))
-      (Recursive. schema-var)))
+    [schema-var]
+    (when-not (var? schema-var)
+      (macros/error! (utils/format* "Not a var: %s" schema-var)))
+    (Recursive. schema-var)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
@@ -372,7 +523,11 @@
 ;; mappings from integers to strings.
 
 
-;;; Definitions for required and optional keys
+;;; Definitions for required and optional keys, and single entry validators
+
+(def +missing+
+  "A sentinel value representing missing portions of the input data."
+  ::missing)
 
 (defrecord RequiredKey [k])
 
@@ -397,7 +552,6 @@
 (defn optional-key? [ks]
   (instance? OptionalKey ks))
 
-;;; Implementation helper functions
 
 (defn explicit-schema-key [ks]
   (cond (keyword? ks) ks
@@ -409,6 +563,59 @@
   (or (required-key? ks)
       (optional-key? ks)))
 
+;; A schema for a single map entry.  kspec is either a keyword, required or optional key,
+;; or key schema.  val-schema is a value schema.
+(defrecord MapEntry [kspec val-schema]
+  Schema
+  (walker [this subschema->walker]
+    (let [val-walker (subschema->walker val-schema)]
+      (if (specific-key? kspec)
+        (let [optional? (optional-key? kspec)
+              k (explicit-schema-key kspec)]
+          (fn [x]
+            (cond (identical? +missing+ x)
+                  (when-not optional?
+                    (utils/error [k 'missing-required-key]))
+
+                  (not (= 2 (count x)))
+                  (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+
+                  :else
+                  (let [[xk xv] x]
+                    (assert (= xk k))
+                    (let [vres (val-walker xv)]
+                      (if-let [ve (utils/error-val vres)]
+                        (utils/error [xk ve])
+                        [xk vres]))))))
+        (let [key-walker (subschema->walker kspec)]
+          (fn [x]
+            (if-not (= 2 (count x))
+              (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+              (let [out-k (key-walker (key x))
+                    out-ke (utils/error-val out-k)
+                    out-v (val-walker (val x))
+                    out-ve (utils/error-val out-v)]
+                (if (or out-ke out-ve)
+                  (utils/error [(or out-ke (key x)) (or out-ve 'invalid-key)])
+                  [out-k out-v]))))))))
+  (explain [this]
+    (list
+     'map-entry
+     (if (specific-key? kspec)
+       (if (keyword? kspec)
+         kspec
+         (list (cond (required-key? kspec) 'required-key
+                     (optional-key? kspec) 'optional-key)
+               (explicit-schema-key kspec)))
+       (explain kspec))
+     (explain val-schema))))
+
+(defn map-entry [kspec val-schema]
+  (MapEntry. kspec val-schema))
+
+
+;;; Implementation helper functions
+
 (defn- find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
     (macros/assert! (< (count key-schemata) 2)
@@ -416,68 +623,41 @@
                     (vec key-schemata))
     (first key-schemata)))
 
-(defn- check-explicit-key
-  "Validate a single schema key and dissoc the value from m"
-  [value [key-schema val-schema]]
-  (let [optional? (optional-key? key-schema)
-        k (explicit-schema-key key-schema)
-        present? (contains? value k)]
-    (cond (and (not optional?) (not present?))
-          [k 'missing-required-key]
-
-          present?
-          (when-let [error (check val-schema (get value k))]
-            [k error]))))
-
-(defn- check-extra-key
-  "Validate a single schema key and dissoc the value from m"
-  [key-schema val-schema [value-k value-v]]
-  (if-not key-schema
-    [value-k 'disallowed-key]
-    (if-let [error (check key-schema value-k)]
-      [error 'invalid-key]
-      (when-let [error (check val-schema value-v)]
-        [value-k error]))))
-
-(defn- check-map [map-schema value]
+(defn- map-walker [map-schema subschema->walker]
   (let [extra-keys-schema (find-extra-keys-schema map-schema)
-        extra-vals-schema (get map-schema extra-keys-schema)
-        explicit-schema (dissoc map-schema extra-keys-schema)
-        errors (concat
-                (keep #(check-explicit-key value %)
-                      explicit-schema)
-                (keep #(check-extra-key extra-keys-schema extra-vals-schema %)
-                      (apply dissoc value (map explicit-schema-key (keys explicit-schema)))))]
-    (when (seq errors)
-      (into {} errors))))
-
-
-;;; Extending the Schema protocol to Clojure maps.
-
-(defn- map-check [this x]
-  (if-not (map? x)
-    (macros/validation-error this x (list 'map? (utils/value-name x)))
-    (check-map this x)))
+        extra-walker (when extra-keys-schema
+                       (subschema->walker (apply map-entry (find map-schema extra-keys-schema))))
+        explicit-walkers (into {} (for [[k v] (dissoc map-schema extra-keys-schema)]
+                                    [(explicit-schema-key k) (subschema->walker (map-entry k v))]))
+        err-conj (utils/result-builder (constantly {}))]
+    (fn [x]
+      (if-not (map? x)
+        (macros/validation-error map-schema x (list 'map? (utils/value-name x)))
+        (loop [x x explicit-walkers (seq explicit-walkers) out {}]
+          (if-not explicit-walkers
+            (reduce
+             (if extra-walker
+               (fn [out e]
+                 (err-conj out (extra-walker e)))
+               (fn [out [k _]]
+                 (err-conj out (utils/error [k 'disallowed-key]))))
+             out
+             x)
+            (let [[wk wv] (first explicit-walkers)]
+              (recur (dissoc x wk)
+                     (next explicit-walkers)
+                     (err-conj out (wv (or (find x wk) +missing+)))))))))))
 
 (defn- map-explain [this]
-  (into {}
-        (for [[k v] this]
-          [(if (specific-key? k)
-             (if (keyword? k)
-               k
-               (list (cond (required-key? k) 'required-key
-                           (optional-key? k) 'optional-key)
-                     (explicit-schema-key k)))
-             (explain k))
-           (explain v)])))
+  (into {} (for [[k v] this] (vec (next (explain (map-entry k v)))))))
 
 (extend-protocol Schema
   #+clj clojure.lang.APersistentMap
   #+cljs cljs.core.PersistentArrayMap
-  (check [this x] (map-check this x))
+  (walker [this subschema->walker] (map-walker this subschema->walker))
   (explain [this] (map-explain this))
   #+cljs cljs.core.PersistentHashMap
-  #+cljs (check [this x] (map-check this x))
+  #+cljs (walker [this subschema->walker] (map-walker this subschema->walker))
   #+cljs (explain [this] (map-explain this)))
 
 
@@ -489,12 +669,16 @@
 (extend-protocol Schema
   #+clj clojure.lang.APersistentSet
   #+cljs cljs.core.PersistentHashSet
-  (check [this x]
+  (walker [this subschema->walker]
     (macros/assert! (= (count this) 1) "Set schema must have exactly one element")
-    (or (when-not (set? x)
-          (macros/validation-error this x (list 'set? (utils/value-name x))))
-        (when-let [out (seq (keep #(check (first this) %) x))]
-          (set out))))
+    (let [sub-walker (subschema->walker (first this))]
+      (fn [x]
+        (or (when-not (set? x)
+              (macros/validation-error this x (list 'set? (utils/value-name x))))
+            (let [[good bad] ((juxt remove keep) utils/error-val (map sub-walker x))]
+              (if (seq bad)
+                (utils/error (set bad))
+                (set good)))))))
   (explain [this] (set [(explain (first this))])))
 
 
@@ -530,37 +714,41 @@
 (extend-protocol Schema
   #+clj clojure.lang.APersistentVector
   #+cljs cljs.core.PersistentVector
-  (check [this x]
-    (or (when-not (or (nil? x) (sequential? x))
-          (macros/validation-error this x (list 'sequential? (utils/value-name x))))
-        (let [[singles multi] (parse-sequence-schema this)]
-          (#(when (some identity %) %)
-           (loop [singles singles x x out []]
-             (if-let [[^One first-single & more-singles] (seq singles)]
-               (if (empty? x)
-                 (if (.-optional? first-single)
-                   out
-                   (conj out
-                         (macros/validation-error
-                          (vec singles)
-                          nil
-                          (list* 'present?
-                                 (for [^One single singles
-                                       :while (not (.-optional? single))]
-                                   (.-name single))))))
-                 (recur more-singles
-                        (rest x)
-                        (conj out
-                              (when-let [err (check (.-schema first-single) (first x))]
-                                (utils/->NamedError (.-name first-single) err)))))
-               (cond multi
-                     (into out (map #(check multi %) x))
+  (walker [this subschema->walker]
+    (let [[singles multi] (parse-sequence-schema this)
+          single-walkers (for [^One s singles]
+                           [s (subschema->walker (.-schema s))])
+          multi-walker (when multi (subschema->walker multi))
+          err-conj (utils/result-builder (fn [m] (vec (repeat (count m) nil))))]
+      (fn [x]
+        (or (when-not (or (nil? x) (sequential? x))
+              (macros/validation-error this x (list 'sequential? (utils/value-name x))))
+            (loop [single-walkers single-walkers x x out []]
+              (if-let [[^One first-single single-walker] (first single-walkers)]
+                (if (empty? x)
+                  (if (.-optional? first-single)
+                    out
+                    (err-conj out
+                              (macros/validation-error
+                               (vec (map first single-walkers))
+                               nil
+                               (list* 'present?
+                                      (for [[^One single] single-walkers
+                                            :while (not (.-optional? single))]
+                                        (.-name single))))))
+                  (recur (next single-walkers)
+                         (rest x)
+                         (err-conj out
+                                   (utils/wrap-error-name
+                                    (.-name first-single)
+                                    (single-walker (first x))))))
+                (cond multi
+                      (reduce err-conj out (map multi-walker x))
 
-                     (seq x)
-                     (conj out (macros/validation-error nil x (list 'has-extra-elts? (count x))))
-
-                     :else
-                     out)))))))
+                      (seq x)
+                      (err-conj out (macros/validation-error nil x (list 'has-extra-elts? (count x))))
+                      :else
+                      out)))))))
   (explain [this]
     (let [[singles multi] (parse-sequence-schema this)]
       (vec
@@ -586,12 +774,20 @@
 
 (defrecord Record [klass schema]
   Schema
-  (check [this r]
-    (or (when-not (instance? klass r)
-          (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
-        (check-map schema r)
-        (when-let [f (:extra-validator-fn this)]
-          (check (pred f) r))))
+  (walker [this subschema->walker]
+    (let [map-checker (subschema->walker schema)
+          pred-checker (when-let [evf (:extra-validator-fn this)]
+                         (subschema->walker (pred evf)))]
+      (fn [r]
+        (or (when-not (instance? klass r)
+              (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
+            (let [res (map-checker r)]
+              (if (utils/error? res)
+                res
+                (let [pred-res (when pred-checker (pred-checker r))]
+                  (if (utils/error? pred-res)
+                    pred-res
+                    (merge r res)))))))))
   (explain [this]
     (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
@@ -620,9 +816,11 @@
 
 (defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
-  (check [this x] nil
-    (when-not (fn? x)
-      (macros/validation-error this x (list 'fn? (utils/value-name x)))))
+  (walker [this _]
+    (fn [x]
+      (if (fn? x)
+        x
+        (macros/validation-error this x (list 'fn? (utils/value-name x))))))
   (explain [this]
     (if (> (count input-schemas) 1)
       (list* '=>* (explain output-schema) (map explain-input-schema input-schemas))
@@ -653,119 +851,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Cross-platform Schema leaves, for writing Schemas that are valid in both clj and cljs.
-
-#+clj (ns-unmap *ns* 'String)
-(def String
-  "Satisfied only by String.
-   Is (pred string?) and not js/String in cljs because of keywords."
-  #+clj java.lang.String #+cljs (pred string?))
-
-#+clj (ns-unmap *ns* 'Number)
-(def Number
-  "Any number"
-  #+clj java.lang.Number #+cljs js/Number)
-
-(def Int
-  "Any integral number"
-  (pred integer? 'integer?))
-
-(def Keyword
-  "A keyword"
-  (pred keyword? 'keyword?))
-
-(def Regex
-  "Any Regular Expression"
-  #+clj java.util.regex.Pattern #+cljs js/RegExp)
-
-(def Inst
-  "The local representation of #inst ..."
-  #+clj java.util.Date #+cljs js/Date)
-
-(def Uuid
-  "The local representation of #uuid ..."
-  #+clj java.util.UUID #+cljs cljs.core/UUID)
-
-
-;;; Extending the Schema protocol to java.util.regex.Pattern
-
-(defn- explain-regex [regex]
-  #+clj (symbol (str "#\"" regex "\""))
-  #+cljs (symbol (str "#\"" (.slice (str regex) 1 -1) "\"")) )
-
-(extend-protocol Schema
-  #+clj java.util.regex.Pattern
-  #+cljs js/RegExp
-  (check [this x]
-    (if-not (string? x)
-      (macros/validation-error this x (list 'string? (utils/value-name x)))
-      (when-not (re-find this x)
-        (macros/validation-error this x (list 're-find
-                                              (explain-regex this)
-                                              (utils/value-name x))))))
-  (explain [this]
-    (explain-regex this)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Platform-specific Schemas
-
-;; On the JVM, a Class itself is a schema, and the primitive coercion functions (double, long,
-;; etc) match only instances of that concrete type (identical to Double, Long, etc).
-#+clj
-(do
-  (defn- check-class [schema class value]
-    (when-not (instance? class value)
-      (macros/validation-error schema value (list 'instance? class (utils/value-name value)))))
-
-  (extend-protocol Schema
-    Class
-    (check [this x]
-      (or (check-class this this x)
-          (when-let [more-schema (utils/class-schema this)]
-            (check more-schema x))))
-    (explain [this]
-      (if-let [more-schema (utils/class-schema this)]
-        (explain more-schema)
-        (symbol (.getName ^Class this)))))
-
-  ;; prevent coersion, so you have to be exactly the given type.
-  (defmacro extend-primitive [cast-sym class-sym]
-    `(extend-protocol Schema
-       ~cast-sym
-       (check [this# x#]
-         (check-class ~cast-sym ~class-sym x#))
-       (explain [this#] '~(symbol (last (.split (name cast-sym) "\\$"))))))
-
-  (extend-primitive clojure.core$double Double)
-  (extend-primitive clojure.core$float Float)
-  (extend-primitive clojure.core$long Long)
-  (extend-primitive clojure.core$int Integer)
-  (extend-primitive clojure.core$short Short)
-  (extend-primitive clojure.core$char Character)
-  (extend-primitive clojure.core$byte Byte)
-  (extend-primitive clojure.core$boolean Boolean))
-
-;; On JS, we treat functions as prototypes so any function prototype checks
-;; objects for compatibility (Prototype constructor hack)
-#+cljs
-(extend-protocol Schema
-  js/Function
-  (check [this x]
-    (if-let [schema (utils/class-schema this)]
-      (check schema x)
-      ;; Am I from this proto
-      (when (or (nil? x)
-                (not (or (identical? this (.-constructor x))
-                         (js* "~{} instanceof ~{}" x this))))
-        (macros/validation-error this x (list 'instance? this (utils/value-name x))))))
-  (explain [this]
-    (if-let [more-schema (utils/class-schema this)]
-      (explain more-schema)
-      this)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized records and functions
+;;; Schematized defrecord and (de)fn macros
 
 ;; In Clojure, we can suck the defrecord/fn/defn macros into this namespace
 ;; In ClojureScript, you have to use them from clj schema.macros

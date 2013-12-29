@@ -23,37 +23,59 @@
 (deftest compiling-cljs?-test
   (is (= #+cljs true #+clj false (sm/compiling-cljs-now?))))
 
+(deftest try-catchall-test
+  (let [a (atom 0)]
+    (is (= 2 (sm/try-catchall (reset! a 1) (swap! a inc) (catch e (swap! a - 10)))))
+    (is (= 2 @a)))
+  (let [a (atom 0)]
+    (is (= -9 (sm/try-catchall (reset! a 1) (swap! a read-string) (catch e (swap! a - 10)))))
+    (is (= -9 @a))))
+
 (deftest validate-return-test
   (is (= 1 (s/validate s/Int 1))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Simple Schemas
+;;; Platform-specific leaf Schemas
+
+#+clj
+(do
+  (deftest class-test
+    (valid! String "a")
+    (invalid! String nil "(not (instance? java.lang.String nil))")
+    (invalid! String :a "(not (instance? java.lang.String :a))")
+    (is (= 'java.lang.String (s/explain String))))
+
+  (deftest primitive-test
+    (valid! double 1.0)
+    (invalid! double (float 1.0) "(not (instance? java.lang.Double 1.0))")
+    (is (= 'java.lang.Double (s/explain double)))
+    (valid! float (float 1.0))
+    (invalid! float 1.0)
+    (valid! long 1)
+    (invalid! long (byte 1))
+    (valid! boolean true)
+    (invalid! boolean 1)
+    (doseq [f [byte char short int]]
+      (valid! f (f 1))
+      (invalid! f 1)))
+
+  (deftest array-test
+    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
+    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
+    (valid! (Class/forName "[D") (double-array [1.0]))
+    (invalid! (Class/forName "[D") (into-array Double [1.0]))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Cross-platform Schema leaves
 
 (deftest any-test
   (valid! s/Any 10)
   (valid! s/Any nil)
   (valid! s/Any :whatever)
   (is (= 'Any (s/explain s/Any))))
-
-(deftest regex-test
-  (valid! #"lex" "Alex B")
-  (valid! #"lex" "lex")
-  (invalid! #"lex" nil "(not (string? nil))")
-  (invalid! #"lex" "Ale" "(not (re-find #\"lex\" \"Ale\"))")
-  (is (= (symbol "#\"lex\"") (s/explain #"lex"))))
-
-(deftest maybe-test
-  (let [schema (s/maybe s/Int)]
-    (valid! schema nil)
-    (valid! schema 1)
-    (invalid! schema 1.1 "(not (integer? 1.1))")
-    (is (= '(maybe Int) (s/explain schema)))))
-
-(deftest named-test
-  (let [schema (s/named s/Int :score)]
-    (valid! schema 12)
-    (invalid! schema :a "(named (not (integer? :a)) :score)")
-    (is (= '(named Int :score) (s/explain schema)))))
 
 (deftest eq-test
   (let [schema (s/eq 10)]
@@ -69,28 +91,12 @@
     (invalid! schema 2 "(not (#{1 :a :b} 2))")
     (is (= '(1 :a :b enum) (sort-by str (s/explain schema))))))
 
-(deftest either-test
-  (let [schema (s/either
-                {:num s/Int}
-                {:str s/String})]
-    (valid! schema {:num 1})
-    (valid! schema {:str "hello"})
-    (invalid! schema {:num "bad!"})
-    (invalid! schema {:str 1})
-    (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
-    (is (s/explain schema))))
-
-(deftest both-test
-  (let [schema (s/both
-                (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)) 'equal-keys?)
-                {s/Keyword s/Keyword})]
-    (valid! schema {})
-    (valid! schema {:foo :foo :bar :bar})
-    (invalid! schema {"foo" "foo"})
-    (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
-    (invalid! schema {:foo 1} "(not (empty? [(not (equal-keys? {:foo 1})) {:foo (not (keyword? 1))}]))")
-    (is (= '(both (pred vector?) [Int])
-           (s/explain (s/both (s/pred vector? 'vector?) [s/Int]))))))
+(deftest pred-test
+  (let [schema (s/pred odd? 'odd?)]
+    (valid! schema 1)
+    (invalid! schema 2 "(not (odd? 2))")
+    (invalid! schema :foo "(throws? (odd? :foo))")
+    (is (= '(pred odd?) (s/explain schema)))))
 
 (defprotocol ATestProtocol)
 (def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
@@ -107,16 +113,97 @@
     (invalid! schema 117 "(not (satisfies? ATestProtocol 117))")
     (is (= '(protocol ATestProtocol) (s/explain schema)))))
 
-(deftest pred-test
-  (let [schema (s/pred odd? 'odd?)]
+(deftest regex-test
+  (valid! #"lex" "Alex B")
+  (valid! #"lex" "lex")
+  (invalid! #"lex" nil "(not (string? nil))")
+  (invalid! #"lex" "Ale" "(not (re-find #\"lex\" \"Ale\"))")
+  (is (= (symbol "#\"lex\"") (s/explain #"lex"))))
+
+(deftest leaf-string-test
+  (valid! s/Str "asdf")
+  (invalid! s/Str nil "(not (instance? java.lang.String nil))")
+  (invalid! s/Str :a "(not (instance? java.lang.String :a))")
+  #+clj (is (= 'java.lang.String (s/explain s/Str))))
+
+(deftest leaf-number-test
+  (valid! s/Num 1)
+  (valid! s/Num 1.2)
+  (valid! s/Num (/ 1 2))
+  (invalid! s/Num nil "(not (instance? java.lang.Number nil))")
+  (invalid! s/Num "1" "(not (instance? java.lang.Number \"1\"))")
+  #+clj (is (= 'java.lang.Number (s/explain s/Num))))
+
+(deftest leaf-int-test
+  (valid! s/Int 1)
+  (invalid! s/Int 1.2 "(not (integer? 1.2))")
+  #+clj (invalid! s/Int 1.0 "(not (integer? 1.0))")
+  (invalid! s/Int nil "(not (integer? nil))")
+  (is (= 'Int (s/explain s/Int))))
+
+(deftest leaf-keyword-test
+  (valid! s/Keyword :a)
+  (valid! s/Keyword ::a)
+  (invalid! s/Keyword nil "(not (keyword? nil))")
+  (invalid! s/Keyword ":a" "(not (keyword? \":a\"))")
+  (is (= 'Keyword (s/explain s/Keyword))))
+
+(deftest leaf-regex-test
+  (valid! s/Regex #".*")
+  (invalid! s/Regex ".*"))
+
+(deftest leaf-inst-test
+  (valid! s/Inst #inst "2013-01-01T01:15:01.840-00:00")
+  (invalid! s/Inst "2013-01-01T01:15:01.840-00:00"))
+
+(deftest leaf-uuid-test
+  (valid! s/Uuid #uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf")
+  (invalid! s/Uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf"))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Simple composite Schemas
+
+(deftest maybe-test
+  (let [schema (s/maybe s/Int)]
+    (valid! schema nil)
     (valid! schema 1)
-    (invalid! schema 2 "(not (odd? 2))")
-    (invalid! schema :foo "(throws? (odd? :foo))")
-    (is (= '(pred odd?) (s/explain schema)))))
+    (invalid! schema 1.1 "(not (integer? 1.1))")
+    (is (= '(maybe Int) (s/explain schema)))))
+
+(deftest named-test
+  (let [schema (s/named s/Int :score)]
+    (valid! schema 12)
+    (invalid! schema :a "(named (not (integer? :a)) :score)")
+    (is (= '(named Int :score) (s/explain schema)))))
+
+(deftest either-test
+  (let [schema (s/either
+                {:num s/Int}
+                {:str s/Str})]
+    (valid! schema {:num 1})
+    (valid! schema {:str "hello"})
+    (invalid! schema {:num "bad!"})
+    (invalid! schema {:str 1})
+    (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
+    (is (s/explain schema))))
+
+(deftest both-test
+  (let [schema (s/both
+                (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)) 'equal-keys?)
+                {s/Keyword s/Keyword})]
+    (valid! schema {})
+    (valid! schema {:foo :foo :bar :bar})
+    (invalid! schema {"foo" "foo"})
+    (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
+    (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
+    (is (= '(both (pred vector?) [Int])
+           (s/explain (s/both (s/pred vector? 'vector?) [s/Int]))))))
 
 (deftest conditional-test
-  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Number}
-                              #(= (:type %) :bar) {:type (s/eq :bar) :baz s/String})]
+  (let [schema (s/conditional #(= (:type %) :foo) {:type (s/eq :foo) :baz s/Num}
+                              #(= (:type %) :bar) {:type (s/eq :bar) :baz s/Str})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
@@ -127,8 +214,8 @@
 
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
-                 {:type (s/eq :foo) :baz s/Number}
-                 {:type (s/eq :bar) :baz s/String})]
+                 {:type (s/eq :foo) :baz s/Num}
+                 {:type (s/eq :bar) :baz s/Str})]
     (valid! schema {:type :foo :baz 10})
     (valid! schema {:type :bar :baz "10"})
     (invalid! schema {:type :foo :baz "10"})
@@ -138,11 +225,11 @@
 
 #+clj
 (do (def NestedVecs
-      [(s/one s/Number "Node ID")
+      [(s/one s/Num "Node ID")
        (s/recursive #'NestedVecs)])
 
     (def NestedMaps
-      {:node-id s/Number
+      {:node-id s/Num
        (s/optional-key :children) [(s/recursive #'NestedMaps)]})
 
     (declare BlackNode)
@@ -187,7 +274,7 @@
     (valid! schema {})
     (valid! schema {:a 1 :b 2})
     (invalid! schema {'a 1 :b 2} "{(not (keyword? a)) invalid-key}")
-    (invalid! schema {:a :a :b :b} "{:a (not (integer? :a)), :b (not (integer? :b))}")
+    (invalid! schema {:a :a :b :b} "{:b (not (integer? :b)), :a (not (integer? :a))}")
     (is (= '{Keyword Int} (s/explain {s/Keyword s/Int})))))
 
 (deftest simple-specific-key-map-test
@@ -204,7 +291,7 @@
 
 (deftest fancier-map-schema-test
   (let [schema {:foo s/Int
-                s/String s/Number}]
+                s/Str s/Num}]
     (valid! schema {:foo 1})
     (valid! schema {:foo 1 "bar" 2.0})
     (valid! schema {:foo 1 "bar" 2.0 "baz" 10.0})
@@ -215,7 +302,7 @@
 
 (deftest another-fancy-map-schema-test
   (let [schema {:foo (s/maybe s/Int)
-                (s/optional-key :bar) s/Number
+                (s/optional-key :bar) s/Num
                 :baz {:b1 (s/pred odd?)}
                 s/Keyword s/Any}]
     (valid! schema {:foo 1 :bar 1.0 :baz {:b1 3}})
@@ -235,7 +322,7 @@
 
 (deftest simple-set-test
   (testing "set schemas must have exactly one entry"
-    (is (thrown? Exception (s/check #{s/Int s/Number} #{})))
+    (is (thrown? Exception (s/check #{s/Int s/Num} #{})))
     (is (thrown? Exception (s/check #{} #{}))))
 
   (testing "basic set identification"
@@ -281,7 +368,7 @@
     (invalid! schema [1 2 1.1])))
 
 (deftest simple-one-seq-test
-  (let [schema [(s/one s/Int "int") (s/one s/String "str")]]
+  (let [schema [(s/one s/Int "int") (s/one s/Str "str")]]
     (valid! schema [1 "a"])
     (invalid! schema [1])
     (invalid! schema [1 1.0 2])
@@ -290,7 +377,7 @@
 
 (deftest optional-seq-test
   (let [schema [(s/one s/Int "int")
-                (s/optional s/String "str")
+                (s/optional s/Str "str")
                 (s/optional s/Int "int2")]]
     (valid! schema [1])
     (valid! schema [1 "a"])
@@ -315,7 +402,7 @@
     (is (= '[(one (maybe Int) :maybe-long) (optional Keyword :key) Int] (s/explain schema)))))
 
 (deftest pair-test
-  (let [schema (s/pair s/String "user-name" s/Int "count")]
+  (let [schema (s/pair s/Str "user-name" s/Int "count")]
     (valid! schema ["user1" 42])
     (invalid! schema ["user2" 42.1])
     (invalid! schema [42 "user1"])
@@ -368,82 +455,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Cross-platform Schema leaves, for writing Schemas that are valid in both clj and cljs.
-
-(deftest leaf-string-test
-  (valid! s/String "asdf")
-  (invalid! s/String nil "(not (instance? java.lang.String nil))")
-  (invalid! s/String :a "(not (instance? java.lang.String :a))")
-  #+clj (is (= 'java.lang.String (s/explain s/String))))
-
-(deftest leaf-number-test
-  (valid! s/Number 1)
-  (valid! s/Number 1.2)
-  (valid! s/Number (/ 1 2))
-  (invalid! s/Number nil "(not (instance? java.lang.Number nil))")
-  (invalid! s/Number "1" "(not (instance? java.lang.Number \"1\"))")
-  #+clj (is (= 'java.lang.Number (s/explain s/Number))))
-
-(deftest leaf-int-test
-  (valid! s/Int 1)
-  (invalid! s/Int 1.2 "(not (integer? 1.2))")
-  #+clj (invalid! s/Int 1.0 "(not (integer? 1.0))")
-  (invalid! s/Int nil "(not (integer? nil))")
-  (is (= 'Int (s/explain s/Int))))
-
-(deftest leaf-keyword-test
-  (valid! s/Keyword :a)
-  (valid! s/Keyword ::a)
-  (invalid! s/Keyword nil "(not (keyword? nil))")
-  (invalid! s/Keyword ":a" "(not (keyword? \":a\"))")
-  (is (= 'Keyword (s/explain s/Keyword))))
-
-(deftest leaf-regex-test
-  (valid! s/Regex #".*")
-  (invalid! s/Regex ".*"))
-
-(deftest leaf-inst-test
-  (valid! s/Inst #inst "2013-01-01T01:15:01.840-00:00")
-  (invalid! s/Inst "2013-01-01T01:15:01.840-00:00"))
-
-(deftest leaf-uuid-test
-  (valid! s/Uuid #uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf")
-  (invalid! s/Uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Platform-specific Schemas
-
-#+clj
-(do
-  (deftest class-test
-    (valid! String "a")
-    (invalid! String nil "(not (instance? java.lang.String nil))")
-    (invalid! String :a "(not (instance? java.lang.String :a))")
-    (is (= 'java.lang.String (s/explain String))))
-
-  (deftest primitive-test
-    (valid! double 1.0)
-    (invalid! double (float 1.0) "(not (instance? java.lang.Double 1.0))")
-    (is (= 'double (s/explain double)))
-    (valid! float (float 1.0))
-    (invalid! float 1.0)
-    (valid! long 1)
-    (invalid! long (byte 1))
-    (valid! boolean true)
-    (invalid! boolean 1)
-    (doseq [f [byte char short int]]
-      (valid! f (f 1))
-      (invalid! f 1)))
-
-  (deftest array-test
-    (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
-    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
-    (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
-    (valid! (Class/forName "[D") (double-array [1.0]))
-    (invalid! (Class/forName "[D") (into-array Double [1.0]))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
 (defmacro test-normalized-meta [symbol ex-schema desired-meta]
@@ -484,29 +495,29 @@
 ;; exercies some different arities
 
 (sm/defrecord Bar
-    [^s/Int foo ^s/String bar]
+    [^s/Int foo ^s/Str bar]
   {(s/optional-key :baz) s/Keyword})
 
 (sm/defrecord Bar2
-    [^s/Int foo ^s/String bar]
+    [^s/Int foo ^s/Str bar]
   {(s/optional-key :baz) s/Keyword}
   PProtocol
   (do-something [this] 2))
 
 (sm/defrecord Bar3
-    [^s/Int foo ^s/String bar]
+    [^s/Int foo ^s/Str bar]
   PProtocol
   (do-something [this] 3))
 
 (sm/defrecord Bar4
-    [^{:s [s/Int]} foo ^{:s? {s/String s/String}} bar]
+    [^{:s [s/Int]} foo ^{:s? {s/Str s/Str}} bar]
   PProtocol
   (do-something [this] 4))
 
 (deftest defrecord-schema-test
   (is (= (utils/class-schema Bar)
          (s/record Bar {:foo s/Int
-                        :bar s/String
+                        :bar s/Str
                         (s/optional-key :baz) s/Keyword})))
   (is (Bar. 1 :foo))
   (is (= #{:foo :bar} (set (keys (map->Bar {:foo 1})))))
@@ -532,14 +543,14 @@
 
 (sm/defrecord BarNewStyle
     [foo :- s/Int
-     bar :- s/String
+     bar :- s/Str
      zoo]
   {(s/optional-key :baz) s/Keyword})
 
 (deftest defrecord-new-style-schema-test
   (is (= (utils/class-schema BarNewStyle)
          (s/record BarNewStyle {:foo s/Int
-                                :bar s/String
+                                :bar s/Str
                                 :zoo s/Any
                                 (s/optional-key :baz) s/Keyword})))
   (is (BarNewStyle. 1 :foo "a"))
@@ -555,7 +566,7 @@
 ;; Now test that schemata and protocols work as type hints.
 ;; (auto-detecting protocols only works in clj currently)
 
-(def LongOrString (s/either s/Int s/String))
+(def LongOrString (s/either s/Int s/Str))
 
 #+clj (sm/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
 #+clj (sm/defrecord NestedNew [b :- Bar4 c :- LongOrString p :- PProtocol])
@@ -635,10 +646,10 @@
 
 (def +test-fn-schema+
   "Schema for (s/fn ^String [^OddLong x y])"
-  (sm/=> s/String OddLong s/Any))
+  (sm/=> s/Str OddLong s/Any))
 
 (deftest simple-validated-meta-test
-  (let [f (sm/fn ^s/String foo [^OddLong arg0 arg1])]
+  (let [f (sm/fn ^s/Str foo [^OddLong arg0 arg1])]
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
 (deftest no-schema-fn-test
@@ -698,9 +709,9 @@
 
 (deftest two-arity-fn-test
   (let [f (sm/fn foo :- s/Int
-            ([^s/String arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
-            ([^s/String arg0] (parse-long arg0)))]
-    (is (= (sm/=>* s/Int [s/String] [s/String s/Int])
+            ([^s/Str arg0 ^s/Int arg1] (+ arg1 (foo arg0)))
+            ([^s/Str arg0] (parse-long arg0)))]
+    (is (= (sm/=>* s/Int [s/Str] [s/Str s/Int])
            (s/fn-schema f)))
     (is (= 3 (f "3")))
     (is (= 10 (f "3" 7)))))
@@ -708,9 +719,9 @@
 (deftest infinite-arity-fn-test
   (let [f (sm/fn foo :- s/Int
             ([^s/Int arg0] (inc arg0))
-            ([^s/Int arg0  & ^{:s [s/String]} strs]
+            ([^s/Int arg0  & ^{:s [s/Str]} strs]
                (reduce + (foo arg0) (map count strs))))]
-    (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/String]])
+    (is (= (sm/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
     (sm/with-fn-validation
       (is (= 5 (f 4)))
@@ -765,7 +776,7 @@
 ;;; defn
 
 (def OddLongString
-  (s/both s/String (s/pred #(odd? (parse-long %)) 'odd-str?)))
+  (s/both s/Str (s/pred #(odd? (parse-long %)) 'odd-str?)))
 
 (sm/defn ^{:s OddLongString :tag String} simple-validated-defn
   "I am a simple schema fn"
@@ -781,7 +792,7 @@
 
 (sm/defn validated-pre-post-defn :- OddLong
   "I have pre/post conditions"
-  [arg0 :- s/Number]
+  [arg0 :- s/Num]
   {:pre  [(odd? arg0) (> 10 arg0)]
    :post [(odd? %)    (<  5 %)]}
   arg0)
@@ -829,7 +840,7 @@
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
       (let [{:keys [tag schema metadata]} (meta v)]
-        #+clj (is (= tag s/String))
+        #+clj (is (= tag s/Str))
         (is (= +simple-validated-defn-schema+ schema))
         (is (= metadata :bla)))
       (is (= +simple-validated-defn-schema+ (s/fn-schema @v)))
@@ -927,7 +938,7 @@
                     :c :whatever})
     (invalid! schema {:a #{[1 2 3 4] [] [1 2] [:a :b]}
                       :b [1 :a]}
-              "{:a #{[(not (integer? :a)) (not (integer? :b))]}, :b [(named (not (keyword? 1)) :k) (not (integer? :a))], :c missing-required-key}")))
+              "{:c missing-required-key, :b [(named (not (keyword? 1)) :k) (not (integer? :a))], :a #{[(not (integer? :a)) (not (integer? :b))]}}")))
 
 (sm/defrecord Explainer
     [^s/Int foo ^s/Keyword bar]
@@ -949,13 +960,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Helpers for defining schemas (used in in-progress work, expanlation coming soon)
 
-(sm/defschema TestFoo {:bar s/String})
+(sm/defschema TestFoo {:bar s/Str})
 
 (deftest test-defschema
   (is (= 'TestFoo (:name (meta TestFoo)))))
 
 (deftest schema-with-name-test
-  (let [schema (s/schema-with-name {:baz s/Number} 'Baz)]
+  (let [schema (s/schema-with-name {:baz s/Num} 'Baz)]
     (valid! schema {:baz 123})
     (invalid! schema {:baz "abc"})
     (is (= 'Baz (s/schema-name schema)))))
