@@ -6,7 +6,7 @@
 
 #+clj
 (do
-  (s/defn test-fn :- s/String [] 5)
+  (s/defn test-fn :- s/Str [] 5)
 
   (deftest validation-off-test
     (is (= 5 (test-fn))))

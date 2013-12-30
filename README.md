@@ -20,11 +20,11 @@ A Schema is just a Clojure(Script) data structure describing a data shape, which
 (ns schema-examples
   (:require [schema.core :as s]))
 
-;; s/Any, s/Number, s/Keyword, s/Integer, and s/String are cross-platform schemas.
+;; s/Any, s/Num, s/Keyword, s/Integer, and s/Str are cross-platform schemas.
 
-(s/validate s/Number 42)  
+(s/validate s/Num 42)  
 ;; 42
-(s/validate s/Number "42")
+(s/validate s/Num "42")
 ;; RuntimeException: Value does not match schema: (not (instance java.lang.Number "42")) 
 
 (s/validate s/Keyword :whoa)  
@@ -43,7 +43,7 @@ From these simple building blocks, we can build up more complex schemas that loo
 
 ```clojure 
 ;; list of strings 
-(s/validate [s/String] ["a" "b" "c"])
+(s/validate [s/Str] ["a" "b" "c"])
 
 ;; nested map from long to String to double
 (s/validate {long {String double}} {1 {"2" 3.0 "4" 5.0}})
@@ -52,7 +52,7 @@ From these simple building blocks, we can build up more complex schemas that loo
 Since schemas are just data, you can also `def` them and reuse and compose them as you would expect:
 
 ```clojure 
-(def StringList [s/String])
+(def StringList [s/Str])
 (def StringScores {String double})
 (def StringScoreMap {long StringScores}) 
 ```
@@ -100,11 +100,11 @@ Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, 
 
 (sm/defrecord StampedNames
   [date :- Long
-   names :- [s/String]])
+   names :- [s/Str]])
    
 (sm/defn stamped-names :- StampedNames
   "names is a list of Strings"
-  [names :- [s/String]]
+  [names :- [s/Str]]
   (StampedNames. (str (System/currentTimeMillis)) names))
 ```
 
@@ -173,7 +173,7 @@ Longer-term, we have lots more in store for Schema. Just a few of the crazy idea
 In addition to uniform maps (like String to double), map schemas can also capture maps with specific key requirements:
 
 ```clojure
-(def FooBar {(s/required-key :foo) s/String (s/required-key :bar) s/Keyword})
+(def FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
 
 (s/validate FooBar {:foo "f" :bar :b})
 ;; {:foo "f" :bar :b}
@@ -184,7 +184,7 @@ In addition to uniform maps (like String to double), map schemas can also captur
 ;;   :bar missing-required-key}
 ```
 
-For the special case of keywords, you can omit the `required-key`, like `{:foo s/String :bar s/Keyword}`. You can also provide specific optional keys, and combine specific keys with generic schemas for the remaining key-value mappings:
+For the special case of keywords, you can omit the `required-key`, like `{:foo s/Str :bar s/Keyword}`. You can also provide specific optional keys, and combine specific keys with generic schemas for the remaining key-value mappings:
 
 ```clojure
 
@@ -192,7 +192,7 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
   "If foo is present, it must map to a Keyword.  Any number of additional 
    String-String mappings are allowed as well."
   {(s/optional-key :foo) s/Keyword 
-    s/String s/String})
+    s/Str s/Str})
 
 (s/validate FancyMap {"a" "b"})
 
@@ -207,9 +207,9 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (def FancySeq 
   "A sequence that starts with a String, followed by an optional Keyword,
    followed by any number of Numbers."
-  [(s/one s/String "s")
+  [(s/one s/Str "s")
    (s/optional s/Keyword "k")
-   s/Number])
+   s/Num])
 
 (s/validate FancySeq ["test"])
 (s/validate FancySeq ["test" :k])

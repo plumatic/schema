@@ -28,7 +28,7 @@
     (is (= 2 (sm/try-catchall (reset! a 1) (swap! a inc) (catch e (swap! a - 10)))))
     (is (= 2 @a)))
   (let [a (atom 0)]
-    (is (= -9 (sm/try-catchall (reset! a 1) (swap! a read-string) (catch e (swap! a - 10)))))
+    (is (= -9 (sm/try-catchall (reset! a 1) (swap! a #(throw (sm/error! (str %)))) (catch e (swap! a - 10)))))
     (is (= -9 @a))))
 
 (deftest validate-return-test

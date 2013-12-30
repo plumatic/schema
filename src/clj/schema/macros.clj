@@ -33,8 +33,8 @@
     (assert (= catch 'catch))
     (assert (symbol? sym))
     (if (compiling-cljs?)
-      `(try* ~@try-body (catch ~sym ~@catch-body))
-      `(try ~@try-body (catch Throwable ~sym ~@catch-body)))))
+      `(try ~@try-body (~'catch js/Object ~sym ~@catch-body))
+      `(try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
 
 (defmacro error!
   "Generate a cross-platform exception in client (non-compilation) code."
