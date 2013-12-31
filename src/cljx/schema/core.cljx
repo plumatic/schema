@@ -194,7 +194,16 @@
   (extend-primitive clojure.core$short Short)
   (extend-primitive clojure.core$char Character)
   (extend-primitive clojure.core$byte Byte)
-  (extend-primitive clojure.core$boolean Boolean))
+  (extend-primitive clojure.core$boolean Boolean)
+
+  (extend-primitive clojure.core$doubles (Class/forName "[D"))
+  (extend-primitive clojure.core$floats (Class/forName "[F"))
+  (extend-primitive clojure.core$longs (Class/forName "[J"))
+  (extend-primitive clojure.core$ints (Class/forName "[I"))
+  (extend-primitive clojure.core$shorts (Class/forName "[S"))
+  (extend-primitive clojure.core$chars (Class/forName "[C"))
+  (extend-primitive clojure.core$bytes (Class/forName "[B"))
+  (extend-primitive clojure.core$booleans (Class/forName "[Z")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Cross-platform Schema leaves

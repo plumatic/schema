@@ -56,6 +56,8 @@
     (invalid! long (byte 1))
     (valid! boolean true)
     (invalid! boolean 1)
+    (valid! longs (long-array 10))
+    (invalid! longs (int-array 10))
     (doseq [f [byte char short int]]
       (valid! f (f 1))
       (invalid! f 1)))
