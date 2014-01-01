@@ -24,6 +24,18 @@
   []
   (compiling-cljs?))
 
+(defmacro try-catchall
+  "A variant of try-catch that catches all exceptions in client (non-compilation) code.
+   Does not (yet) support finally, and does not need or want an exception class."
+  [& body]
+  (let [try-body (butlast body)
+        [catch sym & catch-body :as catch-form] (last body)]
+    (assert (= catch 'catch))
+    (assert (symbol? sym))
+    (if (compiling-cljs?)
+      `(try ~@try-body (~'catch js/Object ~sym ~@catch-body))
+      `(try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
+
 (defmacro error!
   "Generate a cross-platform exception in client (non-compilation) code."
   ([s]
@@ -59,7 +71,8 @@
      (throw (RuntimeException. (format ~@format-args)))))
 
 (defmacro validation-error [schema value expectation & [fail-explanation]]
-  `(utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation))
+  `(schema.utils/error
+    (utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
@@ -205,11 +218,17 @@
   (let [original-arglist bind
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
-        input-schema-sym (gensym "input-schema")]
+        input-schema-sym (gensym "input-schema")
+        enable-validation (not (:never-validate (meta fn-name)))
+        input-checker-sym (gensym "input-checker")
+        output-checker-sym (gensym "output-checker")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
+     :more-bindings (when enable-validation
+                      [input-checker-sym `(schema.core/checker ~input-schema-sym)
+                       output-checker-sym `(schema.core/checker ~output-schema-sym)])
      :arglist bind
      :raw-arglist original-arglist
-     :arity-form (if-not (:never-validate (meta fn-name))
+     :arity-form (if enable-validation
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
@@ -224,7 +243,7 @@
                            (let [args# ~(if rest-arg
                                           `(list* ~@bind-syms ~rest-sym)
                                           bind-syms)]
-                             (when-let [error# (schema.core/check ~input-schema-sym args#)]
+                             (when-let [error# (~input-checker-sym args#)]
                                (error! (utils/format* "Input to %s does not match schema: %s"
                                                       '~fn-name (pr-str error#))
                                        {:schema ~input-schema-sym :value args# :error error#}))))
@@ -232,7 +251,7 @@
                                                (when rest-arg [rest-arg rest-sym]))
                                     ~@(apply-prepost-conditions body))]
                            (when validate#
-                             (when-let [error# (schema.core/check ~output-schema-sym o#)]
+                             (when-let [error# (~output-checker-sym o#)]
                                (error! (utils/format* "Output of %s does not match schema: %s"
                                                       '~fn-name (pr-str error#))
                                        {:schema ~output-schema-sym :value o# :error error#})))
@@ -254,10 +273,11 @@
                                  fn-body))
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
-    {:outer-bindings (vec (apply concat
-                                 `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
-                                 [output-schema-sym output-schema]
-                                 schema-bindings))
+    {:outer-bindings (vec (concat
+                           `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
+                           [output-schema-sym output-schema]
+                           (apply concat schema-bindings)
+                           (mapcat :more-bindings processed-arities)))
      :arglists (map :arglist processed-arities)
      :raw-arglists (map :raw-arglist processed-arities)
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
@@ -438,9 +458,9 @@
    use with-fn-validation to enable runtime checking of function inputs and
    outputs.
 
-   (sm/defn foo :- s/Number
+   (sm/defn foo :- s/Num
     [x :- s/Int
-     y :- s/Number]
+     y :- s/Num]
     (* x y))
 
    (s/fn-schema foo)

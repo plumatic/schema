@@ -31,6 +31,9 @@
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Error descriptions
+
 ;; A leaf schema validation error, describing the schema and value and why it failed to
 ;; match the schema.  In Clojure, prints like a form describing the failure that would
 ;; return true.
@@ -45,14 +48,15 @@
 (defn validation-error-explain [^ValidationError err]
   (list (or (.-fail-explanation err) 'not) @(.-expectation-delay err)))
 
+#+clj ;; Validation errors print like forms that would return false
+(defmethod print-method ValidationError [err writer]
+  (print-method (validation-error-explain err) writer))
+
 (defn ->ValidationError
   "for cljs sake (easier than normalizing imports in macros.clj)"
   [schema value expectation-delay fail-explanation]
   (ValidationError. schema value expectation-delay fail-explanation))
 
-#+clj ;; Validation errors print like forms that would return false
-(defmethod print-method ValidationError [err writer]
-  (print-method (validation-error-explain err) writer))
 
 ;; Attach a name to an error from a named schema.
 (declare named-error-explain)
@@ -65,11 +69,49 @@
 (defn named-error-explain [^NamedError err]
   (list 'named (.-error err) (.-name err)))
 
-(defn ->NamedError [name error] (NamedError. name error))
-
 #+clj ;; Validation errors print like forms that would return false
 (defmethod print-method NamedError [err writer]
   (print-method (named-error-explain err) writer))
+
+(defn ->NamedError
+  "for cljs sake (easier than normalizing imports in macros.clj)"
+  [name error]
+  (NamedError. name error))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Monoidish error containers, which wrap errors (to distinguish from success values).
+
+(defrecord ErrorContainer [error])
+
+(defn error
+  "Distinguish a value (must be non-nil) as an error."
+  [x] (assert x) (->ErrorContainer x))
+
+(defn error? [x]
+  (instance? ErrorContainer x))
+
+(defn error-val [x]
+  (when (error? x)
+    (.-error ^ErrorContainer x)))
+
+(defn wrap-error-name
+  "If maybe-error is an error, wrap the inner value in a NamedError; otherwise, return as-is"
+  [name maybe-error]
+  (if-let [e (error-val maybe-error)]
+    (error (->NamedError name e))
+    maybe-error))
+
+(defn result-builder
+  "Build up a result by conjing values, producing an error if at least one
+   sub-value returns an error."
+  [lift-to-error]
+  (fn conjer [m e]
+    (if-let [err (error-val e)]
+      (error (conj (or (error-val m) (lift-to-error m)) err))
+      (if-let [merr (error-val m)]
+        (error (conj merr nil))
+        (conj m e)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

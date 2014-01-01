@@ -3,9 +3,9 @@
   (:require clojure.test))
 
 (defmacro valid!
-  "Assert that x satisfies schema s"
+  "Assert that x satisfies schema s, and the walked value is equal to the original."
   [s x]
-  `(~'is (not (s/check ~s ~x))))
+  `(let [x# ~x] (~'is (= x# ((s/identity-walker ~s) x#)))))
 
 (defmacro invalid!
   "Assert that x does not satisfy schema s, optionally checking the stringified return value"
