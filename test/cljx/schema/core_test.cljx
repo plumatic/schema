@@ -101,7 +101,6 @@
     (is (= '(pred odd?) (s/explain schema)))))
 
 (defprotocol ATestProtocol)
-(def +protocol-schema+ ATestProtocol) ;; make sure we don't fuck it up by capturing the earlier value.
 (defrecord DirectTestProtocolSatisfier [] ATestProtocol)
 (defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
 (defrecord NonTestProtocolSatisfier [])

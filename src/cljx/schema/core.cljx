@@ -428,13 +428,13 @@
       ;; do something pretty reasonable and assume we walk in order passing the result
       ;; of each walk to the next, and failing at the first error
       (fn [x]
-        (loop [x x sub-walkers (seq sub-walkers)]
-          (if-not sub-walkers
-            x
-            (let [res ((first sub-walkers) x)]
-              (if (utils/error? res)
-                res
-                (recur res (next sub-walkers)))))))))
+        (reduce
+         (fn [x sub-walker]
+           (if (utils/error? x)
+             x
+             (sub-walker x)))
+         x
+         sub-walkers))))
   (explain [this] (cons 'both (map explain schemas))))
 
 (defn both
