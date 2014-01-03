@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord fn defn])
+  (:refer-clojure :exclude [defrecord fn defn letfn])
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -525,6 +525,12 @@
                     t)))
          ~@fn-body)
        (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
+
+(defmacro letfn [fnspecs# & body#]
+  (list 'clojure.core/let
+        (vec (interleave (map first fnspecs#)
+                         (map macroexpand (map #(cons `schema.macros/fn %) fnspecs#))))
+        `(do ~@body#)))
 
 (defmacro with-fn-validation
   "Execute body with input and ouptut schema validation turned on for all s/defn

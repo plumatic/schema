@@ -872,17 +872,18 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized defrecord and (de)fn macros
+;;; Schematized defrecord and (de,let)fn macros
 
-;; In Clojure, we can suck the defrecord/fn/defn macros into this namespace
+;; In Clojure, we can suck the defrecord/fn/defn/let macros into this namespace
 ;; In ClojureScript, you have to use them from clj schema.macros
 #+clj
 (do
-  (doseq [s ['fn 'defn 'defrecord]] (ns-unmap *ns* s))
+  (doseq [s ['fn 'defn 'letfn 'defrecord]] (ns-unmap *ns* s))
   (potemkin/import-vars
    macros/defrecord
    macros/fn
    macros/defn
+   macros/letfn
    macros/with-fn-validation)
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
