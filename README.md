@@ -14,12 +14,43 @@ One of the difficulties with bringing Clojure into a team is the overhead of und
 
 ## Meet Schema
 
-A Schema is just a Clojure(Script) data structure describing a data shape, which can be used to document and validate functions and data.  The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM) and prototypes (in ClojureScript):
+A Schema is a Clojure(Script) data structure describing a data shape, which can be used to document and validate functions and data.  
 
 ```clojure
 (ns schema-examples
   (:require [schema.core :as s]))
 
+(def Data
+  "A schema for a nested data type"
+  {:a {:b s/String
+       :c s/Int}
+   :d [{:e s/Keyword
+        :f [s/Number]}]})
+
+(s/validate
+  Data  
+  {:a {:b "abc"
+       :c 123}
+   :d [{:e :bc
+        :f [12.2 13 100]}
+       {:e :bc
+        :f [-1]}]})
+;; Success!
+
+(s/validate
+  Data  
+  {:a {:b 123
+       :c "ABC"}})
+;; Exception -- Value does not match schema:
+;;  {:a {:b (not (instance? java.lang.String 123)),
+;;       :c (not (integer? "ABC"))}, 
+;;   :d missing-required-key}
+
+```
+
+The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM) and prototypes (in ClojureScript):
+
+```clojure
 ;; s/Any, s/Num, s/Keyword, s/Integer, and s/Str are cross-platform schemas.
 
 (s/validate s/Num 42)  
