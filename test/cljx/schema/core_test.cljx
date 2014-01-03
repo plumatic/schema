@@ -886,6 +886,45 @@
     (sm/with-fn-validation
       (is (= 120 (fact 5 1))))))
 
+;; letfn
+
+(deftest minimal-letfn-test
+  (is (= "1"
+         (sm/letfn
+             []
+           "1"))))
+
+(deftest simple-letfn-test
+  (is (= "1"
+         (sm/with-fn-validation
+           (sm/letfn
+               [(x :- s/Num [] 1)
+                (y :- s/Str [m :- s/Num] (str m))]
+             (y (x)))))))
+
+(deftest unannotated-letfn-test
+  (is (= "1"
+         (sm/with-fn-validation
+           (sm/letfn
+               [(x [] 1)
+                (y [m] (str m))]
+             (y (x)))))))
+
+(deftest no-validation-letfn-test
+  (is (= "1"
+         (sm/letfn
+             [(x :- s/Num [] 1)
+              (y :- s/Str [m :- s/Num] (str m))]
+           (y (x))))))
+
+(deftest error-letfn-test
+  (is (thrown? #+clj RuntimeException #+cljs js/Error
+               (sm/with-fn-validation
+                 (sm/letfn
+                     [(x :- s/Num [] "1")
+                      (y :- s/Str [m :- s/Num] (str m))]
+                   (y (x)))))))
+
 ;; Primitive validation testing for JVM
 #+clj
 (do
