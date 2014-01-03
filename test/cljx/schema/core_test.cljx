@@ -317,6 +317,9 @@
     (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})
     (invalid! schema {:foo 1 :bar "z" :baz {:b1 3}})))
 
+(deftest throw-on-multiple-key-variants-test
+  (is (thrown? Exception (s/checker {:foo String (s/optional-key :foo) String})))
+  (is (thrown? Exception (s/checker {(s/required-key "A") String (s/optional-key "A") String}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set Schemas

@@ -572,6 +572,15 @@
   (or (required-key? ks)
       (optional-key? ks)))
 
+(defn- explain-kspec [kspec]
+  (if (specific-key? kspec)
+    (if (keyword? kspec)
+      kspec
+      (list (cond (required-key? kspec) 'required-key
+                  (optional-key? kspec) 'optional-key)
+            (explicit-schema-key kspec)))
+    (explain kspec)))
+
 ;; A schema for a single map entry.  kspec is either a keyword, required or optional key,
 ;; or key schema.  val-schema is a value schema.
 (defrecord MapEntry [kspec val-schema]
@@ -610,13 +619,7 @@
   (explain [this]
     (list
      'map-entry
-     (if (specific-key? kspec)
-       (if (keyword? kspec)
-         kspec
-         (list (cond (required-key? kspec) 'required-key
-                     (optional-key? kspec) 'optional-key)
-               (explicit-schema-key kspec)))
-       (explain kspec))
+     (explain-kspec kspec)
      (explain val-schema))))
 
 (defn map-entry [kspec val-schema]
@@ -636,9 +639,18 @@
   (let [extra-keys-schema (find-extra-keys-schema map-schema)
         extra-walker (when extra-keys-schema
                        (subschema->walker (apply map-entry (find map-schema extra-keys-schema))))
-        explicit-walkers (into {} (for [[k v] (dissoc map-schema extra-keys-schema)]
+        explicit-schema (dissoc map-schema extra-keys-schema)
+        explicit-walkers (into {} (for [[k v] explicit-schema]
                                     [(explicit-schema-key k) (subschema->walker (map-entry k v))]))
         err-conj (utils/result-builder (constantly {}))]
+    (when-not (= (count explicit-schema) (count explicit-walkers))
+      (macros/error! (utils/format* "Schema has multiple variants of the same explicit key: %s"
+                                    (->> (keys explicit-schema)
+                                         (group-by explicit-schema-key)
+                                         vals
+                                         (filter #(> (count %) 1))
+                                         (apply concat)
+                                         (mapv explain-kspec)))))
     (fn [x]
       (if-not (map? x)
         (macros/validation-error map-schema x (list 'map? (utils/value-name x)))
