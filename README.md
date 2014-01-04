@@ -2,7 +2,7 @@
 
 A Clojure(Script) library for declarative data description and validation.
 
-Leiningen dependency (Clojars): `[prismatic/schema "0.1.10"]`
+Leiningen dependency (Clojars): `[prismatic/schema "0.2.0"]`
 
 **This is an alpha release. The API and organizational structure are
 subject to change. Comments and contributions are much appreciated.**
@@ -10,6 +10,8 @@ subject to change. Comments and contributions are much appreciated.**
 --
 
 One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://blog.getprismatic.com/blog/2013/9/4/schema-for-clojurescript-data-shape-declaration-and-validation) on the Prismatic blog.)
+
+As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  See [this post](http://blog.getprismatic.com/blog/2014/1/4/schema-020-back-with-clojurescript-data-coercion) for a detailed overview, or check out the Coercion section below for an example.  
 
 
 ## Meet Schema
@@ -45,7 +47,6 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
 ;;  {:a {:b (not (instance? java.lang.String 123)),
 ;;       :c (not (integer? "ABC"))}, 
 ;;   :d missing-required-key}
-
 ```
 
 The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM) and prototypes (in ClojureScript):
@@ -134,7 +135,6 @@ Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, 
    names :- [s/Str]])
    
 (sm/defn stamped-names :- StampedNames
-  "names is a list of Strings"
   [names :- [s/Str]]
   (StampedNames. (str (System/currentTimeMillis)) names))
 ```
@@ -170,7 +170,7 @@ First, we ensure that all data types that will be shared across namespaces (or h
 
 This documentation is probably the most important benefit of Schema, which is why we've optimized Schemas for easy readability and reuse -- and sometimes, this is all you need. Schemas are purely descriptive, not prescriptive, so unlike a type system they should never get in your way, or constrain the types of functions you can write.  
 
-After documentation, the next-most important benefit is validation.  Thus far, we've found two key use cases for validation.  First, you can globally turn on function validation within a given test namespace by adding this line:
+After documentation, the next-most important benefit is validation.  Thus far, we've found three key use cases for validation.  First, you can globally turn on function validation within a given test namespace by adding this line:
 
 ```clojure
 (use-fixtures :once schema.test/validate-schemas)
@@ -178,9 +178,9 @@ After documentation, the next-most important benefit is validation.  Thus far, w
 
 As long as your tests cover all call boundaries, this means you will should catch any 'type-like' bugs in your code at test time. 
 
-Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.
+Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).
 
-Finally, you can turn on, by default, validation for a given function (without the need for `with-fn-validation`):
+Alternatively, you can force validation for key functions (without the need for `with-fn-validation`):
 
 ```
 (s/defn ^:always-validate stamped-names ...)
@@ -188,12 +188,7 @@ Finally, you can turn on, by default, validation for a given function (without t
 
 Thus, each time you invoke `stamped-names`, Schema will perform validation.
 
-## For the Future
-
-Longer-term, we have lots more in store for Schema. Just a few of the crazy ideas we have brewing are:
- - Automatically generate API client libraries based on API schemas
- - Automatically generate test data from schemas
- - Compile to `core.typed` annotations for more typey goodness, if that's your thing
+Finally, we use validation with coercion for API inputs and outputs.  See the coercion section below for details.
 
 ## More examples
 
@@ -276,6 +271,45 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate OddLong (int 3))
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
 ```
+
+## Transformations and Coercion 
+
+As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.  
+
+An example application of coercion is converting parsed JSON (e.g., from an HTTP post request) to a domain object with a richer set of types (e.g., Keywords). 
+
+```clojure
+(def CommentRequest
+  {(s/optional-key :parent-comment-id) long
+   :text String
+   :share-services [(s/enum :twitter :facebook :google)]})
+   
+(def parse-comment-request
+  (coerce/coercer CommentRequest coerce/json-coercion-matcher))
+ 
+(= (parse-comment-request 
+    {:parent-comment-id (int 2128123123)
+     :text "This is awesome!"
+     :share-services ["twitter" "facebook"]})
+   {:parent-comment-id 2128123123
+    :text "This is awesome!"
+    :share-services [:twitter :facebook]})
+;; ==> true    
+```
+
+Here, `json-coercion-matcher` provides some useful defaults for coercing from JSON, such as:
+
+ - Numbers should be coerced to the expected type, if this can be done without losing precision.
+ - When a Keyword is expected, a String can be coerced to the correct type by calling keyword 
+ 
+There's nothing special about `json-coercion-matcher` though; it's just as easy to make your own schema-specific transformations to do even more.  For more details, see [this blog post](http://blog.getprismatic.com/blog/2014/1/4/schema-020-back-with-clojurescript-data-coercion).
+
+## For the Future
+
+Longer-term, we have lots more in store for Schema. Just a few of the crazy ideas we have brewing are:
+ - Automatically generate API client libraries based on API schemas
+ - Automatically generate test data from schemas
+ - Compile to `core.typed` annotations for more typey goodness, if that's your thing
 
 ## Community
 
