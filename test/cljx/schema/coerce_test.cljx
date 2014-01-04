@@ -57,3 +57,14 @@
                 res {:l 2 :d 1.0 :jk :asdf}]
             (is (= res (coercer {:l "2.0" :d "1" :jk "asdf"})))
             (is (= #{:l} (err-ks (coercer {:l "1.2"})))))))
+
+#+clj
+(do
+  (def NestedVecs
+    [(s/one s/Num "Node ID") (s/recursive #'NestedVecs)])
+
+  (deftest recursive-coercion-test
+    "Test that recursion (which rebinds subschema-walker) works with coercion."
+    (is (= [1 [2 [3] [4]]]
+           ((coerce/coercer NestedVecs coerce/string-coercion-matcher)
+            ["1" ["2" ["3"] ["4"]]])))))
