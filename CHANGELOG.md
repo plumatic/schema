@@ -1,7 +1,8 @@
 ## 0.2.0
+ * **breaking change:** Cross-platform leaves String and Number are now Str and Num (the former caused warnings and broke AOT).
  * Replaced core Schema protocol method `check` with `walker`, for increased speed and versatility
- * Cross-platform leaves String and Number are now Str and Num (the former caused warnings and broke AOT).
- 
+ * Schemas for primitive arrays (`longs`, etc)
+ * Schematized `letfn` 
 
 ## 0.1.10 
  * Remove non-dev dependency on cljx
