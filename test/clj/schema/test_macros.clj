@@ -5,7 +5,7 @@
 (defmacro valid!
   "Assert that x satisfies schema s, and the walked value is equal to the original."
   [s x]
-  `(let [x# ~x] (~'is (= x# ((s/identity-walker ~s) x#)))))
+  `(let [x# ~x] (~'is (= x# ((s/start-walker s/walker ~s) x#)))))
 
 (defmacro invalid!
   "Assert that x does not satisfy schema s, optionally checking the stringified return value"

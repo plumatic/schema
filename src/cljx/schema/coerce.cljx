@@ -25,8 +25,9 @@
 (macros/defn coercer
   "Produce a function that simultaneously coerces and validates a datum."
   [schema coercion-matcher :- CoercionMatcher]
-  ((fn rec [s]
-     (let [walker (s/walker s rec)]
+  (s/start-walker
+   (fn [s]
+     (let [walker (s/walker s)]
        (if-let [coercer (coercion-matcher s)]
          (fn [x]
            (macros/try-catchall
