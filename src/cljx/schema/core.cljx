@@ -92,24 +92,25 @@
 ;;; Schema protocol
 
 (defprotocol Schema
-  (walker [this subschema->walker]
+  (walker [this]
     "Produce a function that takes [data], and either returns a walked version of data
      (by default, usually just data), or a utils/ErrorContainer containing value that looks
      like the 'bad' parts of data with ValidationErrors at the leaves describing the failures.
 
-     If this is a leaf schema, subschema->walker is not called.
-
-     If this is a composite schema, should let-bind (subschema->walker sub-schema) for each
+     If this is a composite schema, should let-bind (subschema-walker sub-schema) for each
      subschema outside the returned fn.  Within the returned fn, should break down data
      into constituents, call the let-bound subschema walkers on each component, and then
      reassemble the components into a walked version of the data (or an ErrorContainer
      describing the validaiton failures).
 
      Attempting to walk a value that already contains a utils/ErrorContainer produces undefined
-     behavior.")
+     behavior.
+
+     User code should never call `walker` directly.  Instead, it should call `start-walker`
+     below.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
-     also expanding classes schematas at the leaves.  Example:
+     also expanding class schematas at the leaves.  Example:
 
      user> (s/explain {:a s/Keyword :b [s/Int]} )
      {:a Keyword, :b [Int]}"))
@@ -122,16 +123,34 @@
     (prefer-method print-method schema.core.Schema java.util.Map)
     (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
 
-(defn identity-walker
-  "A walker that just does pure checking/walking, with no added bells or whistles."
-  [schema]
-  (walker schema identity-walker))
+(def ^:dynamic subschema-walker
+  "The function to call within 'walker' implementations to create walkers for subschemas.
+   Can be dynamically bound (using start-walker below) to create different walking behaviors.
+
+   For the curious, implemented using dynamic binding rather than making walker take a
+   subschema-walker as an argument because some behaviors (e.g. recursive schema walkers)
+   seem to require mind-bending things like fixed-point combinators that way, but are
+   simple this way."
+  (fn [s]
+    (macros/error!
+     (str "Walking is unsupported outside of start-walker; "
+          "all composite schemas must eagerly bind subschema-walkers "
+          "outside the returned walker."))))
+
+(defn start-walker
+  "The entry point for creating walkers.  Binds the provided walker to subschema-walker,
+   then calls it on the provided schema.  For simple validation, pass walker as sub-walker.
+   More sophisticated behavior (coercion, etc), can be achieved by passing a sub-walker
+   that wraps walker with additional behavior."
+  [sub-walker schema]
+  (binding [subschema-walker sub-walker]
+    (subschema-walker schema)))
 
 (defn checker
   "Compile an efficient checker for schema, which returns nil for valid values and
    error descriptions otherwise."
   [schema]
-  (comp utils/error-val (identity-walker schema)))
+  (comp utils/error-val (start-walker walker schema)))
 
 (defn check
   "Return nil if x matches schema; otherwise, returns a value that looks like the
@@ -156,10 +175,10 @@
 (extend-protocol Schema
   #+clj Class
   #+cljs js/Function
-  (walker [this subschema->walker]
+  (walker [this]
     (let [class-walker (if-let [more-schema (utils/class-schema this)]
                          ;; do extra validation for records and such
-                         (subschema->walker more-schema)
+                         (subschema-walker more-schema)
                          identity)]
       (fn [x]
         (or (when #+clj (not (instance? this x))
@@ -182,8 +201,8 @@
   (defmacro extend-primitive [cast-sym class-sym]
     `(extend-protocol Schema
        ~cast-sym
-       (walker [this# subschema->walker#]
-         (subschema->walker# ~class-sym))
+       (walker [this#]
+         (subschema-walker ~class-sym))
        (explain [this#]
          (explain ~class-sym))))
 
@@ -215,7 +234,7 @@
   ;; loses type info, which makes this unusable in schema-fn.
   ;; http://dev.clojure.org/jira/browse/CLJ-1196
   Schema
-  (walker [this _] identity)
+  (walker [this] identity)
   (explain [this] 'Any))
 
 (def Any
@@ -226,7 +245,7 @@
 
 (defrecord EqSchema [v]
   Schema
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (if (= v x)
         x
@@ -243,7 +262,7 @@
 
 (defrecord EnumSchema [vs]
   Schema
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (if (contains? vs x)
         x
@@ -260,7 +279,7 @@
 
 (defrecord Predicate [p? pred-name]
   Schema
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (if-let [reason (macros/try-catchall (when-not (p? x) 'not) (catch e 'throws?))]
         (macros/validation-error this x (list pred-name (utils/value-name x)) reason)
@@ -290,7 +309,7 @@
 ;; and put it in metadata of the record so that equality is preserved, along with the name.
 (defrecord Protocol [p]
   Schema
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (if #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
           x
@@ -310,7 +329,7 @@
 (extend-protocol Schema
   #+clj java.util.regex.Pattern
   #+cljs js/RegExp
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (cond (not (string? x))
             (macros/validation-error this x (list 'string? (utils/value-name x)))
@@ -366,8 +385,8 @@
 
 (defrecord Maybe [schema]
   Schema
-  (walker [this subschema->walker]
-    (let [sub-walker (subschema->walker schema)]
+  (walker [this]
+    (let [sub-walker (subschema-walker schema)]
       (fn [x]
         (when-not (nil? x)
           (sub-walker x)))))
@@ -383,8 +402,8 @@
 
 (defrecord NamedSchema [schema name]
   Schema
-  (walker [this subschema->walker]
-    (let [sub-walker (subschema->walker schema)]
+  (walker [this]
+    (let [sub-walker (subschema-walker schema)]
       (fn [x] (utils/wrap-error-name name (sub-walker x)))))
   (explain [this] (list 'named (explain schema) name)))
 
@@ -398,8 +417,8 @@
 
 (defrecord Either [schemas]
   Schema
-  (walker [this subschema->walker]
-    (let [sub-walkers (map subschema->walker schemas)]
+  (walker [this]
+    (let [sub-walkers (mapv subschema-walker schemas)]
       (fn [x]
         (loop [sub-walkers (seq sub-walkers)]
           (if-not sub-walkers
@@ -422,8 +441,8 @@
 
 (defrecord Both [schemas]
   Schema
-  (walker [this subschema->walker]
-    (let [sub-walkers (map subschema->walker schemas)]
+  (walker [this]
+    (let [sub-walkers (mapv subschema-walker schemas)]
       ;; Both doesn't really have a clean semantics for non-identity walks, but we can
       ;; do something pretty reasonable and assume we walk in order passing the result
       ;; of each walk to the next, and failing at the first error
@@ -447,9 +466,9 @@
 
 (defrecord ConditionalSchema [preds-and-schemas]
   Schema
-  (walker [this subschema->walker]
-    (let [preds-and-walkers (map (fn [[pred schema]] [pred (subschema->walker schema)])
-                                 preds-and-schemas)]
+  (walker [this]
+    (let [preds-and-walkers (mapv (fn [[pred schema]] [pred (subschema-walker schema)])
+                                  preds-and-schemas)]
       (fn [x]
         (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-walkers))]
           (match x)
@@ -488,18 +507,14 @@
     (let [{:keys [ns name]} (meta v)]
       (symbol (str (ns-name ns) "/" name))))
 
-  ;; TODO: revisit how to do this in less horrible way.
-  (def ^:dynamic ^:private *recursive-walkers* {})
-
   (defrecord Recursive [schema-var]
     Schema
-    (walker [this subschema->walker]
-      (if-let [a (*recursive-walkers* schema-var)]
-        (fn [x] (@a x))
-        (let [a (atom nil)]
-          (binding [*recursive-walkers* (assoc *recursive-walkers* schema-var a)]
-            (reset! a (subschema->walker @schema-var))
-            @a))))
+    (walker [this]
+      (let [a (atom nil)]
+        (reset! a (start-walker
+                   (let [old subschema-walker]
+                     (fn [s] (if (= s this) #(@a %) (old s))))
+                   @schema-var))))
     (explain [this]
       (list 'recursive (list 'var (var-name schema-var)))))
 
@@ -585,8 +600,8 @@
 ;; or key schema.  val-schema is a value schema.
 (defrecord MapEntry [kspec val-schema]
   Schema
-  (walker [this subschema->walker]
-    (let [val-walker (subschema->walker val-schema)]
+  (walker [this]
+    (let [val-walker (subschema-walker val-schema)]
       (if (specific-key? kspec)
         (let [optional? (optional-key? kspec)
               k (explicit-schema-key kspec)]
@@ -605,7 +620,7 @@
                       (if-let [ve (utils/error-val vres)]
                         (utils/error [xk ve])
                         [xk vres]))))))
-        (let [key-walker (subschema->walker kspec)]
+        (let [key-walker (subschema-walker kspec)]
           (fn [x]
             (if-not (= 2 (count x))
               (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
@@ -635,13 +650,14 @@
                     (vec key-schemata))
     (first key-schemata)))
 
-(defn- map-walker [map-schema subschema->walker]
+(defn- map-walker [map-schema]
   (let [extra-keys-schema (find-extra-keys-schema map-schema)
         extra-walker (when extra-keys-schema
-                       (subschema->walker (apply map-entry (find map-schema extra-keys-schema))))
+                       (subschema-walker (apply map-entry (find map-schema extra-keys-schema))))
         explicit-schema (dissoc map-schema extra-keys-schema)
         explicit-walkers (into {} (for [[k v] explicit-schema]
-                                    [(explicit-schema-key k) (subschema->walker (map-entry k v))]))
+                                    [(explicit-schema-key k)
+                                     (subschema-walker (map-entry k v))]))
         err-conj (utils/result-builder (constantly {}))]
     (when-not (= (count explicit-schema) (count explicit-walkers))
       (macros/error! (utils/format* "Schema has multiple variants of the same explicit key: %s"
@@ -675,10 +691,10 @@
 (extend-protocol Schema
   #+clj clojure.lang.APersistentMap
   #+cljs cljs.core.PersistentArrayMap
-  (walker [this subschema->walker] (map-walker this subschema->walker))
+  (walker [this] (map-walker this))
   (explain [this] (map-explain this))
   #+cljs cljs.core.PersistentHashMap
-  #+cljs (walker [this subschema->walker] (map-walker this subschema->walker))
+  #+cljs (walker [this] (map-walker this))
   #+cljs (explain [this] (map-explain this)))
 
 
@@ -690,9 +706,9 @@
 (extend-protocol Schema
   #+clj clojure.lang.APersistentSet
   #+cljs cljs.core.PersistentHashSet
-  (walker [this subschema->walker]
+  (walker [this]
     (macros/assert! (= (count this) 1) "Set schema must have exactly one element")
-    (let [sub-walker (subschema->walker (first this))]
+    (let [sub-walker (subschema-walker (first this))]
       (fn [x]
         (or (when-not (set? x)
               (macros/validation-error this x (list 'set? (utils/value-name x))))
@@ -735,11 +751,11 @@
 (extend-protocol Schema
   #+clj clojure.lang.APersistentVector
   #+cljs cljs.core.PersistentVector
-  (walker [this subschema->walker]
+  (walker [this]
     (let [[singles multi] (parse-sequence-schema this)
-          single-walkers (for [^One s singles]
-                           [s (subschema->walker (.-schema s))])
-          multi-walker (when multi (subschema->walker multi))
+          single-walkers (vec (for [^One s singles]
+                                [s (subschema-walker (.-schema s))]))
+          multi-walker (when multi (subschema-walker multi))
           err-conj (utils/result-builder (fn [m] (vec (repeat (count m) nil))))]
       (fn [x]
         (or (when-not (or (nil? x) (sequential? x))
@@ -795,10 +811,10 @@
 
 (defrecord Record [klass schema]
   Schema
-  (walker [this subschema->walker]
-    (let [map-checker (subschema->walker schema)
+  (walker [this]
+    (let [map-checker (subschema-walker schema)
           pred-checker (when-let [evf (:extra-validator-fn this)]
-                         (subschema->walker (pred evf)))]
+                         (subschema-walker (pred evf)))]
       (fn [r]
         (or (when-not (instance? klass r)
               (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
@@ -837,7 +853,7 @@
 
 (defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
-  (walker [this _]
+  (walker [this]
     (fn [x]
       (if (fn? x)
         x
