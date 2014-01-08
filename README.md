@@ -272,6 +272,8 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
 ```
 
+You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types).
+
 ## Transformations and Coercion 
 
 As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.  
@@ -302,7 +304,9 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
  - Numbers should be coerced to the expected type, if this can be done without losing precision.
  - When a Keyword is expected, a String can be coerced to the correct type by calling keyword 
  
-There's nothing special about `json-coercion-matcher` though; it's just as easy to make your own schema-specific transformations to do even more.  For more details, see [this blog post](http://blog.getprismatic.com/blog/2014/1/4/schema-020-back-with-clojurescript-data-coercion).
+There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/Prismatic/schema/wiki/Writing-Custom-Transformations) to do even more.  
+
+For more details, see [this blog post](http://blog.getprismatic.com/blog/2014/1/4/schema-020-back-with-clojurescript-data-coercion).
 
 ## For the Future
 
