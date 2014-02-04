@@ -40,7 +40,7 @@
   "Generate a cross-platform exception in client (non-compilation) code."
   ([s]
      (if (compiling-cljs?)
-       `(throw (js/Error ~s))
+       `(throw (js/Error. ~s))
        `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String})))))
   ([s m]
      (if (compiling-cljs?)
