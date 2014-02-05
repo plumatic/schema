@@ -1,7 +1,7 @@
 (ns schema.coerce-test
   #+clj (:use clojure.test)
   #+cljs (:use-macros
-          [cljs-test.macros :only [is deftest]])
+          [cemerick.cljs.test :only [is deftest]])
   (:require
    [schema.core :as s]
    [schema.utils :as utils]

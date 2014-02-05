@@ -1,6 +1,8 @@
 (ns schema.test-macros
   "Macros to help cross-language testing of schemas."
-  (:require clojure.test))
+  (:require
+   clojure.test
+   [schema.macros :as sm]))
 
 (defmacro valid!
   "Assert that x satisfies schema s, and the walked value is equal to the original."
@@ -19,15 +21,4 @@
 (defmacro invalid-call!
   "Assert that f throws (presumably due to schema validation error) when called on args."
   [f & args]
-  `(~'is (~'thrown? Throwable (~f ~@args))))
-
-;;; cljs only
-
-(defmacro thrown?
-  ([_ form]
-     `(try
-        ~form false
-        (catch js/Error e# true))))
-
-(defmacro testing [label & form]
-  `(do ~@form))
+  `(~'is (~'thrown? ~'Throwable (~f ~@args))))

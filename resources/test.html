@@ -1,5 +1,15 @@
-<html>
-  <body>
-    <script src="../target/unit-test.js" type="text/javascript"></script>
-  </body>
-</html>
+<style>
+body {
+  background: #222;
+  color: #fff;
+  font: 18px 'Helvetica';
+}
+</style>
+
+<script src="../target/unit-test.js"></script>
+<script>
+  cemerick.cljs.test.set_print_fn_BANG_(function(x) {
+    document.write(x.replace(/\n/g, "<br>"));
+  });
+  cemerick.cljs.test.run_all_tests();
+</script>
