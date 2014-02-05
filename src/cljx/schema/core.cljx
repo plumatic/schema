@@ -294,7 +294,7 @@
    Optional pred-name can be passed for nicer validation errors."
   ([p?] (pred p? p?))
   ([p? pred-name]
-     (when-not (fn? p?)
+     (when-not (ifn? p?)
        (macros/error! (utils/format* "Not a function: %s" p?)))
      (Predicate. p? pred-name)))
 
