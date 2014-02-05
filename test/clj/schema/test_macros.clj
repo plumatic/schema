@@ -1,6 +1,8 @@
 (ns schema.test-macros
   "Macros to help cross-language testing of schemas."
-  (:require clojure.test))
+  (:require
+   clojure.test
+   [schema.macros :as sm]))
 
 (defmacro valid!
   "Assert that x satisfies schema s, and the walked value is equal to the original."

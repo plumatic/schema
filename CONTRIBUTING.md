@@ -17,5 +17,5 @@ Schema is relatively well-tested, on both Clojure and ClojureScript.  Before sub
  * ensure any new code is well-tested, and if possible, any issue fixed is covered by one or more new tests
  * check that all of the tests pass **in both Clojure and ClojureScript**
  
-To run the Clojure and ClojureScript tests, first run `lein cljx`, then run `lein test`.
+To run the Clojure and ClojureScript tests, first run `lein cljx`, then run `lein test`.  You must have phantomjs installed for the ClojureScript tests to run.
 
