@@ -352,6 +352,10 @@
    Is (pred string?) and not js/String in cljs because of keywords."
   #+clj java.lang.String #+cljs (pred string?))
 
+(def Bool
+  "Boolean true or false"
+  #+clj java.lang.Boolean #+cljs js/Boolean)
+
 (def Num
   "Any number"
   #+clj java.lang.Number #+cljs js/Number)
