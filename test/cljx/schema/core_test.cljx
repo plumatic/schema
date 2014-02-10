@@ -127,6 +127,11 @@
   (invalid! #"lex" "Ale" "(not (re-find #\"lex\" \"Ale\"))")
   (is (= (symbol "#\"lex\"") (s/explain #"lex"))))
 
+(deftest leaf-bool-test
+  (valid! s/Bool true)
+  (invalid! s/Bool nil "(not (instance? java.lang.Boolean nil))")
+  #+clj (is (= 'java.lang.Boolean (s/explain s/Bool))))
+
 (deftest leaf-string-test
   (valid! s/Str "asdf")
   (invalid! s/Str nil "(not (instance? java.lang.String nil))")
