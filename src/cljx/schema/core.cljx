@@ -922,7 +922,7 @@
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
   (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
-  (or (utils/class-schema (utils/type-of f))
+  (or (utils/class-schema (utils/fn-schema-bearer f))
       (macros/safe-get (meta f) :schema)))
 
 
