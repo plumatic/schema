@@ -524,7 +524,7 @@
                   (when-not (primitive-sym? t)
                     t)))
          ~@fn-body)
-       (utils/declare-class-schema! (utils/type-of ~name) ~schema-form))))
+       (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 
 (defmacro letfn [fnspecs# & body#]
   (list 'clojure.core/let

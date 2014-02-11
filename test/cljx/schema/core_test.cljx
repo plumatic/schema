@@ -833,7 +833,8 @@
     (invalid-call! validated-pre-post-defn "a"))
   (let [e (try (sm/with-fn-validation (simple-validated-defn 2)) nil
                (catch js/Error e e))]
-    (is (>= (.indexOf (str e) +bad-input-str+) 0))))
+    (is (>= (.indexOf (str e) +bad-input-str+) 0)))
+  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn))))
 
 #+clj
 (deftest simple-validated-defn-test

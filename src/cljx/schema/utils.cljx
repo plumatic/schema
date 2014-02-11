@@ -19,6 +19,13 @@
   #+clj (class x)
   #+cljs (js* "typeof ~{}" x))
 
+(defn fn-schema-bearer
+  "What class can we associate the fn schema with? In Clojure use the class of the fn; in
+   cljs just use the fn itself."
+  [f]
+  #+clj (class f)
+  #+cljs f)
+
 (defn format* [fmt & args]
   (apply #+clj format #+cljs gstring/format fmt args))
 
