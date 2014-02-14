@@ -2,7 +2,7 @@
 
 A Clojure(Script) library for declarative data description and validation.
 
-Leiningen dependency (Clojars): `[prismatic/schema "0.2.0"]`
+Leiningen dependency (Clojars): `[prismatic/schema "0.2.1"]`
 
 **This is an alpha release. The API and organizational structure are
 subject to change. Comments and contributions are much appreciated.**
