@@ -57,11 +57,7 @@
 
 (defn set-matcher [schema]
   (if (instance? #+clj clojure.lang.APersistentSet #+cljs cljs.core.PersistentHashSet schema)
-    (fn [x]
-      (cond
-        (set? x) x
-        (sequential? x) (set x)
-        :else nil))))
+    (fn [x] (if (sequential? x) (set x) x))))
 
 (defn safe
   "Take a single-arg function f, and return a single-arg function that acts as identity
