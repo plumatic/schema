@@ -55,6 +55,14 @@
              (every? keyword? (.-vs ^schema.core.EnumSchema schema)))
     string->keyword))
 
+(defn set-matcher [schema]
+  #+clj (if (instance? clojure.lang.APersistentSet schema)
+          (fn [x]
+            (cond
+              (set? x) x
+              (sequential? x) (set x)
+              :else nil))))
+
 (defn safe
   "Take a single-arg function f, and return a single-arg function that acts as identity
    if f throws an exception, and like f otherwise.  Useful because coercers are not explicitly
@@ -82,7 +90,8 @@
      from numbers on the JVM (without losing precision)"
     [schema]
     (or (coercions schema)
-        (keyword-enum-matcher schema))))
+        (keyword-enum-matcher schema)
+        (set-matcher schema))))
 
 (def edn-read-string #+clj edn/read-string #+cljs reader/read-string)
 

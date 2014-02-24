@@ -24,7 +24,8 @@
 (def JVM
   {(s/optional-key :l) long
    (s/optional-key :d) Double
-   (s/optional-key :jk) clojure.lang.Keyword})
+   (s/optional-key :jk) clojure.lang.Keyword
+   (s/optional-key :set) #{s/Keyword}})
 
 (defn err-ks [res]
   (set (keys (utils/error-val res))))
@@ -41,10 +42,10 @@
 
   #+clj (testing "jvm specific"
           (let [coercer (coerce/coercer JVM coerce/json-coercion-matcher)
-                res {:l 1 :d 1.0 :jk :asdf}]
-            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf"})))
+                res {:l 1 :d 1.0 :jk :asdf :set #{:a :b}}]
+            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf" :set ["a" "a" "b"]})))
             (is (= res (coercer res)))
-            (is (= #{:l :jk} (err-ks (coercer {:l 1.2 :jk 1.0})))))))
+            (is (= #{:l :jk :set} (err-ks (coercer {:l 1.2 :jk 1.0 :set "a"})))))))
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]
