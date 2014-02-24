@@ -15,7 +15,8 @@
    (s/optional-key :s) s/Str
    (s/optional-key :k1) {s/Int s/Keyword}
    (s/optional-key :k2) s/Keyword
-   (s/optional-key :e) (s/enum :a :b :c)})
+   (s/optional-key :e) (s/enum :a :b :c)
+   (s/optional-key :set) #{s/Keyword}})
 
 (def JSON
   {(s/optional-key :is) [s/Int]})
@@ -24,8 +25,7 @@
 (def JVM
   {(s/optional-key :l) long
    (s/optional-key :d) Double
-   (s/optional-key :jk) clojure.lang.Keyword
-   (s/optional-key :set) #{s/Keyword}})
+   (s/optional-key :jk) clojure.lang.Keyword})
 
 (defn err-ks [res]
   (set (keys (utils/error-val res))))
@@ -34,18 +34,18 @@
   (let [coercer (coerce/coercer
                  (merge Generic JSON)
                  coerce/json-coercion-matcher)
-        res {:i 1 :is [1 2] :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a}]
+        res {:i 1 :is [1 2] :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :set #{:a :b}}]
     (is (= res
-           (coercer {:i 1.0 :is [1.0 2.0] :n 3.0 :s "asdf" :k1 {1.0 "hi"} :k2 "bye" :e "a"})))
+           (coercer {:i 1.0 :is [1.0 2.0] :n 3.0 :s "asdf" :k1 {1.0 "hi"} :k2 "bye" :e "a" :set ["a" "a" "b"]})))
     (is (= res (coercer res)))
-    (is (= #{:i} (err-ks (coercer {:i 1.1 :n 3})))))
+    (is (= #{:i :set} (err-ks (coercer {:i 1.1 :n 3 :set "a"})))))
 
   #+clj (testing "jvm specific"
           (let [coercer (coerce/coercer JVM coerce/json-coercion-matcher)
-                res {:l 1 :d 1.0 :jk :asdf :set #{:a :b}}]
-            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf" :set ["a" "a" "b"]})))
+                res {:l 1 :d 1.0 :jk :asdf}]
+            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf"})))
             (is (= res (coercer res)))
-            (is (= #{:l :jk :set} (err-ks (coercer {:l 1.2 :jk 1.0 :set "a"})))))))
+            (is (= #{:l :jk} (err-ks (coercer {:l 1.2 :jk 1.0})))))))
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]

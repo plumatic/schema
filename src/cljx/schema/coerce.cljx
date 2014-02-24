@@ -56,12 +56,12 @@
     string->keyword))
 
 (defn set-matcher [schema]
-  #+clj (if (instance? clojure.lang.APersistentSet schema)
-          (fn [x]
-            (cond
-              (set? x) x
-              (sequential? x) (set x)
-              :else nil))))
+  (if (instance? #+clj clojure.lang.APersistentSet #+cljs cljs.core.PersistentHashSet schema)
+    (fn [x]
+      (cond
+        (set? x) x
+        (sequential? x) (set x)
+        :else nil))))
 
 (defn safe
   "Take a single-arg function f, and return a single-arg function that acts as identity
