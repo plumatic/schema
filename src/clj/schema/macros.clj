@@ -534,7 +534,7 @@
 
 (defmacro with-fn-validation
   "Execute body with input and ouptut schema validation turned on for all s/defn
-   and s/fn instances."
+   and s/fn instances globally (across all threads).  Not concurrency-safe."
   [& body]
   `(do
      (schema.core/set-fn-validation! true)
