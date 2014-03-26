@@ -232,7 +232,7 @@
 (defrecord AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
   ;; loses type info, which makes this unusable in schema-fn.
-  ;; http://dev.clojure.org/jira/browse/CLJ-1196
+  ;; http://dev.clojure.org/jira/browse/CLJ-1093
   Schema
   (walker [this] identity)
   (explain [this] 'Any))
