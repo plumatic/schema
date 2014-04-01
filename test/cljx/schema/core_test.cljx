@@ -8,7 +8,7 @@
     - (invalid-call! s x) asserts that calling the function throws an error."
   #+clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:use-macros
-          [cemerick.cljs.test :only [is is= deftest testing]]
+          [cemerick.cljs.test :only [is deftest testing]]
           [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:require-macros
           [schema.macros :as sm])
