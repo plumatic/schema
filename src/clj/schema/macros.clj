@@ -513,7 +513,7 @@
            :doc (str
                  (str "Inputs: " (if (= 1 (count raw-arglists))
                                    (first raw-arglists)
-                                   raw-arglists))
+                                   (apply list raw-arglists)))
                  (when-let [ret (when (= (first more) :-) (second more))]
                    (str "\n  Returns: " ret))
                  (when doc-string? (str  "\n\n  " doc-string?)))

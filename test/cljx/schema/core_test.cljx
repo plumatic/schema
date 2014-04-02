@@ -837,6 +837,15 @@
   (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn))))
 
 #+clj
+(sm/defn ^String multi-arglist-validated-defn :- OddLongString
+  "I am a multi-arglist schema fn"
+  {:metadata :bla}
+  ([arg0 :- OddLong]
+     (str arg0))
+  ([arg0 :- OddLong arg1 :- Long]
+     (str (+ arg0 arg1))))
+
+#+clj
 (deftest simple-validated-defn-test
   (is (= "Inputs: [arg0]\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn))))
@@ -844,6 +853,9 @@
   (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn-new))))
   (is (= '([arg0]) (:arglists (meta #'simple-validated-defn-new))))
+  (is (= "Inputs: ([arg0 :- OddLong] [arg0 :- OddLong arg1 :- Long])\n  Returns: OddLongString\n\n  I am a multi-arglist schema fn"
+         (:doc (meta #'multi-arglist-validated-defn))))
+  (is (= '([arg0] [arg0 arg1]) (:arglists (meta #'multi-arglist-validated-defn))))
   (sm/with-fn-validation
     (testing "pre/post"
       (is (= 7 (validated-pre-post-defn 7)))
