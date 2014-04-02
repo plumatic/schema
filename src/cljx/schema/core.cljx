@@ -428,7 +428,7 @@
           (if-not sub-walkers
             (macros/validation-error
              this x
-             (list 'either? (list 'check '% (utils/value-name x)) (map explain schemas)))
+             (list 'some (list 'check '% (utils/value-name x)) 'schemas))
             (let [res ((first sub-walkers) x)]
               (if-not (utils/error? res)
                 res
