@@ -166,7 +166,7 @@ As you can see, these type hints are precise, easy to read, and shorter than the
 
 We've already seen how we can build up Schemas via composition, attach them to functions, and use them to validate data. What does this look like in practice?
 
-First, we ensure that all data types that will be shared across namespaces (or heavily used within namespaces) have Schemas, either by `def`ing them or using `sm/defrecord`.  This allows us to compactly and precisely refer to this data type in more complex data types, or when documenting function arguments and return vales. 
+First, we ensure that all data types that will be shared across namespaces (or heavily used within namespaces) have Schemas, either by `def`ing them or using `sm/defrecord`.  This allows us to compactly and precisely refer to this data type in more complex data types, or when documenting function arguments and return values. 
 
 This documentation is probably the most important benefit of Schema, which is why we've optimized Schemas for easy readability and reuse -- and sometimes, this is all you need. Schemas are purely descriptive, not prescriptive, so unlike a type system they should never get in your way, or constrain the types of functions you can write.  
 
@@ -176,7 +176,7 @@ After documentation, the next-most important benefit is validation.  Thus far, w
 (use-fixtures :once schema.test/validate-schemas)
 ```
 
-As long as your tests cover all call boundaries, this means you will should catch any 'type-like' bugs in your code at test time. 
+As long as your tests cover all call boundaries, this means you should catch any 'type-like' bugs in your code at test time. 
 
 Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).
 
