@@ -27,7 +27,10 @@
                                     :rules :clj}
                                    {:source-paths ["test/cljx"]
                                     :output-path "target/generated/test/cljs"
-                                    :rules :cljs}]}}}
+                                    :rules :cljs}]}}
+             :1.6 {:dependencies [[org.clojure/clojure "1.6.0"]]}}
+
+  :aliases {"all" ["with-profile" "dev:dev,1.6"]}
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
