@@ -96,7 +96,7 @@
     (valid! schema :a)
     (valid! schema 1)
     (invalid! schema :c)
-    (invalid! schema 2 "(not (#{1 :a :b} 2))")
+    (invalid! (s/enum :a) 2 "(not (#{:a} 2))")
     (is (= '(1 :a :b enum) (sort-by str (s/explain schema))))))
 
 (deftest pred-test
@@ -287,7 +287,7 @@
     (valid! schema {})
     (valid! schema {:a 1 :b 2})
     (invalid! schema {'a 1 :b 2} "{(not (keyword? a)) invalid-key}")
-    (invalid! schema {:a :a :b :b} "{:b (not (integer? :b)), :a (not (integer? :a))}")
+    (invalid! schema {:a :b} "{:a (not (integer? :b))}")
     (is (= '{Keyword Int} (s/explain {s/Keyword s/Int})))))
 
 (deftest simple-specific-key-map-test
@@ -860,11 +860,11 @@
     (testing "pre/post"
       (is (= 7 (validated-pre-post-defn 7)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(odd\? arg0\)"
-            (validated-pre-post-defn 0)))
+                            (validated-pre-post-defn 0)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(> 10 arg0\)"
-            (validated-pre-post-defn 11)))
+                            (validated-pre-post-defn 11)))
       (is (thrown-with-msg? AssertionError #"Assert failed: \(< 5 %\)"
-            (validated-pre-post-defn 1)))
+                            (validated-pre-post-defn 1)))
       (invalid-call! validated-pre-post-defn "a")))
   (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
     (testing label
