@@ -5,7 +5,8 @@
   (:require
    [schema.core :as s]
    [schema.utils :as utils]
-   [schema.coerce :as coerce]))
+   [schema.coerce :as coerce]
+   #+cljs cemerick.cljs.test))
 
 ;; s/Num s/Int
 
