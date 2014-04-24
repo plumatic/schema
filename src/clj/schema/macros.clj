@@ -539,7 +539,7 @@
    previously set value. Not concurrency-safe."
   [& body]
   `(if (schema.core/fn-validation?)
-     ~@body
+     (do ~@body)
      (do (schema.core/set-fn-validation! true)
          (try ~@body (finally (schema.core/set-fn-validation! false))))))
 
@@ -552,4 +552,4 @@
   `(if (schema.core/fn-validation?)
      (do (schema.core/set-fn-validation! false)
          (try ~@body (finally (schema.core/set-fn-validation! true))))
-     ~@body))
+     (do ~@body)))
