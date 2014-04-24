@@ -533,9 +533,23 @@
         `(do ~@body#)))
 
 (defmacro with-fn-validation
-  "Execute body with input and ouptut schema validation turned on for all s/defn
-   and s/fn instances globally (across all threads).  Not concurrency-safe."
+  "Execute body with input and ouptut schema validation turned on for
+   all s/defn and s/fn instances globally (across all threads). After
+   all forms have been executed, resets function validation to its
+   previously set value. Not concurrency-safe."
   [& body]
-  `(do
-     (schema.core/set-fn-validation! true)
-     (try ~@body (finally (schema.core/set-fn-validation! false)))))
+  `(if (schema.core/fn-validation?)
+     (do ~@body)
+     (do (schema.core/set-fn-validation! true)
+         (try ~@body (finally (schema.core/set-fn-validation! false))))))
+
+(defmacro without-fn-validation
+  "Execute body with input and ouptut schema validation turned off for
+   all s/defn and s/fn instances globally (across all threads). After
+   all forms have been executed, resets function validation to its
+   previously set value. Not concurrency-safe."
+  [& body]
+  `(if (schema.core/fn-validation?)
+     (do (schema.core/set-fn-validation! false)
+         (try ~@body (finally (schema.core/set-fn-validation! true))))
+     (do ~@body)))
