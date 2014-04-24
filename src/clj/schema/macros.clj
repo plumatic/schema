@@ -538,7 +538,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(if-let [toggle-val (.get_cell utils/use-fn-validation)]
+  `(if (schema.core/fn-validation?)
      ~@body
      (do (schema.core/set-fn-validation! true)
          (try ~@body (finally (schema.core/set-fn-validation! false))))))
@@ -549,7 +549,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(if-let [toggle-val (.get_cell utils/use-fn-validation)]
+  `(if (schema.core/fn-validation?)
      (do (schema.core/set-fn-validation! false)
          (try ~@body (finally (schema.core/set-fn-validation! true))))
      ~@body))

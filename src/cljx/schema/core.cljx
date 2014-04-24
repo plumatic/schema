@@ -908,6 +908,11 @@
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
+(defn fn-validation?
+  "Get the current global schema validation setting."
+  []
+  (.get_cell utils/use-fn-validation))
+
 (defn set-fn-validation!
   "Globally turn on schema validation for all s/fn and s/defn instances."
   [on?]
