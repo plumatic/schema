@@ -11,7 +11,7 @@ subject to change. Comments and contributions are much appreciated.**
 
 One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://blog.getprismatic.com/blog/2013/9/4/schema-for-clojurescript-data-shape-declaration-and-validation) on the Prismatic blog.)
 
-As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  See [this post]http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/) for a detailed overview, or check out the Coercion section below for an example.  
+As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  See [this post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/) for a detailed overview, or check out the Coercion section below for an example.  
 
 
 ## Meet Schema
