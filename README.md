@@ -306,7 +306,7 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
  
 There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/Prismatic/schema/wiki/Writing-Custom-Transformations) to do even more.  
 
-For more details, see [this blog post](http://blog.getprismatic.com/blog/2014/1/4/schema-020-back-with-clojurescript-data-coercion).
+For more details, see [this blog post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/).
 
 ## For the Future
 
