@@ -904,7 +904,9 @@
    macros/fn
    macros/defn
    macros/letfn
-   macros/with-fn-validation)
+   macros/with-fn-validation
+   macros/without-fn-validation
+   macros/def)
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
