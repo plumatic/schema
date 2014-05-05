@@ -1,3 +1,6 @@
+## 0.2.2
+ * Add validated `s/def`.
+
 ## 0.2.1
  * Add `Bool` to cross-platform primitives
  * Fix several minor bugs

@@ -994,6 +994,24 @@
   (is (false? (.get_cell utils/use-fn-validation))))
 
 
+;; def
+
+(deftest def-test ;; heh
+  (sm/def v 1)
+  (is (= 1 v))
+  (sm/def v "doc" 2)
+  (is (= 2 v))
+  #+clj (is (= "doc" (:doc (meta #'v))))
+  (sm/def v :- s/Int "doc" 3)
+  (is (= 3 v))
+  #+clj (is (= "doc" (:doc (meta #'v))))
+  (sm/def v :- s/Int 3)
+  #+clj (is (= String (:tag (meta (s/def v :- String "a")))))
+  #+clj (is (thrown? Exception (sm/def v :- s/Int "doc" 1.0)))
+  #+clj (is (thrown? Exception (sm/def v :- s/Int 1.0)))
+  #+clj (is (thrown? Exception (sm/def ^s/Int v 1.0))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
 

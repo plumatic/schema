@@ -340,7 +340,7 @@
 
 (defmacro defrecord
   "Define a record with a schema.  If *use-potemkin* is true, the resulting record
-   is a potemkin/defrecord+, otherwise it is a clojure.core/defrecord.
+   is a potemkin/defrecord+, otherwise it is a defrecord.
 
    In addition to the ordinary behavior of defrecord, this macro produces a schema
    for the Record, which will automatically be used when validating instances of
@@ -553,3 +553,27 @@
      (do (schema.core/set-fn-validation! false)
          (try ~@body (finally (schema.core/set-fn-validation! true))))
      (do ~@body)))
+
+(defmacro def
+  "Like def, but takes a schema on the var name (with the same format
+   as the output schema of s/defn), requires an initial value, and
+   asserts that the initial value matches the schema on the var name
+   (regardless of the status of with-fn-validation).  Due to
+   limitations of add-watch!, cannot enforce validation of subsequent
+   rebindings of var.  Throws at compile-time for clj, and client-side
+   load-time for cljs.
+
+   Example:
+
+   (s/def foo :- long \"a long\" 2)"
+  [& def-args]
+  (let [[name more-def-args] (extract-arrow-schematized-element &env def-args)
+        [doc-string? more-def-args] (if (= (count more-def-args) 2)
+                                      (maybe-split-first string? more-def-args)
+                                      [nil more-def-args])
+        init (first more-def-args)]
+    (assert-c! (= 1 (count more-def-args)) "Illegal args passed to schema def: %s" def-args)
+    `(let [output-schema# ~(extract-schema-form name)]
+       (def ~name
+         ~@(when doc-string? [doc-string?])
+         (schema.core/validate output-schema# ~init)))))
