@@ -1,5 +1,7 @@
 ## 0.2.2
  * Add validated `s/def`.
+ * Add validated `s/defmethod`.
+ * Add `Bool` coercions.
 
 ## 0.2.1
  * Add `Bool` to cross-platform primitives
