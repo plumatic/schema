@@ -1012,6 +1012,46 @@
   #+clj (is (thrown? Exception (sm/def ^s/Int v 1.0))))
 
 
+;; defmethod
+
+(defmulti m #(:k (first %&)))
+
+(deftest defmethod-unannotated-test
+  (sm/defmethod m :v [m x y] (+ x y))
+  (is (= 3 (m {:k :v} 1 2))))
+
+(deftest defmethod-input-annotated
+  (sm/defmethod m :v [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
+  (is (= 3
+         (sm/with-fn-validation (m {:k :v} 1 2)))))
+
+(deftest defmethod-output-annotated
+  (sm/defmethod m :v :- s/Num [m x y] (+ x y))
+  (is (= 3
+         (sm/with-fn-validation (m {:k :v} 1 2)))))
+
+(deftest defmethod-all-annotated
+  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
+  (is (= 3
+         (sm/with-fn-validation (m {:k :v} 1 2)))))
+
+(deftest defmethod-input-error-test
+  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
+  (is (thrown? #+clj RuntimeException #+cljs js/Error
+               (sm/with-fn-validation
+                 (sm/with-fn-validation (m {:k :v} 1 "2"))))))
+
+(deftest defmethod-output-error-test
+  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
+  (is (thrown? #+clj RuntimeException #+cljs js/Error
+               (sm/with-fn-validation
+                 (sm/with-fn-validation (m {:k :v} 1 2))))))
+
+(deftest defmethod-metadata-test
+  (sm/defmethod ^:always-validate m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
+  (is (thrown? #+clj RuntimeException #+cljs js/Error
+              (m {:k :v} 1 2))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
 

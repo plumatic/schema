@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord fn defn letfn])
+  (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -577,3 +577,23 @@
        (def ~name
          ~@(when doc-string? [doc-string?])
          (schema.core/validate output-schema# ~init)))))
+
+(defmacro defmethod
+  "Like clojure.core/defmethod, except that schema-style typehints can be given on
+   the argument symbols and after the dispatch-val (for the return value).
+
+   See (doc schema.macros/defn) for details.
+
+   Examples:
+
+     (s/defmethod mymultifun :a-dispatch-value :- s/Num [x :- s/Int y :- s/Num] (* x y))
+
+     ;; You can also use meta tags like ^:always-validate by placing them
+     ;; before the multifunction name:
+
+     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
+  "
+  [multifn dispatch-val & fn-tail]
+  (if (compiling-cljs?)
+    `(cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+    `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
