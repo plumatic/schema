@@ -88,7 +88,7 @@
                        #+clj {clojure.lang.Keyword string->keyword
                               s/Int safe-long-cast
                               Long safe-long-cast
-                              Double double
+                              Double (safe double)
                               Boolean string->boolean})]
   (defn json-coercion-matcher
     "A matcher that coerces keywords and keyword enums from strings, and longs and doubles
