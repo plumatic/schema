@@ -174,7 +174,7 @@
 
 (extend-protocol Schema
   #+clj Class
-  #+cljs js/Function
+  #+cljs function
   (walker [this]
     (let [class-walker (if-let [more-schema (utils/class-schema this)]
                          ;; do extra validation for records and such
