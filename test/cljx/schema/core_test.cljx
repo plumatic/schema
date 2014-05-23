@@ -55,7 +55,6 @@
   (deftest primitive-test
     (valid! double 1.0)
     (invalid! double (float 1.0) "(not (instance? java.lang.Double 1.0))")
-    (is (= 'java.lang.Double (s/explain double)))
     (valid! float (float 1.0))
     (invalid! float 1.0)
     (valid! long 1)
@@ -66,14 +65,17 @@
     (invalid! longs (int-array 10))
     (doseq [f [byte char short int]]
       (valid! f (f 1))
-      (invalid! f 1)))
+      (invalid! f 1))
+    (is (= 'double (s/explain double))))
 
   (deftest array-test
     (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
     (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
     (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
     (valid! (Class/forName "[D") (double-array [1.0]))
-    (invalid! (Class/forName "[D") (into-array Double [1.0]))))
+    (invalid! (Class/forName "[D") (into-array Double [1.0]))
+    (valid! doubles (double-array [1.0]))
+    (is (= 'doubles (s/explain doubles)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1050,7 +1052,7 @@
 (deftest defmethod-metadata-test
   (sm/defmethod ^:always-validate m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
   (is (thrown? #+clj RuntimeException #+cljs js/Error
-              (m {:k :v} 1 2))))
+               (m {:k :v} 1 2))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)

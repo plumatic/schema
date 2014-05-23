@@ -199,30 +199,31 @@
 #+clj
 (do
   (defmacro extend-primitive [cast-sym class-sym]
-    `(extend-protocol Schema
-       ~cast-sym
-       (walker [this#]
-         (subschema-walker ~class-sym))
-       (explain [this#]
-         (explain ~class-sym))))
+    (let [qualified-cast-sym (symbol (str "clojure.core$" (name cast-sym)))]
+      `(extend-protocol Schema
+         ~qualified-cast-sym
+         (walker [this#]
+           (subschema-walker ~class-sym))
+         (explain [this#]
+           '~cast-sym))))
 
-  (extend-primitive clojure.core$double Double)
-  (extend-primitive clojure.core$float Float)
-  (extend-primitive clojure.core$long Long)
-  (extend-primitive clojure.core$int Integer)
-  (extend-primitive clojure.core$short Short)
-  (extend-primitive clojure.core$char Character)
-  (extend-primitive clojure.core$byte Byte)
-  (extend-primitive clojure.core$boolean Boolean)
+  (extend-primitive double Double)
+  (extend-primitive float Float)
+  (extend-primitive long Long)
+  (extend-primitive int Integer)
+  (extend-primitive short Short)
+  (extend-primitive char Character)
+  (extend-primitive byte Byte)
+  (extend-primitive boolean Boolean)
 
-  (extend-primitive clojure.core$doubles (Class/forName "[D"))
-  (extend-primitive clojure.core$floats (Class/forName "[F"))
-  (extend-primitive clojure.core$longs (Class/forName "[J"))
-  (extend-primitive clojure.core$ints (Class/forName "[I"))
-  (extend-primitive clojure.core$shorts (Class/forName "[S"))
-  (extend-primitive clojure.core$chars (Class/forName "[C"))
-  (extend-primitive clojure.core$bytes (Class/forName "[B"))
-  (extend-primitive clojure.core$booleans (Class/forName "[Z")))
+  (extend-primitive doubles (Class/forName "[D"))
+  (extend-primitive floats (Class/forName "[F"))
+  (extend-primitive longs (Class/forName "[J"))
+  (extend-primitive ints (Class/forName "[I"))
+  (extend-primitive shorts (Class/forName "[S"))
+  (extend-primitive chars (Class/forName "[C"))
+  (extend-primitive bytes (Class/forName "[B"))
+  (extend-primitive booleans (Class/forName "[Z")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Cross-platform Schema leaves
