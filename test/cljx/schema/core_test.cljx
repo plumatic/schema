@@ -202,6 +202,17 @@
     (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
     (is (s/explain schema))))
 
+(deftest named-either-test
+  (let [schema (s/named-either
+                 "Key" s/Keyword
+                 "Path" [s/Keyword])]
+    (valid! schema :foo)
+    (valid! schema [:foo :bar :baz])
+    (invalid! schema 1 "(not (some (check % 1) [Key Path]))")
+    (invalid! schema [:foo 2] "(not (some (check % [:foo 2]) [Key Path]))")
+    (is (= '(either Keyword [Keyword]) (s/explain schema)))
+    (is (s/explain schema))))
+
 (deftest both-test
   (let [schema (s/both
                 (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)) 'equal-keys?)
