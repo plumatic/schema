@@ -83,35 +83,38 @@
                l
                x)))))
 
-(let [coercions (merge {s/Keyword string->keyword
-                        s/Bool string->boolean}
-                       #+clj {clojure.lang.Keyword string->keyword
-                              s/Int safe-long-cast
-                              Long safe-long-cast
-                              Double (safe double)
-                              Boolean string->boolean})]
-  (defn json-coercion-matcher
-    "A matcher that coerces keywords and keyword enums from strings, and longs and doubles
+(def +json-coercions+
+  (merge
+   {s/Keyword string->keyword
+    s/Bool string->boolean}
+   #+clj {clojure.lang.Keyword string->keyword
+          s/Int safe-long-cast
+          Long safe-long-cast
+          Double (safe double)
+          Boolean string->boolean}))
+
+(defn json-coercion-matcher
+  "A matcher that coerces keywords and keyword enums from strings, and longs and doubles
      from numbers on the JVM (without losing precision)"
-    [schema]
-    (or (coercions schema)
-        (keyword-enum-matcher schema)
-        (set-matcher schema))))
+  [schema]
+  (or (+json-coercions+ schema)
+      (keyword-enum-matcher schema)
+      (set-matcher schema)))
 
 (def edn-read-string #+clj edn/read-string #+cljs reader/read-string)
 
-(let [coercions (merge {s/Keyword string->keyword
-                        s/Bool string->boolean
-                        s/Num (safe edn-read-string)
-                        s/Int (safe edn-read-string)}
-                       #+clj {clojure.lang.Keyword string->keyword
-                              s/Int (safe #(safe-long-cast (edn-read-string %)))
-                              Long (safe #(safe-long-cast (edn-read-string %)))
-                              Double (safe #(Double/parseDouble %))
-                              Boolean string->boolean})]
-  (defn string-coercion-matcher
-    "A matcher that coerces keywords, keyword enums, s/Num and s/Int,
+(def +string-coercions+
+  (merge
+   +json-coercions+
+   {s/Num (safe edn-read-string)
+    s/Int (safe edn-read-string)}
+   #+clj {s/Int (safe #(safe-long-cast (edn-read-string %)))
+          Long (safe #(safe-long-cast (edn-read-string %)))
+          Double (safe #(Double/parseDouble %))}))
+
+(defn string-coercion-matcher
+  "A matcher that coerces keywords, keyword enums, s/Num and s/Int,
      and long and doubles (JVM only) from strings."
-    [schema]
-    (or (coercions schema)
-        (keyword-enum-matcher schema))))
+  [schema]
+  (or (+string-coercions+ schema)
+      (keyword-enum-matcher schema)))
