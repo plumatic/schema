@@ -10,6 +10,7 @@
                                   [org.clojure/clojurescript "0.0-2030"]
                                   [com.keminglabs/cljx "0.3.1"]]
                    :plugins [[com.keminglabs/cljx "0.3.1"]
+                             [codox "0.8.8"]
                              [lein-cljsbuild "0.3.2"]
                              [com.cemerick/austin "0.1.3"]
                              [com.cemerick/clojurescript.test "0.2.2"]]
@@ -59,4 +60,5 @@
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
 
-                                 :pretty-print true}}}})
+                                 :pretty-print true}}}}
+  :codox {:src-uri-mapping {#"target/classes" #(str "src/" % "x")}})
