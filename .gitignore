@@ -5,3 +5,4 @@ out/
 *~
 pom.xml
 *.asc
+/doc/
