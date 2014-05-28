@@ -61,4 +61,6 @@
                                  :optimizations :whitespace
 
                                  :pretty-print true}}}}
-  :codox {:src-uri-mapping {#"target/classes" #(str "src/" % "x")}})
+  :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
+          :src-dir-uri "http://github.com/prismatic/schema/blob/master/"
+          :src-linenum-anchor-prefix "L"})
