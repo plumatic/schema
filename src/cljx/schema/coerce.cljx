@@ -83,7 +83,7 @@
                l
                x)))))
 
-(def +json-coercions+
+(def ^:no-doc +json-coercions+
   (merge
    {s/Keyword string->keyword
     s/Bool string->boolean}
@@ -103,7 +103,7 @@
 
 (def edn-read-string #+clj edn/read-string #+cljs reader/read-string)
 
-(def +string-coercions+
+(def ^:no-doc +string-coercions+
   (merge
    +json-coercions+
    {s/Num (safe edn-read-string)
