@@ -1,3 +1,9 @@
+## 0.2.3
+ * Improved explains for primitives & primitive arrays
+ * More robust double coercions
+ * Fix cljs warning about extending js/Function
+ * Import schema.macros/defmulti in schema.core
+
 ## 0.2.2
  * Add validated `s/def`.
  * Add validated `s/defmethod`.
