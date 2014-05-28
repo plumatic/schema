@@ -554,7 +554,7 @@
 
 ;;; Definitions for required and optional keys, and single entry validators
 
-(def +missing+
+(def ^:no-doc +missing+
   "A sentinel value representing missing portions of the input data."
   ::missing)
 
