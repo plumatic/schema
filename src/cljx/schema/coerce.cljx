@@ -101,7 +101,9 @@
       (keyword-enum-matcher schema)
       (set-matcher schema)))
 
-(def edn-read-string #+clj edn/read-string #+cljs reader/read-string)
+(def edn-read-string
+  "Reads one object from a string. Returns nil when string is nil or empty"
+  #+clj edn/read-string #+cljs reader/read-string)
 
 (def ^:no-doc +string-coercions+
   (merge
