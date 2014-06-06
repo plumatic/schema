@@ -303,7 +303,9 @@
   ([name form]
      `(defschema ~name "" ~form))
   ([name docstring form]
-     `(def ~name ~docstring (schema.core/schema-with-name ~form '~name))))
+     (let [fully-qualified (-> (ns-name *ns*) (str "/" name) symbol)]
+       `(def ~name ~docstring (schema.core/schema-with-name ~form '~fully-qualified)))))
+
 
 ;;; The clojure version is a function in schema.core, this must be here for cljs because
 ;;; satisfies? is a macro that must have access to the protocol at compile-time.
