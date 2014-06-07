@@ -898,7 +898,7 @@
 ;; In ClojureScript, you have to use them from clj schema.macros
 #+clj
 (do
-  (doseq [s ['fn 'defn 'letfn 'defrecord]] (ns-unmap *ns* s))
+  (doseq [s ['fn 'defn 'letfn 'defrecord 'defmulti 'defmethod]] (ns-unmap *ns* s))
   (potemkin/import-vars
    macros/defrecord
    macros/fn
@@ -906,7 +906,10 @@
    macros/letfn
    macros/with-fn-validation
    macros/without-fn-validation
-   macros/def)
+   macros/def
+   macros/defmulti
+   macros/defmethod
+   )
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))
 
