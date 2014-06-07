@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
+  (:refer-clojure :exclude [defrecord fn defn letfn defmulti defmethod])
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -73,6 +73,36 @@
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(schema.utils/error
     (utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation)))
+
+(defmacro as2->
+  "Like as-> but can use destructuring expressions in name. Fix proposed at
+   http://dev.clojure.org/jira/browse/CLJ-1418
+  "
+  [expr name & forms]
+  `(let [~name ~expr
+         ~@(interleave (repeat name) (butlast forms))]
+     ~(last forms)))
+
+(clojure.core/defn qualify-varsym
+  "Qualify a var symbol"
+  [varsym env]
+  (if (:ns env)
+    ;; ClojureScript
+    (let [def-var  (get-in env [:ns :defs varsym :name])
+          used-ns  (get-in env [:ns :uses varsym])]
+      (cond (namespace varsym) varsym
+            def-var            def-var
+            used-ns            (symbol (str used-ns) (str varsym))
+            :else              (symbol (str *ns*)    (str varsym)) ; var not created yet 
+            ))
+    ;; Clojure
+    (let [res-meta (meta (resolve varsym))]
+      (cond (namespace varsym) varsym
+            res-meta           (symbol (str (:ns res-meta)) (str (:name res-meta)))
+            :else              (symbol (str *ns*)           (str varsym)) ; var not created yet 
+            ))
+    ))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
@@ -578,11 +608,97 @@
          ~@(when doc-string? [doc-string?])
          (schema.core/validate output-schema# ~init)))))
 
+;; Compile-time central registry for defmulti default schemas,
+;; needed because: 
+;;
+;; 1- in Clojure storing default schemas in defmulti var metadata is
+;;    very fragile. For example, if you call s/defmulti and s/defmethod
+;;    inside a deftest, s/defmethod will not find the var, because
+;;    s/defmulti expands to the def but the def is not evaluated before
+;;    s/defmulti is executed. 
+;;
+;; 2- in ClojureScript you can't access to ClojureScript vars an their
+;;    metadata from macros in compile-time.
+(def defmulti-schemas (atom {}))
+
+(defmacro defmulti
+  "
+  Like clojure.core/defmulti, except that you can define default schema-style typehints
+  for the subsequent invocations of s/defmethod, so you can define the type-hints for all
+  methods in a single place. 
+
+  Examples:
+    (s/defmulti mymulti dispatch-fn :- s/Str [x :- s/Num y :- s/Num])
+
+    ;; the following methods will be hinted in the exact same way:
+    (s/defmethod mymulti :dispatch-val1 [x y] 
+      (* * x y))                       
+    (s/defmethod mymulti :dispatch-val2 :- s/Str [x :- s/Str y :- s/Str] 
+      (* x y))
+    (s/defmethod mymulti :dispatch-val3 [some-other-name y] 
+      (* some-other-name y))
+
+    ;; if you need to use defmulti options simply put them at the end
+    (s/defmulti mymulti dispatch-fn :- s/Str [x :- s/Str y :- s/Str] :hierarchy myhierarchy)
+
+    ;; you can also define schema hinting for multiple arities (but all
+    ;; will share the same return value schema)
+    (s/defmulti mymulti dispatch-fn :- s/Str ([x :- s/Num y :- s/Num]
+                                              [x :- s/Num y :- s/Num z :- s/Str]))
+
+  Notes: 
+   - dispatch-fn will be not hinted, if you want to hint it use s/defn or s/fn. 
+   - s/defmulti defines the default hints for s/defmethod, calling s/defmethod with
+     any hints declared will make all s/defmulti hints to be ignored.
+   - the ^:always-validate flag will be also inherited by non-rehinted
+     s/defmethod calls
+
+  Current limitations: 
+   - if s/defmulti and s/defmethod are used in different namespaces, you need to
+     fully qualify the symbols used in the schema passed to s/defmulti. The
+     schema expression is passed as-is to the s/defmethod expression.
+  "
+  [mm-name & opts]
+  (-> [{} opts]
+      (as2-> [m [e & r :as o]] 
+             (if (string? e) 
+               [(assoc m :docstring [e]) r] 
+               [m o])
+             (if (map? e)
+               [(assoc m :attr-map e :dispatch-fn (first r)) (next r)]
+               [(assoc m             :dispatch-fn e)         r])
+             (if (= e :-)
+               [(assoc m :output (first r)) (next r)]
+               [m o])
+             (if (or (vector? e) (list? e))
+               [(assoc m :input
+                       (for [arglist (if (vector? e) (list e) e)]
+                         (for [symbol (schema.macros/process-arrow-schematized-args {} arglist)]
+                           [(with-meta symbol {}) (meta symbol)]))
+                       ) 
+                r]
+               [m o])
+             (do
+               (when (some #{:input :output} (keys m))
+                 (swap! defmulti-schemas #(assoc % (qualify-varsym mm-name &env) 
+                                                   (merge (select-keys m [:input :output])
+                                                          {:meta (meta mm-name)}))))
+               `(clojure.core/defmulti ~mm-name
+                  ~@(get m :docstring []) 
+                   ~(get m :attr-map  {})
+                   ~(get m :dispatch-fn) 
+                  ~@o)
+               ))))
+
+
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
 
-   See (doc schema.macros/defn) for details.
+   If you define a default input/output schema using s/defmulti, defmethod will
+   use it when called with no hints. 
+
+   See (doc schema.macros/defn) and (doc schema.macros/defmulti) for details.
 
    Examples:
 
@@ -593,7 +709,40 @@
 
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
   "
-  [multifn dispatch-val & fn-tail]
-  (if (compiling-cljs?)
-    `(cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+  [multifn dispatch-val & [f & _ :as fn-tail]]
+  (let [default-schemas           (get @defmulti-schemas (qualify-varsym multifn &env))
+        [hinted-fn-tail metadata]
+        (if (some #{:-}
+                  (cond (= f :-)     [f]                    ; hinted return value
+                        (vector? f)  fn-tail                ; only one arity defined, maybe hinted
+                        (list?   f)  (mapcat first fn-tail) ; many arities, maybe hinted
+                        :else        (throw (ex-info "Invalid fn-tail"))))
+          ;; this defmethod call defines hints, ignore defmulti hints:
+          [fn-tail {}]
+          ;; no hints provided, use hints defined in defmulti for return
+          ;; value and each matching input arity:
+          [(concat 
+            (when-let [out (:output default-schemas)] 
+              [:- out])
+            (for [[original-args body] (if (vector? f) [fn-tail] fn-tail)]
+              (list 
+               (if-let [defmulti-args (first (filter #(= (count %) (count original-args)) 
+                                                     (:input default-schemas)))]
+                 ;; get hints but preserve original defmethod binding symbols
+                 (vec (mapcat (clojure.core/fn [orig-arg [_ defmulti-arg-meta]]
+                                (if-let [schema (:schema defmulti-arg-meta)]
+                                  [orig-arg :- schema]
+                                  [orig-arg]))
+                              original-args defmulti-args))
+                 ;; keep original args for this arity
+                 original-args
+                 )
+               body)))
+           (:meta default-schemas)
+           ]) 
+        hinted-fun `(schema.macros/fn ~(with-meta (gensym) (merge (meta multifn) metadata)) ~@hinted-fn-tail)]
+    (if (compiling-cljs?)
+      `(cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val ~hinted-fun)
+      `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val ~hinted-fun)
+      )
+    ))
