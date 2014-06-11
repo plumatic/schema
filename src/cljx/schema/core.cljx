@@ -21,9 +21,9 @@
    (check FooBar {:foo :k :bar [1.0 2.0 3.0] :baz 1})
    ==> {:baz disallowed-key}
 
-   Schema lets you describe your leaf values using the Any, Keyword, Number, String,
-   and Int definitions below, or (in Clojure) you can use arbitrary Java classes or
-   primitive casts to describe simple values.
+   Schema lets you describe your leaf values using the Any, Keyword, Symbol, Number,
+   String, and Int definitions below, or (in Clojure) you can use arbitrary Java
+   classes or primitive casts to describe simple values.
 
    From there, you can build up schemas for complex types using Clojure syntax
    (map literals for maps, set literals for sets, vector literals for sequences,
@@ -78,7 +78,7 @@
    (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
    of defrecord, fn, and defn in schema.macros for more details about how to use
    these macros."
-  (:refer-clojure :exclude [Keyword])
+  (:refer-clojure :exclude [Keyword Symbol])
   (:require
    [clojure.string :as str]
    #+clj potemkin
@@ -288,6 +288,7 @@
   (explain [this]
     (cond (= p? integer?) 'Int
           (= p? keyword?) 'Keyword
+          (= p? symbol?) 'Symbol
           :else (list 'pred pred-name))))
 
 (defn pred
@@ -368,6 +369,10 @@
 (def Keyword
   "A keyword"
   (pred keyword? 'keyword?))
+
+(def Symbol
+  "A symbol"
+  (pred symbol? 'symbol?))
 
 (def Regex
   "A regular expression"
