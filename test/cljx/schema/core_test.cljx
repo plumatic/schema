@@ -162,6 +162,12 @@
   (invalid! s/Keyword ":a" "(not (keyword? \":a\"))")
   (is (= 'Keyword (s/explain s/Keyword))))
 
+(deftest leaf-symbol-test
+  (valid! s/Symbol 'foo)
+  (invalid! s/Symbol nil "(not (symbol? nil))")
+  (invalid! s/Symbol "'a" "(not (symbol? \"'a\"))")
+  (is (= 'Symbol (s/explain s/Symbol))))
+
 (deftest leaf-regex-test
   (valid! s/Regex #".*")
   (invalid! s/Regex ".*"))
