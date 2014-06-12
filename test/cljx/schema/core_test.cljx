@@ -283,6 +283,15 @@
       (invalid! BlackNode {:black {:black {}}})
       (invalid! BlackNode {:black {:red {}}})
 
+      (let [rec (promise)
+            schema {(s/optional-key :x) (s/recursive rec)}]
+        (deliver rec schema)
+        (valid! schema {})
+        (valid! schema {:x {:x {:x {}}}})
+        (invalid! schema {:x {:x {:y {}}}})
+        (is (= '{(optional-key :x) (recursive (derefable))}
+               (s/explain schema))))
+
       (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/BlackNode))}}
              (s/explain BlackNode)))))
 
