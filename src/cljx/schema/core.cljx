@@ -529,7 +529,9 @@
       (list 'recursive
             (if (var? derefable)
               (list 'var (var-name derefable))
-              '(derefable)))))
+              (format "%s@%x"
+                      (.getName (class derefable))
+                      (System/identityHashCode derefable))))))
 
   (defn recursive
     "Support for (mutually) recursive schemas by passing a var that points to a schema,

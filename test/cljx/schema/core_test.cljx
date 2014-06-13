@@ -289,8 +289,11 @@
         (valid! schema {})
         (valid! schema {:x {:x {:x {}}}})
         (invalid! schema {:x {:x {:y {}}}})
-        (is (= '{(optional-key :x) (recursive (derefable))}
-               (s/explain schema))))
+        (let [explanation (first (s/explain schema))]
+          (is (= '(optional-key :x) (key explanation)))
+          (is (= 'recursive (first (val explanation))))
+          (is (re-matches #"clojure\.core\$promise.*"
+                          (second (val explanation))))))
 
       (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/BlackNode))}}
              (s/explain BlackNode)))))
