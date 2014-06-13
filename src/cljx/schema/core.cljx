@@ -517,24 +517,29 @@
     (let [{:keys [ns name]} (meta v)]
       (symbol (str (ns-name ns) "/" name))))
 
-  (defrecord Recursive [schema-var]
+  (defrecord Recursive [derefable]
     Schema
     (walker [this]
       (let [a (atom nil)]
         (reset! a (start-walker
                    (let [old subschema-walker]
                      (fn [s] (if (= s this) #(@a %) (old s))))
-                   @schema-var))))
+                   @derefable))))
     (explain [this]
-      (list 'recursive (list 'var (var-name schema-var)))))
+      (list 'recursive
+            (if (var? derefable)
+              (list 'var (var-name derefable))
+              (format "%s@%x"
+                      (.getName (class derefable))
+                      (System/identityHashCode derefable))))))
 
   (defn recursive
     "Support for (mutually) recursive schemas by passing a var that points to a schema,
        e.g (recursive #'ExampleRecursiveSchema)."
-    [schema-var]
-    (when-not (var? schema-var)
-      (macros/error! (utils/format* "Not a var: %s" schema-var)))
-    (Recursive. schema-var)))
+    [schema]
+    (when-not (instance? clojure.lang.IDeref schema)
+      (macros/error! (utils/format* "Not an IDeref: %s" schema)))
+    (Recursive. schema)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
