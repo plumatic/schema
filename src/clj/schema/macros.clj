@@ -10,19 +10,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
-(clojure.core/defn compiling-cljs?
-  "Return true if we are currently generating cljs code.  Useful because cljx does not
-         provide a hook for conditional macro expansion."
-  []
-  (boolean
-   (when-let [n (find-ns 'cljs.analyzer)]
-     (when-let [v (ns-resolve n '*cljs-file*)]
-       @v))))
+(clojure.core/defn cljs-env?
+  "Take the &env from a macro, and tell whether we are expanding into cljs."
+  [env]
+  (boolean (:ns env)))
 
-(defmacro compiling-cljs-now?
-  "Helper macro to test compiling-cljs?"
-  []
-  (compiling-cljs?))
+(defmacro if-cljs
+  "Return then if we are generating cljs code and else for Clojure code.
+   https://groups.google.com/d/msg/clojurescript/iBY5HaQda4A/w1lAQi9_AwsJ"
+  [then else]
+  (if (cljs-env? &env) then else))
 
 (defmacro try-catchall
   "A variant of try-catch that catches all exceptions in client (non-compilation) code.
@@ -32,20 +29,20 @@
         [catch sym & catch-body :as catch-form] (last body)]
     (assert (= catch 'catch))
     (assert (symbol? sym))
-    (if (compiling-cljs?)
-      `(try ~@try-body (~'catch js/Object ~sym ~@catch-body))
-      `(try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
+    `(if-cljs
+      (try ~@try-body (~'catch js/Object ~sym ~@catch-body))
+      (try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
 
 (defmacro error!
   "Generate a cross-platform exception in client (non-compilation) code."
   ([s]
-     (if (compiling-cljs?)
-       `(throw (js/Error. ~s))
-       `(throw (RuntimeException. ~(with-meta s `{:tag java.lang.String})))))
+     `(if-cljs
+       (throw (js/Error. ~s))
+       (throw (RuntimeException. ~(with-meta s `{:tag java.lang.String})))))
   ([s m]
-     (if (compiling-cljs?)
-       `(throw (ex-info ~s ~m))
-       `(throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m)))))
+     `(if-cljs
+       (throw (ex-info ~s ~m))
+       (throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m)))))
 
 (defmacro safe-get
   "Like get but throw an exception if not found.  A macro just to work around cljx function
@@ -386,7 +383,7 @@
        (when ~extra-validator-fn?
          (assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                   (class ~extra-validator-fn?)))
-       (~(if (and @*use-potemkin* (not (compiling-cljs?)))
+       (~(if (and @*use-potemkin* (not (cljs-env? &env)))
            `potemkin/defrecord+
            `clojure.core/defrecord)
         ~name ~field-schema ~@more-args)
@@ -594,6 +591,6 @@
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
   "
   [multifn dispatch-val & fn-tail]
-  (if (compiling-cljs?)
-    `(cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+  `(if-cljs
+    (cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
