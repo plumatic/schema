@@ -26,8 +26,8 @@
   (def AssertionError js/Error)
   (def Throwable js/Error))
 
-(deftest compiling-cljs?-test
-  (is (= #+cljs true #+clj false (sm/compiling-cljs-now?))))
+(deftest if-cljs-test
+  (is (= #+cljs true #+clj false (sm/if-cljs true false))))
 
 (deftest try-catchall-test
   (let [a (atom 0)]

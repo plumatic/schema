@@ -1,3 +1,8 @@
+## 0.2.4
+ * Fixed an issue that could cause ClojureScript compilation to fail
+ * Generalize `s/recursive` to work on artibrary refs
+ * Add `s/Symbol` as a cross-platfor primitive
+
 ## 0.2.3
  * Improved explains for primitives & primitive arrays
  * More robust double coercions
