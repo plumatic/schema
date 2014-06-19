@@ -666,6 +666,11 @@
                     (vec key-schemata))
     (first key-schemata)))
 
+(defn- preserve-map-type [original walker-result]
+  (if (and (utils/record? original) (not (utils/error? walker-result)))
+    (merge original walker-result)
+    walker-result))
+
 (defn- map-walker [map-schema]
   (let [extra-keys-schema (find-extra-keys-schema map-schema)
         extra-walker (when extra-keys-schema
@@ -686,20 +691,22 @@
     (fn [x]
       (if-not (map? x)
         (macros/validation-error map-schema x (list 'map? (utils/value-name x)))
-        (loop [ok-key #{} explicit-walkers (seq explicit-walkers) out {}]
-          (if-not explicit-walkers
-            (reduce
-             (if extra-walker
-               (fn [out e]
-                 (err-conj out (extra-walker e)))
-               (fn [out [k _]]
-                 (err-conj out (utils/error [k 'disallowed-key]))))
-             out
-             (remove (fn [[k v]] (ok-key k)) x))
-            (let [[wk wv] (first explicit-walkers)]
-              (recur (conj ok-key wk)
-                     (next explicit-walkers)
-                     (err-conj out (wv (or (find x wk) +missing+)))))))))))
+        (preserve-map-type
+         x
+         (loop [ok-key #{} explicit-walkers (seq explicit-walkers) out {}]
+           (if-not explicit-walkers
+             (reduce
+              (if extra-walker
+                (fn [out e]
+                  (err-conj out (extra-walker e)))
+                (fn [out [k _]]
+                  (err-conj out (utils/error [k 'disallowed-key]))))
+              out
+              (remove (fn [[k v]] (ok-key k)) x))
+             (let [[wk wv] (first explicit-walkers)]
+               (recur (conj ok-key wk)
+                      (next explicit-walkers)
+                      (err-conj out (wv (or (find x wk) +missing+))))))))))))
 
 (defn- map-explain [this]
   (into {} (for [[k v] this] (vec (next (explain (map-entry k v)))))))

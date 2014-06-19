@@ -353,6 +353,20 @@
   (is (thrown? Exception (s/checker {:foo s/Str (s/optional-key :foo) s/Str})))
   (is (thrown? Exception (s/checker {(s/required-key "A") s/Str (s/optional-key "A") s/Str}))))
 
+(defprotocol SomeProtocol
+  (stuff [this]))
+
+(defrecord SomeRecord [x y z]
+  SomeProtocol
+  (stuff [_] x))
+
+(deftest preserve-type-in-map-schema-check
+  (let [field-subset {:x s/Keyword :y s/Num s/Keyword s/Any}
+        protocol-schema #+clj (s/protocol SomeProtocol) #+cljs (sm/protocol SomeProtocol)
+        schema (s/both field-subset protocol-schema)]
+    (valid! schema (->SomeRecord :foo 42 "extra"))
+    (invalid! schema {:x :foo :y 42})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Handle Struct
 
