@@ -48,6 +48,20 @@
 (declare validation-error-explain)
 
 (deftype ValidationError [schema value expectation-delay fail-explanation]
+  #+clj Object
+  #+clj (equals [this other]
+    (and (= (type-of this) (type-of other))
+         (= (.schema this) (.schema other))
+         (= (.value this) (.value other))
+         (= @(.expectation-delay this) @(.expectation-delay other))
+         (= (.fail-explanation this) (.fail-explanation other))))
+  #+cljs IEquiv
+  #+cljs (-equiv [this other]
+           (and (= (type-of this) (type-of other))
+                (= (.-schema this) (.-schema other))
+                (= (.-value this) (.-value other))
+                (= @(.-expectation-delay this) @(.-expectation-delay other))
+                (= (.-fail-explanation this) (.-fail-explanation other))))
   #+cljs IPrintWithWriter
   #+cljs (-pr-writer [this writer opts]
            (-pr-writer (validation-error-explain this) writer opts)))
