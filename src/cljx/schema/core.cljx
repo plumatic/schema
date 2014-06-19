@@ -446,6 +446,33 @@
   [& schemas]
   (Either. schemas))
 
+(defrecord NamedEither [schemas-by-name]
+  Schema
+  (walker [this]
+    (let [sub-walkers (mapv subschema-walker (vals schemas-by-name))]
+      (fn [x]
+        (loop [sub-walkers (seq sub-walkers)]
+          (if (empty? sub-walkers)
+            (macros/validation-error
+              this, x
+              (list
+                'some
+                (list 'check '% (utils/value-name x))
+                (mapv symbol (keys schemas-by-name))))
+            (let [result ((first sub-walkers) x)]
+              (if-not (utils/error? result)
+                result
+                (recur (next sub-walkers)))))))))
+  (explain [this] (cons 'either (map explain (vals schemas-by-name)))))
+
+(defn named-either
+  "A value that must satisfy at least one of the named schema in schemas."
+  [name schema & names-and-schemas]
+  (let [all-names-and-schemas (concat [name schema] names-and-schemas)]
+    (NamedEither. (->> all-names-and-schemas
+                    (partition 2)
+                    (map vec)
+                    (into {})))))
 
 ;;; both (satisfies this schema and that one)
 
