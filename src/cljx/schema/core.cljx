@@ -616,36 +616,31 @@
 (defrecord MapEntry [kspec val-schema]
   Schema
   (walker [this]
-    (let [val-walker (subschema-walker val-schema)]
-      (if (specific-key? kspec)
-        (let [optional? (optional-key? kspec)
-              k (explicit-schema-key kspec)]
-          (fn [x]
-            (cond (identical? +missing+ x)
-                  (when-not optional?
-                    (utils/error [k 'missing-required-key]))
+    (let [val-walker (subschema-walker val-schema)
+          k (delay (explicit-schema-key kspec))
+          key-walker (subschema-walker (if (specific-key? kspec)
+                                         (if (keyword? @k)
+                                           (both Keyword (eq @k))
+                                           (eq @k))
+                                         kspec))
+          optional? (optional-key? kspec)]
 
-                  (not (= 2 (count x)))
-                  (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+      (fn [x]
+        (cond (identical? +missing+ x)
+              (when-not optional?
+                (utils/error [@k 'missing-required-key]))
 
-                  :else
-                  (let [[xk xv] x]
-                    (assert (= xk k))
-                    (let [vres (val-walker xv)]
-                      (if-let [ve (utils/error-val vres)]
-                        (utils/error [xk ve])
-                        [xk vres]))))))
-        (let [key-walker (subschema-walker kspec)]
-          (fn [x]
-            (if-not (= 2 (count x))
+              (not (= 2 (count x)))
               (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+
+              :else
               (let [out-k (key-walker (key x))
                     out-ke (utils/error-val out-k)
                     out-v (val-walker (val x))
                     out-ve (utils/error-val out-v)]
                 (if (or out-ke out-ve)
                   (utils/error [(or out-ke (key x)) (or out-ve 'invalid-key)])
-                  [out-k out-v]))))))))
+                  [out-k out-v]))))))
   (explain [this]
     (list
      'map-entry
