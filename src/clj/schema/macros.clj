@@ -526,7 +526,7 @@
 (defmacro letfn [fnspecs# & body#]
   (list 'clojure.core/let
         (vec (interleave (map first fnspecs#)
-                         (map macroexpand (map #(cons `schema.macros/fn %) fnspecs#))))
+                         (map #(cons `schema.macros/fn %) fnspecs#)))
         `(do ~@body#)))
 
 (defmacro with-fn-validation
