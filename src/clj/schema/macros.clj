@@ -427,6 +427,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized functions
 
+(def +schema-fn-meta-tags+
+  "The set of attributes that can be provided on s/fn and s/defn names for special effect."
+  #{:always-validate :never-validate})
+
 (defmacro fn
   "sm/fn : sm/defn :: clojure.core/fn : clojure.core/defn
 
@@ -600,6 +604,9 @@
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
   "
   [multifn dispatch-val & fn-tail]
-  `(if-cljs
-    (cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+  `(~@(if (cljs-env? &env)
+        [`cljs.core/-add-method (with-meta multifn {:tag 'cljs.core/MultiFn})]
+        [`.addMethod (with-meta multifn {:tag 'clojure.lang.MultiFn})])
+    ~dispatch-val
+    (schema.macros/fn ~(with-meta (gensym) (select-keys (meta multifn) +schema-fn-meta-tags+))
+      ~@fn-tail)))
