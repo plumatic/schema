@@ -447,6 +447,21 @@
     `(let ~outer-bindings
        (schema.core/schematize-fn (clojure.core/fn ~name ~@fn-body) ~schema-form))))
 
+(clojure.core/defn normalized-defn-args
+  "Helper for defining defn-like macros with schemas.  Env is &env
+   from the macro body.  Reads optional docstring, return type and
+   attribute-map and normalizes them into the metadata of the name,
+   returning the normalized arglist.  Based on
+   clojure.tools.macro/name-with-attributes."
+  [env macro-args]
+  (let [[name macro-args] (extract-arrow-schematized-element env macro-args)
+        [maybe-docstring macro-args] (maybe-split-first string? macro-args)
+        [maybe-attr-map macro-args] (maybe-split-first map? macro-args)]
+    (cons (vary-meta name merge
+                     (or maybe-attr-map {})
+                     (when maybe-docstring {:doc maybe-docstring}))
+          macro-args)))
+
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on
    the argument symbols and on the function name (for the return value).
@@ -498,28 +513,22 @@
     - Unlike clojure.core/defn, a final attr-map on multi-arity functions
       is not supported."
   [& defn-args]
-  (let [[name more-defn-args] (extract-arrow-schematized-element &env defn-args)
-        [doc-string? more-defn-args] (maybe-split-first string? more-defn-args)
-        [attr-map? more-defn-args] (maybe-split-first map? more-defn-args)
-        [f & more] defn-args
+  (let [[name & more-defn-args] (normalized-defn-args &env defn-args)
+        {:keys [doc tag] :as standard-meta} (meta name)
         {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
-       (clojure.core/defn ~name
-         ~(utils/assoc-when
-           (or attr-map? {})
-           :doc (str
-                 (str "Inputs: " (if (= 1 (count raw-arglists))
-                                   (first raw-arglists)
-                                   (apply list raw-arglists)))
-                 (when-let [ret (when (= (first more) :-) (second more))]
-                   (str "\n  Returns: " ret))
-                 (when doc-string? (str  "\n\n  " doc-string?)))
-           :raw-arglists (list 'quote raw-arglists)
-           :arglists (list 'quote arglists)
-           :schema schema-form
-           :tag (let [t (:tag (meta name))]
-                  (when-not (primitive-sym? t)
-                    t)))
+       (clojure.core/defn ~(with-meta name {})
+         ~(assoc (apply dissoc standard-meta (when (primitive-sym? tag) [:tag]))
+            :doc (str
+                  (str "Inputs: " (if (= 1 (count raw-arglists))
+                                    (first raw-arglists)
+                                    (apply list raw-arglists)))
+                  (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
+                    (str "\n  Returns: " ret))
+                  (when doc (str  "\n\n  " doc)))
+            :raw-arglists (list 'quote raw-arglists)
+            :arglists (list 'quote arglists)
+            :schema schema-form)
          ~@fn-body)
        (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 

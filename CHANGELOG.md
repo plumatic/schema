@@ -1,3 +1,6 @@
+## 0.2.5 
+ * Add `normalized-defn-args` helper fn for defining `s/defn`-like macros.
+
 ## 0.2.4
  * Fixed an issue that could cause ClojureScript compilation to fail
  * Generalize `s/recursive` to work on artibrary refs
