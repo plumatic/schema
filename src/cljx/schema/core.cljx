@@ -943,7 +943,8 @@
   [f]
   (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/fn-schema-bearer f))
-      (macros/safe-get (meta f) :schema)))
+      (:schema (meta f))
+      (macros/=> Any [Any])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

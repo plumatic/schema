@@ -642,14 +642,17 @@
 
   "
   [multifn dispatch-val & fn-tail]
-  (let [multifn-var (ns-resolve *ns* multifn)]
+  (let [multifn-var (ns-resolve *ns* multifn)
+        parent-output-schema (if-let [s (:schema (meta multifn-var))]
+                               (safe-get s :output-schema)
+                               `schema.core/Any)
+        [fn-var more-fn-tail] (extract-arrow-schematized-element &env (cons (gensym (name multifn)) fn-tail))]
     `(~@(if (cljs-env? &env)
           [`cljs.core/-add-method (with-meta multifn {:tag 'cljs.core/MultiFn})]
           [`.addMethod (with-meta multifn {:tag 'clojure.lang.MultiFn})])
       ~dispatch-val
-      (schema.macros/fn ~(with-meta (gensym (name multifn))
+      (schema.macros/fn ~(with-meta fn-var
                            (merge (select-keys (meta multifn-var) +schema-fn-meta-tags+)
                                   (meta multifn)
-                                  (when-let [schema (:schema (meta multifn-var))]
-                                    {:schema (safe-get schema :output-schema)})))
-        ~@fn-tail))))
+                                  {:schema `(s/both ~(safe-get (meta fn-var) :schema) ~parent-output-schema)}))
+        ~@more-fn-tail))))

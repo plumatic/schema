@@ -1033,112 +1033,54 @@
 
 
 
-;; defmethod & defmulti 
+;; defmethod & defmulti
 
-(deftest defmethod-unannotated-test
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod schema.core-test/m :v [m x y] (+ x y))
-  (is (= 3 (m {:k :v} 1 2))))
+(defmulti test-multi #(:k (first %&)))
 
-(deftest defmethod-input-annotated
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod m :v [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+(sm/defmethod test-multi :unannotated [m x y] (+ x y))
+(sm/defmethod test-multi :input-annotated [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
+(sm/defmethod test-multi :output-annotated :- s/Int [m x y] (+ x y))
+(sm/defmethod test-multi :all-annotated :- s/Int [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
+(sm/defmethod ^:always-validate test-multi :always-validate :- s/Int [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
 
-(deftest defmethod-output-annotated
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod m :v :- s/Num [m x y] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+(deftest defmethod-on-clojure-defmulti-test
+  (sm/with-fn-validation
+    (is (= 3 (test-multi {:k :unannotated} 1 2)))
+    (is (= 3 (test-multi {:k :input-annotated} 1 2)))
+    (is (= 3 (test-multi {:k :output-annotated} 1 2)))
+    (is (= 3 (test-multi {:k :all-annotated} 1 2)))
 
-(deftest defmethod-all-annotated
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+    (is (= 3.1 (test-multi {:k :unannotated} 1.1 2)))
+    (is (thrown? Exception (test-multi {:k :input-annotated} 1.1 2)))
+    (is (thrown? Exception (test-multi {:k :output-annotated} 1.1 2))))
 
-(deftest defmethod-input-error-test
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (sm/with-fn-validation
-                 (sm/with-fn-validation (m {:k :v} 1 "2"))))))
+  (is (= 3 (test-multi {:k :always-validate} 1 2)))
+  (is (thrown? Exception (test-multi {:k :always-validate} 1.1 2)))
+  (is (= 3.1 (test-multi {:k :all-annotated} 1.1 2))))
 
-(deftest defmethod-output-error-test
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (sm/with-fn-validation (m {:k :v} 1 2)))))
+(sm/defmulti test-s-multi-unschematized-dispatch #(:k %))
+(sm/defmulti test-s-multi :- s/Int (sm/fn [m x :- s/Int y :- s/Int] (:k m)) :default :d)
+(sm/defmethod test-s-multi :d [m v1 v2] -10)
+(defmethod test-s-multi :clojure [m v1 v2] -20.1)
+(sm/defmethod test-s-multi :unannotated [m x y] (+ x y))
+(sm/defmethod test-s-multi :annotated :- (s/pred #(= 0 (mod % 3))) [m x :- (s/pred odd?) y :- (s/pred even?)] (+ x y))
 
-(deftest defmethod-metadata-test
-  (def m nil)
-  (defmulti m #(:k (first %&)))
-  (sm/defmethod ^:always-validate m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-              (m {:k :v} 1 2))))
-
-(deftest defmulti-unannotated-test
-  (def m nil)
-  (sm/defmulti m "not annotated defmulti" :k :default :d)
-  (defmethod m :d [v] 1) ; must work exactly as clojure.core/defmethod
-  (defmethod m :v [v] 2)
-  (is (= 1 (m :any)))
-  (is (= 2 (m {:k :v})))
-  )
-
-(deftest defmulti-input-annotated
-  (def m nil)
-  (sm/defmulti m (fn [k & _] k) [k :- s/Keyword x :- s/Num y :- s/Num] :default :d)
-  ;; will apply defmulti hints: 
-  (sm/defmethod m :v [k x y] (list x y))
-  ;; defmulti hints will be ignored:
-  (sm/defmethod ^:ignore-defmulti-schema m :d [k :- s/Keyword x :- s/Str y :- s/Num] :ok) 
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-           (sm/with-fn-validation (m :v "erroneous-arg" 4))))
-  (is (= :ok (sm/with-fn-validation (m :z "now-ok-arg" 6))))
-  )
-
-(deftest defmulti-input-specialized
-  (def m nil)
-  (sm/defmulti m (fn [k & _] k) [k :- s/Keyword x :- s/Num y :- s/Num] :default :d)
-  (sm/defmethod m :v [k x y :- s/Int] (+ x 1))
-  ;; will fail defmulti schema:
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-           (sm/with-fn-validation (m :v "erroneous-arg" 1))))
-  ;; will fail defmethod specialized schema:
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-           (sm/with-fn-validation (m :v 1 1.0))))
-  )
-
-(deftest defmulti-output-annotated
-  (def m nil)
-  (sm/defmulti m (fn [k & _] k) :- s/Str :default :d)
-  (sm/defmethod m :v [k x y] 8)
-  (sm/defmethod ^:ignore-defmulti-schema m :d :- s/Num [k x y] 8)
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (sm/with-fn-validation (m :v 1 4))))
-  (is (= 8 (sm/with-fn-validation (m :z 1 4))))
-  )
-
-(deftest defmulti-metadata-test
-  (def m nil)
-  (sm/defmulti ^:always-validate m (fn [k & _] k) [k :- s/Keyword x :- s/Num y :- s/Num] :default :d)
-  (sm/defmethod m :v [k x y] (list x y))
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (m :v "erroneus-arg" 4)))
-  )
+(deftest schema-defmulti-test
+  (is (= -10 (test-s-multi {:k :whatever} 1 2)))
+  (is (= 8.1 (test-s-multi {:k :unannotated} 4 4.1)))
+  (is (= 8 (test-s-multi {:k :unannotated} 4 4)))
+  (is (= 8 (test-s-multi {:k :annotated} 4 4)))
+  (sm/with-fn-validation
+    (is (= -10 (test-s-multi {:k :whatever} 1 2)))
+    (is (= 3 (test-s-multi {:k :annotated} 1 2)))
+    (is (= -20.1 (test-s-multi {:k :clojure} 1 2)))
+    (is (thrown? Exception (test-s-multi {:k :unannotated} 4 4.1)))
+    (is (thrown? Exception (test-s-multi {:k :annotated} 2 1)))
+    (is (thrown? Exception (test-s-multi {:k :annotated} 3 2)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
-
 
 (deftest nice-error-test
   (let [schema {:a #{[s/Int]}
