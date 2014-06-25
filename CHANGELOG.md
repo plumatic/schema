@@ -1,4 +1,5 @@
 ## 0.2.5 
+ * Add `s/defmulti`
  * Add `normalized-defn-args` helper fn for defining `s/defn`-like macros.
 
 ## 0.2.4

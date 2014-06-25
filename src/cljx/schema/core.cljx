@@ -78,7 +78,7 @@
    (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
    of defrecord, fn, and defn in schema.macros for more details about how to use
    these macros."
-  (:refer-clojure :exclude [Keyword Symbol])
+  (:refer-clojure :exclude [Keyword Symbol defmulti])
   (:require
    [clojure.string :as str]
    #+clj potemkin
@@ -918,6 +918,7 @@
    macros/with-fn-validation
    macros/without-fn-validation
    macros/def
+   macros/defmulti
    macros/defmethod)
   (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
   (set! *warn-on-reflection* false))

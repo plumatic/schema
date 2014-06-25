@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
+  (:refer-clojure :exclude [defrecord fn defn letfn defmulti defmethod])
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -588,6 +588,41 @@
          ~@(when doc-string? [doc-string?])
          (schema.core/validate output-schema# ~init)))))
 
+(defmacro fixed-defmulti
+  "Simplified version of defmulti that works around CLJ-1446"
+  [mm-name attr-map dispatch-fn & options]
+  (let [options (apply hash-map options)]
+    (#'clojure.core/check-valid-options options :default :hierarchy)
+    `(let [v# (ns-resolve *ns* '~mm-name)]
+       (when-not (and v# (.hasRoot v#) (instance? clojure.lang.MultiFn @v#))
+         (def ~(vary-meta mm-name merge attr-map)
+           (clojure.lang.MultiFn.
+            ~(name mm-name)
+            ~dispatch-fn
+            ~(options :default :default)
+            ~(options :hierarchy #'clojure.core/global-hierarchy)))))))
+
+(defmacro defmulti
+  "sm/defmulti : sm/defn :: clojure.core/defmulti : clojure.core/defn
+
+   Creates a new multimethod with the same syntax as Clojure, except
+   that the return type can be schematized.  To schematize the inputs,
+   pass an `sm/fn` as the dispatch-fn.  To get return type validaion,
+   you must use `sm/defmethod` to declare the methods. Metadata like
+   ^:always-validate will be passed through to the methods."
+  {:arglists '([name-with-optional-schema docstring? attr-map? dispatch-fn & options])
+   :added "1.0"}
+  [& defmulti-args]
+  (let [[mm-name dispatch-fn & more] (normalized-defn-args &env defmulti-args)]
+    `(let [dispatch# ~dispatch-fn
+           schema# (assoc (if (fn? dispatch#)
+                            (schema.core/fn-schema dispatch#)
+                            (schema.core/make-fn-schema schema.core/Any [[schema.core/Any]]))
+                     :output-schema ~(safe-get (meta mm-name) :schema))]
+       (if-cljs
+        (cljs.core/defmulti ~mm-name {:schema schema#} dispatch# ~@more)
+        (fixed-defmulti ~mm-name {:schema schema#} dispatch# ~@more)))))
+
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
@@ -602,11 +637,19 @@
      ;; before the multifunction name:
 
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
+
+   If called on a schema defmulti, takes the default return type from there.
+
   "
   [multifn dispatch-val & fn-tail]
-  `(~@(if (cljs-env? &env)
-        [`cljs.core/-add-method (with-meta multifn {:tag 'cljs.core/MultiFn})]
-        [`.addMethod (with-meta multifn {:tag 'clojure.lang.MultiFn})])
-    ~dispatch-val
-    (schema.macros/fn ~(with-meta (gensym) (select-keys (meta multifn) +schema-fn-meta-tags+))
-      ~@fn-tail)))
+  (let [multifn-var (ns-resolve *ns* multifn)]
+    `(~@(if (cljs-env? &env)
+          [`cljs.core/-add-method (with-meta multifn {:tag 'cljs.core/MultiFn})]
+          [`.addMethod (with-meta multifn {:tag 'clojure.lang.MultiFn})])
+      ~dispatch-val
+      (schema.macros/fn ~(with-meta (gensym (name multifn))
+                           (merge (select-keys (meta multifn-var) +schema-fn-meta-tags+)
+                                  (meta multifn)
+                                  (when-let [schema (:schema (meta multifn-var))]
+                                    {:schema (safe-get schema :output-schema)})))
+        ~@fn-tail))))
