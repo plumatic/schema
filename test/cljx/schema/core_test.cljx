@@ -1121,3 +1121,16 @@
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))
+
+(deftest fn-schema-test
+  "Tests that the anonymous function schema macro can handle a name, a
+   schema without a name and no return schema."
+  (let [named-square (sm/fn square :- s/Int [x :- s/Int]
+                       (* x x))
+        anon-square (sm/fn :- s/Int [x :- s/Int]
+                      (* x x))
+        arg-only-square (sm/fn [x :- s/Int] (* x x))]
+    (is (= 100
+           (named-square 10)
+           (anon-square 10)
+           (arg-only-square 10)))))
