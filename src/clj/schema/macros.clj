@@ -59,7 +59,7 @@
   `(when-not ~form
      (error! (utils/format* ~@format-args))))
 
-(defmacro assert-c!
+(defmacro ^:deprecated assert-c!
   "DEPRECATED.  (No longer necessary now that macroexpansion properly detects context).
    Like assert! but throws a RuntimeException and takes args to format.  Only
    for use during compilation."
