@@ -607,9 +607,13 @@
 
    Creates a new multimethod with the same syntax as Clojure, except
    that the return type can be schematized.  To schematize the inputs,
-   pass an `sm/fn` as the dispatch-fn.  To get return type validaion,
-   you must use `sm/defmethod` to declare the methods. Metadata like
-   ^:always-validate will be passed through to the methods."
+   pass an `sm/fn` as the dispatch-fn.  The multimethod will also
+   have an attached schema based on the declared output schema and
+   the input schema of the dispatch fn.
+
+   To get return type validaion, you must use `sm/defmethod` to declare
+   the methods. Metadata like ^:always-validate will be passed through
+   to the methods."
   {:arglists '([name-with-optional-schema docstring? attr-map? dispatch-fn & options])
    :added "1.0"}
   [& defmulti-args]
@@ -638,9 +642,12 @@
 
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
 
-   If called on a schema defmulti, takes the default return type from there.
+   If called on a schema defmulti, takes the default output schema from there.
+   If an additional output schema is passed here, the return value must validate
+   *both* schemas.
 
-  "
+   Inherits metadata like ^:always-validate from `s/defmulti` and merges with
+   the metadata on the fn symbol."
   [multifn dispatch-val & fn-tail]
   (let [multifn-var (ns-resolve *ns* multifn)
         parent-output-schema (if-let [s (:schema (meta multifn-var))]
@@ -654,5 +661,5 @@
       (schema.macros/fn ~(with-meta fn-var
                            (merge (select-keys (meta multifn-var) +schema-fn-meta-tags+)
                                   (meta multifn)
-                                  {:schema `(s/both ~(safe-get (meta fn-var) :schema) ~parent-output-schema)}))
+                                  {:schema `(schema.core/both ~(safe-get (meta fn-var) :schema) ~parent-output-schema)}))
         ~@more-fn-tail))))
