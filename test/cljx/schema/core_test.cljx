@@ -703,13 +703,26 @@
       (is (= 4 (f 1 {:foo 3})))
       ;; Primitive Interface Test
       #+clj (is (thrown? Exception (.invokePrim f 1 {:foo 3}))) ;; primitive type hints don't work on fns
-      (invalid-call! f 1 {:foo 4}) ;; foo not odd?
-      (invalid-call! f 2 {:foo 3}))  ;; return not even?
+      (invalid-call! f 1 {:foo 4})  ;; foo not odd?
+      (invalid-call! f 2 {:foo 3})) ;; return not even?
 
-    (is (= 5 (f 1 {:foo 4}))) ;; foo not odd?
+    (is (= 5 (f 1 {:foo 4})))     ;; foo not odd?
     (is (= 4.0 (f 1.0 {:foo 3}))) ;; first arg not long
-    (is (= 5 (f 2 {:foo 3})))  ;; return not even?
-    ))
+    (is (= 5 (f 2 {:foo 3})))     ;; return not even?
+    (testing
+        "Tests that the anonymous function schema macro can handle a
+         name, a schema without a name and no return schema."
+      (let [named-square (sm/fn square :- s/Int [x :- s/Int]
+                           (* x x))
+            anon-square (sm/fn :- s/Int [x :- s/Int]
+                          (* x x))
+            arg-only-square (sm/fn [x :- s/Int] (* x x))]
+        (is (= 100
+               (named-square 10)
+               (anon-square 10)
+               (arg-only-square 10)))))))
+
+
 
 (deftest always-validated-fn-test
   (let [f (sm/fn ^:always-validate test-fn :- (s/pred even?)
@@ -1121,16 +1134,3 @@
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))
-
-(deftest fn-schema-test
-  "Tests that the anonymous function schema macro can handle a name, a
-   schema without a name and no return schema."
-  (let [named-square (sm/fn square :- s/Int [x :- s/Int]
-                       (* x x))
-        anon-square (sm/fn :- s/Int [x :- s/Int]
-                      (* x x))
-        arg-only-square (sm/fn [x :- s/Int] (* x x))]
-    (is (= 100
-           (named-square 10)
-           (anon-square 10)
-           (arg-only-square 10)))))

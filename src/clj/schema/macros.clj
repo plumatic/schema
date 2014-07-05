@@ -441,11 +441,10 @@
       produces a wrapper fn, which will decrease performance and
       negate the benefits of primitive type hints compared to
       clojure.core/fn."
-  [& [car :as fn-args]]
-  (let [fn-args (cond (symbol? car) fn-args
-                      (= :- car) (cons (gensym "fn") fn-args)
-                      :else [(with-meta (gensym "fn")
-                               {:schema `schema.core/Any}) fn-args])
+  [& fn-args]
+  (let [fn-args (if (symbol? (first fn-args))
+                  fn-args
+                  (cons (gensym "fn") fn-args))
         [name more-fn-args] (extract-arrow-schematized-element &env fn-args)
         {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
     `(let ~outer-bindings
