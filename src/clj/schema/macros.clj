@@ -433,16 +433,19 @@
    See (doc schema.macros/defn) for details.
 
    Additional gotchas and limitations:
-    - Like s/defn, the output schema must go on the fn name.  If you want an
-      output schema, your function must have a name.
-    - Unlike s/defn, the function schema is stored in metadata on the fn.
-      Clojure's implementation for metadata on fns currently produces a
-      wrapper fn, which will decrease performance and negate the benefits
-      of primitive type hints compared to clojure.core/fn."
+    - Like s/defn, the output schema must go on the fn name. If you
+      don't supply a name, schema will gensym one for you and attach
+      the schema.
+    - Unlike s/defn, the function schema is stored in metadata on the
+      fn.  Clojure's implementation for metadata on fns currently
+      produces a wrapper fn, which will decrease performance and
+      negate the benefits of primitive type hints compared to
+      clojure.core/fn."
   [& fn-args]
-  (let [[name more-fn-args] (if (symbol? (first fn-args))
-                              (extract-arrow-schematized-element &env fn-args)
-                              [(with-meta (gensym "fn") {:schema `schema.core/Any}) fn-args])
+  (let [fn-args (if (symbol? (first fn-args))
+                  fn-args
+                  (cons (gensym "fn") fn-args))
+        [name more-fn-args] (extract-arrow-schematized-element &env fn-args)
         {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
     `(let ~outer-bindings
        (schema.core/schematize-fn (clojure.core/fn ~name ~@fn-body) ~schema-form))))
