@@ -1063,20 +1063,27 @@
 (sm/defmethod test-s-multi :d [m v1 v2] -10)
 (defmethod test-s-multi :clojure [m v1 v2] -20.1)
 (sm/defmethod test-s-multi :unannotated [m x y] (+ x y))
+(sm/defmethod test-s-multi :unannotated-bad-output [m x y] :keyword-instead-of-int)
 (sm/defmethod test-s-multi :annotated :- (s/pred #(= 0 (mod % 3))) [m x :- (s/pred odd?) y :- (s/pred even?)] (+ x y))
+
+(sm/defmulti ^:always-validate test-s-multi-always-validate :- s/Int (sm/fn [m x y] (:k m)))
+(sm/defmethod test-s-multi-always-validate :default [m x y] (+ x y))
 
 (deftest schema-defmulti-test
   (is (= -10 (test-s-multi {:k :whatever} 1 2)))
   (is (= 8.1 (test-s-multi {:k :unannotated} 4 4.1)))
   (is (= 8 (test-s-multi {:k :unannotated} 4 4)))
   (is (= 8 (test-s-multi {:k :annotated} 4 4)))
+  (is (= 8 (test-s-multi-always-validate {:k :annotated} 4 4)))
   (sm/with-fn-validation
     (is (= -10 (test-s-multi {:k :whatever} 1 2)))
     (is (= 3 (test-s-multi {:k :annotated} 1 2)))
     (is (= -20.1 (test-s-multi {:k :clojure} 1 2)))
+    (is (thrown? Exception (test-s-multi {:k :unannotated-bad-output} 1 2)))
     (is (thrown? Exception (test-s-multi {:k :unannotated} 4 4.1)))
     (is (thrown? Exception (test-s-multi {:k :annotated} 2 1)))
-    (is (thrown? Exception (test-s-multi {:k :annotated} 3 2)))))
+    (is (thrown? Exception (test-s-multi {:k :annotated} 3 2)))
+    (is (thrown? Exception (test-s-multi-always-validate {:k :annotated} 1.1 2.2)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
