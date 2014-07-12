@@ -37,6 +37,19 @@
       value
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
+(defn memoize-id
+  "Identity version of memoize, because many schemas are records, and records
+   don't cache their hash codes (at least in Clojure 1.5.1).
+   Not thread safe, and doesn't cache falsey values."
+  [f]
+  #+clj (let [m (java.util.IdentityHashMap.)]
+          (fn [x]
+            (or (.get m x)
+                (let [res (f x)]
+                  (.put m x res)
+                  res))))
+  #+cljs (memoize f))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Error descriptions
