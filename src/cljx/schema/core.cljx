@@ -870,9 +870,9 @@
   Schema
   (walker [this]
     (fn [x]
-      (if (fn? x)
+      (if (ifn? x)
         x
-        (macros/validation-error this x (list 'fn? (utils/value-name x))))))
+        (macros/validation-error this x (list 'ifn? (utils/value-name x))))))
   (explain [this]
     (if (> (count input-schemas) 1)
       (list* '=>* (explain output-schema) (map explain-input-schema input-schemas))
