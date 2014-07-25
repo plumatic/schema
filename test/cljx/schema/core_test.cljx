@@ -474,19 +474,19 @@
   (let [schema (sm/=> s/Keyword s/Int s/Int)]
     (valid! schema (fn [x y] (keyword (str (+ x y)))))
     (valid! schema (fn [])) ;; we don't actually validate what the function does
-    (invalid! schema {} "(not (fn? {}))")
+    (valid! schema {})
     (is (= '(=> Keyword Int Int) (s/explain schema)))))
 
 (deftest single-arity-and-more-fn-schema-test
   (let [schema (sm/=> s/Keyword s/Int s/Int & [s/Keyword])]
     (valid! schema (fn [])) ;; we don't actually validate what the function does
-    (invalid! schema {} "(not (fn? {}))")
+    (valid! schema {})
     (is (= '(=> Keyword Int Int & [Keyword]) (s/explain schema)))))
 
 (deftest multi-arity-fn-schema-test
   (let [schema (sm/=>* s/Keyword [s/Int] [s/Int & [s/Keyword]])]
     (valid! schema (fn [])) ;; we don't actually validate what the function does
-    (invalid! schema {} "(not (fn? {}))")
+    (valid! schema {})
     (is (= '(=>* Keyword [Int] [Int & [Keyword]]) (s/explain schema)))))
 
 
