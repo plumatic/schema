@@ -366,30 +366,29 @@
                     (s/required-key :map) {s/Keyword s/Str}
                     (s/required-key :vec) [s/Num]
                     (s/optional-key :opt) s/Num}]
-        (every? identity
-                [(valid! schema (struct ts1 1 "str" {:key "str"} [1]))
-                 (valid! schema {:num 1 :str "str" :map {:key "str"} :vec [1]})
-                 (valid! schema (struct ts1 1 "str" (struct ts1 "a" "b" "c" "d") [1]))
-                 (valid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
-                                  :opt 1))
-                 (valid! schema (assoc (struct ts2 1 "str")
-                                  :map {}
-                                  :vec []))
+        (valid! schema (struct ts1 1 "str" {:key "str"} [1]))
+        (valid! schema {:num 1 :str "str" :map {:key "str"} :vec [1]})
+        (valid! schema (struct ts1 1 "str" (struct ts1 "a" "b" "c" "d") [1]))
+        (valid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
+                         :opt 1))
+        (valid! schema (assoc (struct ts2 1 "str")
+                         :map {}
+                         :vec []))
 
-                 (invalid! schema (struct ts1 "str" "str" {:key "str"} [1]))
-                 (invalid! schema (struct ts1 1 1 {:key "str"} [1]))
-                 (invalid! schema (struct ts1 1 "str" {"str" "str"} [1]))
-                 (invalid! schema (struct ts1 1 "str" {:key 1} [1]))
-                 (invalid! schema (struct ts1 1 "str" {:key "str"} 1))
-                 (invalid! schema (struct ts1 1 "str" {:key "str"} ["str"]))
-                 (invalid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
-                                    :opt "str"))
-                 (invalid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
-                                    :extra-key 1))
-                 (invalid! schema (struct ts2 1 "str"))
-                 (invalid! schema (assoc (struct ts2 1 "str")
-                                    :map {:key 1}
-                                    :vec []))]))))
+        (invalid! schema (struct ts1 "str" "str" {:key "str"} [1]))
+        (invalid! schema (struct ts1 1 1 {:key "str"} [1]))
+        (invalid! schema (struct ts1 1 "str" {"str" "str"} [1]))
+        (invalid! schema (struct ts1 1 "str" {:key 1} [1]))
+        (invalid! schema (struct ts1 1 "str" {:key "str"} 1))
+        (invalid! schema (struct ts1 1 "str" {:key "str"} ["str"]))
+        (invalid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
+                           :opt "str"))
+        (invalid! schema (assoc (struct ts1 1 "str" {:key "str"} [1])
+                           :extra-key 1))
+        (invalid! schema (struct ts2 1 "str"))
+        (invalid! schema (assoc (struct ts2 1 "str")
+                           :map {:key 1}
+                           :vec [])))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set Schemas
