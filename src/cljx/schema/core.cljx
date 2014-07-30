@@ -685,7 +685,7 @@
     (fn [x]
       (if-not (map? x)
         (macros/validation-error map-schema x (list 'map? (utils/value-name x)))
-        (loop [x x explicit-walkers (seq explicit-walkers) out {}]
+        (loop [ok-key #{} explicit-walkers (seq explicit-walkers) out {}]
           (if-not explicit-walkers
             (reduce
              (if extra-walker
@@ -694,9 +694,9 @@
                (fn [out [k _]]
                  (err-conj out (utils/error [k 'disallowed-key]))))
              out
-             x)
+             (remove (fn [[k v]] (ok-key k)) x))
             (let [[wk wv] (first explicit-walkers)]
-              (recur (dissoc x wk)
+              (recur (conj ok-key wk)
                      (next explicit-walkers)
                      (err-conj out (wv (or (find x wk) +missing+)))))))))))
 
