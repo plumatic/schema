@@ -150,7 +150,7 @@
   "Compile an efficient checker for schema, which returns nil for valid values and
    error descriptions otherwise."
   [schema]
-  (comp utils/error-val (start-walker walker schema)))
+  (comp utils/error-val (start-walker (utils/memoize-id walker) schema)))
 
 (defn check
   "Return nil if x matches schema; otherwise, returns a value that looks like the

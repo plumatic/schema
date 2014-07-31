@@ -1,3 +1,6 @@
+## 0.2.6
+ * Memoize walker computation, providing much faster checker compilation for graph-structured schemas
+
 ## 0.2.5 
  * Add `normalized-defn-args` helper fn for defining `s/defn`-like macros.
  * Map schemas correctly validate against struct-maps

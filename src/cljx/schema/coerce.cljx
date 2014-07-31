@@ -27,17 +27,18 @@
   "Produce a function that simultaneously coerces and validates a datum."
   [schema coercion-matcher :- CoercionMatcher]
   (s/start-walker
-   (fn [s]
-     (let [walker (s/walker s)]
-       (if-let [coercer (coercion-matcher s)]
-         (fn [x]
-           (macros/try-catchall
-            (let [v (coercer x)]
-              (if (utils/error? v)
-                v
-                (walker v)))
-            (catch t (macros/validation-error s x t))))
-         walker)))
+   (utils/memoize-id
+    (fn [s]
+      (let [walker (s/walker s)]
+        (if-let [coercer (coercion-matcher s)]
+          (fn [x]
+            (macros/try-catchall
+             (let [v (coercer x)]
+               (if (utils/error? v)
+                 v
+                 (walker v)))
+             (catch t (macros/validation-error s x t))))
+          walker))))
    schema))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
