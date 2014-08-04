@@ -380,8 +380,8 @@
                                     (keys ~extra-key-schema?)))]
          (assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
                   (vec bad-keys#)))
-       (when ~extra-validator-fn?
-         (assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+       ~(when extra-validator-fn?
+         `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                   (class ~extra-validator-fn?)))
        (~(if (and @*use-potemkin* (not (cljs-env? &env)))
            `potemkin/defrecord+
