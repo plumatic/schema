@@ -40,9 +40,10 @@
        (throw (js/Error. ~s))
        (throw (RuntimeException. ~(with-meta s `{:tag java.lang.String})))))
   ([s m]
-     `(if-cljs
-       (throw (ex-info ~s ~m))
-       (throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m)))))
+     (let [m (merge {:type :schema.core/error} m)]
+       `(if-cljs
+         (throw (ex-info ~s ~m))
+         (throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m))))))
 
 (defmacro safe-get
   "Like get but throw an exception if not found.  A macro just to work around cljx function
