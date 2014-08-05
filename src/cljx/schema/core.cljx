@@ -889,7 +889,7 @@
   "A function outputting a value in output schema, whose argument vector must match one of
    input-schemas, each of which should be a sequence schema.
    Currently function schemas are purely descriptive; they validate against any function,
-   regargless of actual input and output types."
+   regardless of actual input and output types."
   [output-schema input-schemas]
   (macros/assert! (seq input-schemas) "Function must have at least one input schema")
   (macros/assert! (every? vector? input-schemas) "Each arity must be a vector.")
