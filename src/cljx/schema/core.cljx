@@ -423,6 +423,25 @@
   (NamedSchema. schema name))
 
 
+;;; cut (eliminate backtracking up to the most recent choice point)
+
+(defrecord Cut [schema]
+  Schema
+  (walker [this]
+    (let [sub-walker (subschema-walker schema)]
+      (fn [x]
+        (throw (ex-info "cut" {::walker sub-walker})))))
+  (explain [this]
+    (list 'cut (explain schema))))
+
+(defn cut
+  "Cuts other branches from this subschema to the nearest choice point.
+  Improper use can create unsound schemas, but often useful for eliminating
+  slow backtracking and improving validation error messages."
+  [schema]
+  (Cut. schema))
+
+
 ;;; either (satisfies this schema or that one)
 
 (defrecord Either [schemas]
@@ -430,19 +449,25 @@
   (walker [this]
     (let [sub-walkers (mapv subschema-walker schemas)]
       (fn [x]
-        (loop [sub-walkers (seq sub-walkers)]
-          (if-not sub-walkers
-            (macros/validation-error
-             this x
-             (list 'some (list 'check '% (utils/value-name x)) 'schemas))
-            (let [res ((first sub-walkers) x)]
-              (if-not (utils/error? res)
-                res
-                (recur (next sub-walkers)))))))))
+        (macros/try-catchall
+          (loop [sub-walkers (seq sub-walkers)]
+            (if-not sub-walkers
+              (macros/validation-error
+               this x
+               (list 'some (list 'check '% (utils/value-name x)) 'schemas))
+              (let [res ((first sub-walkers) x)]
+                (if-not (utils/error? res)
+                  res
+                  (recur (next sub-walkers))))))
+          (catch e
+            (if-let [walker (-> e ex-data ::walker)]
+              (walker x)
+              e))))))
   (explain [this] (cons 'either (map explain schemas))))
 
 (defn either
-  "A value that must satisfy at least one schema in schemas."
+  "A value that must satisfy at least one schema in schemas.
+  Introduces a choice point. See cut."
   [& schemas]
   (Either. schemas))
 
