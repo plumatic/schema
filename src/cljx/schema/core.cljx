@@ -658,7 +658,7 @@
 
 ;;; Implementation helper functions
 
-(defn- find-extra-keys-schema [map-schema]
+(defn find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
     (macros/assert! (< (count key-schemata) 2)
                     "More than one non-optional/required key schemata: %s"
