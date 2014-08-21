@@ -270,6 +270,18 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: (not (odd? 2))
 (s/validate OddLong (int 3))
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
+
+;; both & pred can be used for schemas of seqs with at least one element:
+(def SetOfAtLeastOneOddLong (s/both #{OddLong} (s/pred seq 'seq)))
+(s/validate SetOfAtLeastOneOddLong #{3})
+;; => #{3}
+(s/validate SetOfAtLeastOneOddLong #{3 5 7})
+;; => #{7 3 5}
+(s/validate SetOfAtLeastOneOddLong #{})
+;; RuntimeException: Value does not match schema: (not (seq #{}))
+(s/validate SetOfAtLeastOneOddLong #{2})
+;; RuntimeException: Value does not match schema: #{(not (odd? 2))}
+
 ```
 
 You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types).
