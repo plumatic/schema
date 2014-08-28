@@ -18,7 +18,8 @@
    (s/optional-key :k1) {s/Int s/Keyword}
    (s/optional-key :k2) s/Keyword
    (s/optional-key :e) (s/enum :a :b :c)
-   (s/optional-key :set) #{s/Keyword}})
+   (s/optional-key :set) #{s/Keyword}
+   s/Keyword s/Int})
 
 (def JSON
   {(s/optional-key :is) [s/Int]})
@@ -43,7 +44,9 @@
     (is (= res (coercer res)))
     (is (= {:i 1 :b true} (coercer {:i 1.0 :b "TRUE"})))
     (is (= {:i 1 :b false} (coercer {:i 1.0 :b "Yes"})))
-    (is (= #{:i :set} (err-ks (coercer {:i 1.1 :n 3 :set "a"})))))
+    (is (= #{:i :set} (err-ks (coercer {:i 1.1 :n 3 :set "a"}))))
+    (is (= {:i 1 :x 7 :y 10} (coercer {:i 1 "x" 7 "y" 10.0})) "Handles extra keys")
+    (is (= {:i 1 :n 2} (coercer {"i" 1 "n" 2}))) "Handles explicit keyword keys")
 
   #+clj (testing "jvm specific"
           (let [coercer (coerce/coercer JVM coerce/json-coercion-matcher)
