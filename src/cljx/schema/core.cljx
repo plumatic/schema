@@ -289,6 +289,7 @@
     (cond (= p? integer?) 'Int
           (= p? keyword?) 'Keyword
           (= p? symbol?) 'Symbol
+          (= p? string?) 'Str
           :else (list 'pred pred-name))))
 
 (defn pred
