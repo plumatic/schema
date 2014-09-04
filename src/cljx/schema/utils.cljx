@@ -1,5 +1,6 @@
 (ns schema.utils
   "Private utilities used in schema implementation."
+  #+clj (:refer-clojure :exclude [record?])
   #+cljs (:require goog.string.format [goog.string :as gstring]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -49,6 +50,10 @@
                   (.put m x res)
                   res))))
   #+cljs (memoize f))
+
+(defn record? [x]
+  #+clj (instance? clojure.lang.IRecord x)
+  #+cljs (satisfies? IRecord x))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
