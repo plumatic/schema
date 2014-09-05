@@ -6,7 +6,7 @@
 
   :dependencies [[potemkin "0.3.2"]]
 
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.5.1"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
                                   [org.clojure/clojurescript "0.0-2030"]
                                   [com.keminglabs/cljx "0.3.1"]]
                    :plugins [[com.keminglabs/cljx "0.3.1"]
@@ -29,9 +29,9 @@
                                    {:source-paths ["test/cljx"]
                                     :output-path "target/generated/test/cljs"
                                     :rules :cljs}]}}
-             :1.6 {:dependencies [[org.clojure/clojure "1.6.0"]]}}
+             :1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}}
 
-  :aliases {"all" ["with-profile" "dev:dev,1.6"]}
+  :aliases {"all" ["with-profile" "dev:dev,1.5"]}
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
