@@ -1,6 +1,6 @@
 (ns schema.utils
   "Private utilities used in schema implementation."
-  #+clj (:refer-clojure :exclude [record?])
+  (:refer-clojure :exclude [record?])
   #+cljs (:require goog.string.format [goog.string :as gstring]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

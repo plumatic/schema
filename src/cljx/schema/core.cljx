@@ -668,7 +668,7 @@
 
 (defn- preserve-map-type [original walker-result]
   (if (and (utils/record? original) (not (utils/error? walker-result)))
-    (merge original walker-result)
+    (into original walker-result)
     walker-result))
 
 (defn- map-walker [map-schema]
@@ -847,7 +847,7 @@
                 (let [pred-res (when pred-checker (pred-checker r))]
                   (if (utils/error? pred-res)
                     pred-res
-                    (merge r res)))))))))
+                    res))))))))
   (explain [this]
     (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
