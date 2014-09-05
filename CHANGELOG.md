@@ -1,3 +1,7 @@
+## 0.2.7
+ * Walking records with map schemas preserves the record type
+ * Proper explain for s/Str
+
 ## 0.2.6
  * Memoize walker computation, providing much faster checker compilation for graph-structured schemas
 
