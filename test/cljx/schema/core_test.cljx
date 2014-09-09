@@ -99,6 +99,10 @@
         schema (s/isa h ::shape)]
     (valid! schema ::square)
     (invalid! schema ::form)
+    #+clj
+    (valid! (s/isa java.lang.Number) java.lang.Long)
+    #+cljs
+    (valid! (s/isa js/Number) js/Number)
     (is (= '(isa? ::shape) (s/explain schema)))))
 
 (deftest enum-test
