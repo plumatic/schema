@@ -93,6 +93,18 @@
     (invalid! schema 9 "(not (= 10 9))")
     (is (= '(eq 10) (s/explain schema)))))
 
+(deftest isa-test
+  (let [h (make-hierarchy)
+        h (derive h ::square ::shape)
+        schema (s/isa h ::shape)]
+    (valid! schema ::square)
+    (invalid! schema ::form)
+    #+clj
+    (valid! (s/isa java.lang.Number) java.lang.Long)
+    #+cljs
+    (valid! (s/isa js/Number) js/Number)
+    (is (= '(isa? ::shape) (s/explain schema)))))
+
 (deftest enum-test
   (let [schema (s/enum :a :b 1)]
     (valid! schema :a)

@@ -258,6 +258,26 @@
   [v]
   (EqSchema. v))
 
+;;; isa (a child of parent)
+
+(defrecord Isa [h parent]
+  Schema
+  (walker [this]
+    (fn [child]
+      (if (or (and h (isa? h child parent))
+              (isa? child parent))
+        child
+        (macros/validation-error this child (list 'isa? child parent)))))
+  (explain [this]
+    (list 'isa? parent)))
+
+(defn isa
+  "A value that must be a child of parent."
+  ([parent]
+     (Isa. nil parent))
+  ([h parent]
+     (Isa. h parent)))
+
 
 ;;; enum (in a set of allowed values)
 
