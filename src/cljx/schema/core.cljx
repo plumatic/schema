@@ -783,7 +783,7 @@
   ([schema name]
      (One. schema true name)))
 
-(defn- parse-sequence-schema [s]
+(defn parse-sequence-schema [s]
   (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert!
