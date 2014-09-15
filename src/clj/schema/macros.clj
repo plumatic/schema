@@ -1,6 +1,6 @@
 (ns schema.macros
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
-  (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
+  (:refer-clojure :exclude [defrecord fn defn letfn defmulti defmethod])
   (:require
    [clojure.data :as data]
    [clojure.string :as str]
@@ -428,6 +428,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized functions
 
+(def +schema-fn-meta-tags+
+  "The set of attributes that can be provided on s/fn and s/defn names for special effect."
+  #{:always-validate :never-validate})
+
 (defmacro fn
   "sm/fn : sm/defn :: clojure.core/fn : clojure.core/defn
 
@@ -588,6 +592,46 @@
          ~@(when doc-string? [doc-string?])
          (schema.core/validate output-schema# ~init)))))
 
+(defmacro fixed-defmulti
+  "Simplified version of defmulti that works around CLJ-1446"
+  [mm-name attr-map dispatch-fn & options]
+  (let [options (apply hash-map options)]
+    (#'clojure.core/check-valid-options options :default :hierarchy)
+    `(let [v# (ns-resolve *ns* '~mm-name)]
+       (when-not (and v# (.hasRoot v#) (instance? clojure.lang.MultiFn @v#))
+         (def ~(vary-meta mm-name merge attr-map)
+           (clojure.lang.MultiFn.
+            ~(name mm-name)
+            ~dispatch-fn
+            ~(options :default :default)
+            ~(options :hierarchy #'clojure.core/global-hierarchy)))))))
+
+(defmacro defmulti
+  "sm/defmulti : sm/defn :: clojure.core/defmulti : clojure.core/defn
+
+   Creates a new multimethod with the same syntax as Clojure, except
+   that the return type can be schematized.  To schematize the inputs,
+   pass an `sm/fn` as the dispatch-fn.  The multimethod will also
+   have an attached schema based on the declared output schema and
+   the input schema of the dispatch fn.
+
+   To get return type validaion, you must use `sm/defmethod` to declare
+   the methods. Metadata like ^:always-validate will be passed through
+   to the methods."
+  {:arglists '([name-with-optional-schema docstring? attr-map? dispatch-fn & options])
+   :added "1.0"}
+  [& defmulti-args]
+  (let [[mm-name dispatch-fn & more] (normalized-defn-args &env defmulti-args)
+        output-schema (safe-get (meta mm-name) :schema)]
+    `(let [dispatch# ~dispatch-fn
+           schema# (assoc (if (fn? dispatch#)
+                            (schema.core/fn-schema dispatch#)
+                            (schema.core/make-fn-schema schema.core/Any [[schema.core/Any]]))
+                     :output-schema ~output-schema)]
+       (if-cljs
+        (cljs.core/defmulti ~mm-name {:schema schema# :output-schema ~output-schema} dispatch# ~@more)
+        (fixed-defmulti ~mm-name {:schema schema# :output-schema ~output-schema} dispatch# ~@more)))))
+
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
@@ -602,8 +646,27 @@
      ;; before the multifunction name:
 
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
-  "
+
+   If called on a schema defmulti, takes the default output schema from there.
+   If an additional output schema is passed here, the return value must validate
+   *both* schemas.
+
+   Inherits metadata like ^:always-validate from `s/defmulti` and merges with
+   the metadata on the fn symbol."
   [multifn dispatch-val & fn-tail]
-  `(if-cljs
-    (cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+  (let [multifn-meta (if (cljs-env? &env)
+                       (cljs.analyzer/resolve-var (dissoc &env :locals) multifn)
+                       (meta (ns-resolve *ns* multifn)))
+        _ (assert multifn-meta (format "Could not resolve existing multifn %s" multifn))
+        parent-output-schema (or (:output-schema multifn-meta)
+                                 `schema.core/Any)
+        [fn-var more-fn-tail] (extract-arrow-schematized-element &env (cons (gensym (name multifn)) fn-tail))]
+    `(~@(if (cljs-env? &env)
+          [`cljs.core/-add-method (with-meta multifn {:tag 'cljs.core/MultiFn})]
+          [`.addMethod (with-meta multifn {:tag 'clojure.lang.MultiFn})])
+      ~dispatch-val
+      (schema.macros/fn ~(with-meta fn-var
+                           (merge (select-keys multifn-meta +schema-fn-meta-tags+)
+                                  (meta multifn)
+                                  {:schema `(schema.core/both ~(safe-get (meta fn-var) :schema) ~parent-output-schema)}))
+        ~@more-fn-tail))))

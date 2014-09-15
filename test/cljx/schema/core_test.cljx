@@ -1108,49 +1108,62 @@
   #+clj (is (thrown? Exception (sm/def ^s/Int v 1.0))))
 
 
-;; defmethod
 
-(defmulti m #(:k (first %&)))
+;; defmethod & defmulti
 
-(deftest defmethod-unannotated-test
-  (sm/defmethod m :v [m x y] (+ x y))
-  (is (= 3 (m {:k :v} 1 2))))
+(defmulti test-multi #(:k (first %&)))
 
-(deftest defmethod-input-annotated
-  (sm/defmethod m :v [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+(sm/defmethod test-multi :unannotated [m x y] (+ x y))
+(sm/defmethod test-multi :input-annotated [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
+(sm/defmethod test-multi :output-annotated :- s/Int [m x y] (+ x y))
+(sm/defmethod test-multi :all-annotated :- s/Int [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
+(sm/defmethod ^:always-validate test-multi :always-validate :- s/Int [m :- {:k s/Keyword} x :- s/Int y :- s/Int] (+ x y))
 
-(deftest defmethod-output-annotated
-  (sm/defmethod m :v :- s/Num [m x y] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+(deftest defmethod-on-clojure-defmulti-test
+  (sm/with-fn-validation
+    (is (= 3 (test-multi {:k :unannotated} 1 2)))
+    (is (= 3 (test-multi {:k :input-annotated} 1 2)))
+    (is (= 3 (test-multi {:k :output-annotated} 1 2)))
+    (is (= 3 (test-multi {:k :all-annotated} 1 2)))
 
-(deftest defmethod-all-annotated
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (= 3
-         (sm/with-fn-validation (m {:k :v} 1 2)))))
+    (is (= 3.1 (test-multi {:k :unannotated} 1.1 2)))
+    (is (thrown? Exception (test-multi {:k :input-annotated} 1.1 2)))
+    (is (thrown? Exception (test-multi {:k :output-annotated} 1.1 2))))
 
-(deftest defmethod-input-error-test
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (sm/with-fn-validation
-                 (sm/with-fn-validation (m {:k :v} 1 "2"))))))
+  (is (= 3 (test-multi {:k :always-validate} 1 2)))
+  (is (thrown? Exception (test-multi {:k :always-validate} 1.1 2)))
+  (is (= 3.1 (test-multi {:k :all-annotated} 1.1 2))))
 
-(deftest defmethod-output-error-test
-  (sm/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (sm/with-fn-validation
-                 (sm/with-fn-validation (m {:k :v} 1 2))))))
+(sm/defmulti test-s-multi-unschematized-dispatch #(:k %))
+(sm/defmulti test-s-multi :- s/Int (sm/fn [m x :- s/Int y :- s/Int] (:k m)) :default :d)
+(sm/defmethod test-s-multi :d [m v1 v2] -10)
+(defmethod test-s-multi :clojure [m v1 v2] -20.1)
+(sm/defmethod test-s-multi :unannotated [m x y] (+ x y))
+(sm/defmethod test-s-multi :unannotated-bad-output [m x y] :keyword-instead-of-int)
+(sm/defmethod test-s-multi :annotated :- (s/pred #(= 0 (mod % 3))) [m x :- (s/pred odd?) y :- (s/pred even?)] (+ x y))
 
-(deftest defmethod-metadata-test
-  (sm/defmethod ^:always-validate m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (m {:k :v} 1 2))))
+(sm/defmulti ^:always-validate test-s-multi-always-validate :- s/Int (sm/fn [m x y] (:k m)))
+(sm/defmethod test-s-multi-always-validate :default [m x y] (+ x y))
+
+(deftest schema-defmulti-test
+  (is (= -10 (test-s-multi {:k :whatever} 1 2)))
+  (is (= 8.1 (test-s-multi {:k :unannotated} 4 4.1)))
+  (is (= 8 (test-s-multi {:k :unannotated} 4 4)))
+  (is (= 8 (test-s-multi {:k :annotated} 4 4)))
+  (is (= 8 (test-s-multi-always-validate {:k :annotated} 4 4)))
+  (sm/with-fn-validation
+    (is (= -10 (test-s-multi {:k :whatever} 1 2)))
+    (is (= 3 (test-s-multi {:k :annotated} 1 2)))
+    (is (= -20.1 (test-s-multi {:k :clojure} 1 2)))
+    (is (thrown? Exception (test-s-multi {:k :unannotated-bad-output} 1 2)))
+    (is (thrown? Exception (test-s-multi {:k :unannotated} 4 4.1)))
+    (is (thrown? Exception (test-s-multi {:k :annotated} 2 1)))
+    (is (thrown? Exception (test-s-multi {:k :annotated} 3 2)))
+    (is (thrown? Exception (test-s-multi-always-validate {:k :annotated} 1.1 2.2)))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Composite Schemas (test a few combinations of above)
-
 
 (deftest nice-error-test
   (let [schema {:a #{[s/Int]}
