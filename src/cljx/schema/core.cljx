@@ -952,7 +952,10 @@
    macros/without-fn-validation
    macros/def
    macros/defmethod)
-  (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
+  ;; Use potemkin for s/defrecord by default
+  ;; **WARNING** -- this default will go away soon, and be replaced with
+  ;; an explicit way to configure the use of potemkin if desired
+  (reset! macros/*use-potemkin* true)
   (set! *warn-on-reflection* false))
 
 (defn fn-validation?

@@ -333,10 +333,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized defrecord
 
-(def ^:dynamic *use-potemkin*
-  "Should we generate records based on potemkin/defrecord+, rather than Clojure's
+(def ^:dynamic ^:deprecated *use-potemkin*
+  "**DEPRECATED**
+   Should we generate records based on potemkin/defrecord+, rather than Clojure's
    defrecord? Turned on by default for Clojure at the bottom of schema.core."
   (atom false))
+
+(def defrecord-constructor-atom
+  "EXPERIMENTAL (use at your own risk):
+   Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+).
+   Takes effect when the deprecated *use-potemkin* flag is false."
+  (atom `clojure.core/defrecord))
+
+(defn- defrecord-constructor
+  [env]
+  (if (and @*use-potemkin* (not (cljs-env? env)))
+    `potemkin/defrecord+
+    @defrecord-constructor-atom))
 
 (defmacro defrecord
   "Define a record with a schema.  If *use-potemkin* is true, the resulting record
@@ -386,10 +399,7 @@
        ~(when extra-validator-fn?
           `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                     (class ~extra-validator-fn?)))
-       (~(if (and @*use-potemkin* (not (cljs-env? &env)))
-           `potemkin/defrecord+
-           `clojure.core/defrecord)
-        ~name ~field-schema ~@more-args)
+       (~(defrecord-constructor &env) ~name ~field-schema ~@more-args)
        (utils/declare-class-schema!
         ~name
         (utils/assoc-when

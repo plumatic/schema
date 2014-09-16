@@ -1,5 +1,7 @@
 ## 0.2.7
  * **Deprecate** old `^{:s schema}` syntax for providing schemas.
+ * **Deprecate** `*use-potemkin*` flag and behavior to default to potemkin sm/defrecords in Clojure;
+   in future releases, you will have to provide your own potemkin and explicitly opt-in to this behavior.
  * Add `isa` schema for Clojure hierarchies.
  * Preserve the types of maps (including Records) when coercing with map schemas.
  * Smarter code generation in s/defrecord to avoid dead code warnings
