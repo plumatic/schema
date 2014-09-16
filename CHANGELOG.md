@@ -1,4 +1,5 @@
 ## 0.2.7
+ * **Deprecate** old `^{:s schema}` syntax for providing schemas.
  * Add `isa` schema for Clojure hierarchies.
  * Preserve the types of maps (including Records) when coercing with map schemas.
  * Smarter code generation in s/defrecord to avoid dead code warnings

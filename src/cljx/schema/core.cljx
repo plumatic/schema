@@ -68,6 +68,7 @@
    (fn-schema (sm/fn [^String x]))
    ==> (=> Any java.lang.String)
 
+   **DEPRECATED SYNTAX BELOW, TO BE REMOVED**
    You can directly type hint a symbol as a class, primitive, protocol, or simple
    schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
    the schema in a {:s schema} map like so:
