@@ -1,4 +1,9 @@
 ## 0.2.7
+ * Add `isa` schema for Clojure hierarchies.
+ * Preserve the types of maps (including Records) when coercing with map schemas.
+ * Smarter code generation in s/defrecord to avoid dead code warnings
+ * Fix printed form of s/Str in ClojureScript
+ * Make some internal fns public to simplify third-part schema extensions
  * Walking records with map schemas preserves the record type
  * Proper explain for s/Str
 
