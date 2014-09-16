@@ -20,7 +20,9 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
 
 ```clojure
 (ns schema-examples
-  (:require [schema.core :as s]))
+  (:require [schema.core :as s 
+             :include-macros true ;; cljs only
+             ]))
 
 (def Data
   "A schema for a nested data type"
@@ -127,14 +129,11 @@ Clojure's type hints make great documentation, but they fall short for complex t
 Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, by allowing arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
 
 ```clojure
-;; only necessary for cljs, macros are imported to schema.core in clj
-(require '[schema.macros :as sm])
-
-(sm/defrecord StampedNames
+(s/defrecord StampedNames
   [date :- Long
    names :- [s/Str]])
 
-(sm/defn stamped-names :- StampedNames
+(s/defn stamped-names :- StampedNames
   [names :- [s/Str]]
   (StampedNames. (str (System/currentTimeMillis)) names))
 ```
@@ -166,7 +165,7 @@ As you can see, these type hints are precise, easy to read, and shorter than the
 
 We've already seen how we can build up Schemas via composition, attach them to functions, and use them to validate data. What does this look like in practice?
 
-First, we ensure that all data types that will be shared across namespaces (or heavily used within namespaces) have Schemas, either by `def`ing them or using `sm/defrecord`.  This allows us to compactly and precisely refer to this data type in more complex data types, or when documenting function arguments and return values.
+First, we ensure that all data types that will be shared across namespaces (or heavily used within namespaces) have Schemas, either by `def`ing them or using `s/defrecord`.  This allows us to compactly and precisely refer to this data type in more complex data types, or when documenting function arguments and return values.
 
 This documentation is probably the most important benefit of Schema, which is why we've optimized Schemas for easy readability and reuse -- and sometimes, this is all you need. Schemas are purely descriptive, not prescriptive, so unlike a type system they should never get in your way, or constrain the types of functions you can write.
 
@@ -319,12 +318,6 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
 There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/Prismatic/schema/wiki/Writing-Custom-Transformations) to do even more.
 
 For more details, see [this blog post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/).
-
-## Compilation
-
-Currently the way schema.core imports schema.macros breaks with AOT compilation. This was done for ClojureScript's sake but it is no longer necessary and we are planning to collapse them back in a future major release.
-
-In the mean time, if your project is being compiled AOT and you are using the macros (defn, defrecord etc) you should explicitly require schema.macros as described above.
 
 ## For the Future
 

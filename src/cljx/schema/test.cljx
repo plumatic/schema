@@ -1,7 +1,7 @@
 (ns schema.test
   "Utilities for testing with schemas"
-  #+clj (:require [schema.core :as s] clojure.test)
-  #+cljs (:require-macros [schema.macros :as s]))
+  (:require [schema.core :as s :include-macros true]
+            #+clj clojure.test))
 
 (defn validate-schemas
   "A fixture for tests: put

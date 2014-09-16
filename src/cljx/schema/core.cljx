@@ -30,19 +30,20 @@
    with details described below), plus helpers below that provide optional values,
    enumerations, arbitrary predicates, and more.
 
-   Schema also provides macros (defined in schema.macros, and imported into this ns
-   in Clojure) for defining records with schematized elements (sm/defrecord), and
-   named or anonymous functions (sm/fn and sm/defn) with schematized inputs and
-   return values.  In addition to producing better-documented records and functions,
-   these macros allow you to retrieve the schema associated with the defined record
-   or function.  Moreover, functions include optional *validation*, which will throw
-   an error if the inputs or outputs do not match the provided schemas:
+   Assuming you (:require [schema.core :as s :include-macros true]),
+   Schema also provides macros for defining records with schematized elements
+   (s/defrecord), and named or anonymous functions (s/fn and s/defn) with
+   schematized inputs and return values.  In addition to producing better-documented
+   records and functions, these macros allow you to retrieve the schema associated
+   with the defined record or function.  Moreover, functions include optional
+   *validation*, which will throw an error if the inputs or outputs do not
+   match the provided schemas:
 
-   (sm/defrecord FooBar
+   (s/defrecord FooBar
     [foo :- Int
      bar :- String])
 
-   (sm/defn quux :- Int
+   (s/defn quux :- Int
     [foobar :- Foobar
      mogrifier :- Number]
     (* mogrifier (+ (:foo foobar) (Long/parseLong (:bar foobar)))))
@@ -53,7 +54,7 @@
    (fn-schema quux)
    ==> (=> Int (record user.FooBar {:foo Int, :bar java.lang.String}) java.lang.Number)
 
-   (sm/with-fn-validation (quux (FooBar. 10.2 \"5\") 2))
+   (s/with-fn-validation (quux (FooBar. 10.2 \"5\") 2))
    ==> Input to quux does not match schema: [(named {:foo (not (integer? 10.2))} foobar) nil]
 
    As you can see, the preferred syntax for providing type hints to schema's defrecord,
@@ -65,7 +66,7 @@
 
    If you don't like this style, standard Clojure-style typehints are also supported:
 
-   (fn-schema (sm/fn [^String x]))
+   (fn-schema (s/fn [^String x]))
    ==> (=> Any java.lang.String)
 
    **DEPRECATED SYNTAX BELOW, TO BE REMOVED**
@@ -73,12 +74,11 @@
    schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
    the schema in a {:s schema} map like so:
 
-   (fn-schema (sm/fn [^{:s [String]} x]))
+   (fn-schema (s/fn [^{:s [String]} x]))
    (=> Any [java.lang.String])
 
    (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
-   of defrecord, fn, and defn in schema.macros for more details about how to use
-   these macros."
+   of defrecord, fn, and defn for more details about how to use these macros."
   ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
   (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
   (:require
@@ -980,7 +980,7 @@
    for the Record, which will automatically be used when validating instances of
    the Record class:
 
-   (sm/defrecord FooBar
+   (m/defrecord FooBar
     [foo :- Int
      bar :- String])
 
@@ -1027,7 +1027,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(schema.macros/with-fn-validation ~@body))
+  `(macros/with-fn-validation ~@body))
 
 (defmacro without-fn-validation
   "Execute body with input and ouptut schema validation turned off for
@@ -1035,7 +1035,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(schema.macros/without-fn-validation ~@body))
+  `(macros/without-fn-validation ~@body))
 
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
@@ -1053,9 +1053,9 @@
 #+clj (ns-unmap *ns* 'fn)
 
 (defmacro fn
-  "sm/fn : sm/defn :: clojure.core/fn : clojure.core/defn
+  "s/fn : s/defn :: clojure.core/fn : clojure.core/defn
 
-   See (doc schema.macros/defn) for details.
+   See (doc s/defn) for details.
 
    Additional gotchas and limitations:
     - Like s/defn, the output schema must go on the fn name. If you
@@ -1077,7 +1077,7 @@
    use with-fn-validation to enable runtime checking of function inputs and
    outputs.
 
-   (sm/defn foo :- s/Num
+   (s/defn foo :- s/Num
     [x :- s/Int
      y :- s/Num]
     (* x y))
@@ -1085,10 +1085,10 @@
    (s/fn-schema foo)
    ==> (=> java.lang.Number Int java.lang.Number)
 
-   (sm/with-fn-validation (foo 1 2))
+   (s/with-fn-validation (foo 1 2))
    ==> 2
 
-   (sm/with-fn-validation (foo 1.5 2))
+   (s/with-fn-validation (foo 1.5 2))
    ==> Input to foo does not match schema: [(named (not (integer? 1.5)) x) nil]
 
    See (doc schema.core) for details of the :- syntax for arguments and return
@@ -1110,8 +1110,8 @@
       use destructuring, but you must put schema metadata on the top-level
       arguments, not the destructured variables.
 
-      Bad:  (sm/defn foo [{:keys [x :- s/Int]}])
-      Good: (sm/defn foo [{:keys [x]} :- {:x s/Int}])
+      Bad:  (s/defn foo [{:keys [x :- s/Int]}])
+      Good: (s/defn foo [{:keys [x]} :- {:x s/Int}])
     - Only a specific subset of rest-arg destructuring is supported:
       - & rest works as expected
       - & [a b] works, with schemas for individual elements parsed out of the binding,
@@ -1126,7 +1126,7 @@
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
 
-   See (doc schema.macros/defn) for details.
+   See (doc s/defn) for details.
 
    Examples:
 
@@ -1143,7 +1143,7 @@
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
   [fnspecs & body]
-  `(macros/letfn fnspecs ~@body))
+  `(macros/letfn ~fnspecs ~@body))
 
 (defmacro def
   "Like def, but takes a schema on the var name (with the same format

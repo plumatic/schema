@@ -7,13 +7,12 @@
   :dependencies [[potemkin "0.3.2"]]
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
-                                  [org.clojure/clojurescript "0.0-2030"]
+                                  [org.clojure/clojurescript "0.0-2120"]
                                   [com.keminglabs/cljx "0.3.1"]]
                    :plugins [[com.keminglabs/cljx "0.3.1"]
                              [codox "0.8.8"]
-                             [lein-cljsbuild "0.3.2"]
-                             [com.cemerick/austin "0.1.3"]
-                             [com.cemerick/clojurescript.test "0.2.2"]]
+                             [lein-cljsbuild "1.0.2"]
+                             [com.cemerick/clojurescript.test "0.3.1"]]
                    :hooks [leiningen.cljsbuild]
                    :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
                                                      cljx.repl-middleware/wrap-cljx]}

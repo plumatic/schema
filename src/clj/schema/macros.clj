@@ -487,5 +487,11 @@
   "DEPRECATED -- canonical version moved to schema.core"
   [multifn dispatch-val & fn-tail]
   `(if-cljs
-    (cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod        ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+    (cljs.core/-add-method
+     ~(with-meta multifn {:tag 'cljs.core/MultiFn})
+     ~dispatch-val
+     (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
+       addMethod
+       ~dispatch-val
+       (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
