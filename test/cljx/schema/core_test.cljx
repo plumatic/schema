@@ -16,7 +16,6 @@
    clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
-   #+clj potemkin
    #+clj [schema.macros :as sm]
    #+cljs cemerick.cljs.test))
 
@@ -588,8 +587,8 @@
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
     (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
 
-(#+clj potemkin/defprotocol+ #+cljs defprotocol PProtocol
-       (do-something [this]))
+(defprotocol PProtocol
+  (do-something [this]))
 
 ;; exercies some different arities
 

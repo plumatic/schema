@@ -298,37 +298,29 @@
 ;;; Public: miscellaneous macros and helpers
 
 (defmacro defschema
-  "Convenience macro to make it clear to reader that body is meant to be used as a schema.
-   The name of the schema is recorded in the metadata."
+  "DEPRECATED -- canonical version moved to schema.core"
   ([name form]
      `(defschema ~name "" ~form))
   ([name docstring form]
      `(def ~name ~docstring (schema.core/schema-with-name ~form '~name))))
 
-;;; The clojure version is a function in schema.core, this must be here for cljs because
-;;; satisfies? is a macro that must have access to the protocol at compile-time.
 (defmacro protocol
-  "A value that must satsify? protocol p"
+  "DEPRECATED -- canonical version moved to schema.core"
   [p]
   `(with-meta (schema.core/->Protocol ~p)
      {:proto-pred #(satisfies? ~p %)
       :proto-sym '~p}))
 
 (defmacro =>*
-  "Produce a function schema from an output schema and a list of arity input schema specs,
-   each of which is a vector of argument schemas, ending with an optional '& more-schema'
-   specification where more-schema must be a sequence schema.
-
-   Currently function schemas are purely descriptive; there is no validation except for
-   functions defined directly by s/fn or s/defn"
+  "DEPRECATED -- canonical version moved to schema.core"
   [output-schema & arity-schema-specs]
   `(schema.core/make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
 
 (defmacro =>
-  "Convenience function for defining function schemas with a single arity; like =>*, but
-   there is no vector around the argument schemas for this arity."
+  "DEPRECATED -- canonical version moved to schema.core"
   [output-schema & arg-schemas]
   `(=>* ~output-schema ~(vec arg-schemas)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized defrecord
@@ -352,41 +344,7 @@
     @defrecord-constructor-atom))
 
 (defmacro defrecord
-  "Define a record with a schema.  If *use-potemkin* is true, the resulting record
-   is a potemkin/defrecord+, otherwise it is a defrecord.
-
-   In addition to the ordinary behavior of defrecord, this macro produces a schema
-   for the Record, which will automatically be used when validating instances of
-   the Record class:
-
-   (sm/defrecord FooBar
-    [foo :- Int
-     bar :- String])
-
-   (schema.utils/class-schema FooBar)
-   ==> (record user.FooBar {:foo Int, :bar java.lang.String})
-
-   (s/check FooBar (FooBar. 1.2 :not-a-string))
-   ==> {:foo (not (integer? 1.2)), :bar (not (instance? java.lang.String :not-a-string))}
-
-   See (doc schema.core) for details of the :- syntax for record elements.
-
-   Moreover, optional arguments extra-key-schema? and extra-validator-fn? can be
-   passed to augment the record schema.
-    - extra-key-schema is a map schema that defines validation for additional
-      key-value pairs not in the record base (the default is to not allow extra
-       mappings).
-    - extra-validator-fn? is an additional predicate that will be used as part
-      of validating the record value.
-
-   The remaining opts+specs (i.e., protocol and interface implementations) are
-   passed through directly to defrecord.
-
-   Finally, this macro replaces Clojure's map->name constructor with one that is
-   more than an order of magnitude faster (as of Clojure 1.5), and provides a
-   new strict-map->name constructor that throws or drops extra keys not in the
-   record base."
-  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  "DEPRECATED -- canonical version moved to schema.core"
   [name field-schema & more-args]
   (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
         [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
@@ -441,19 +399,7 @@
 ;;; Public: schematized functions
 
 (defmacro fn
-  "sm/fn : sm/defn :: clojure.core/fn : clojure.core/defn
-
-   See (doc schema.macros/defn) for details.
-
-   Additional gotchas and limitations:
-    - Like s/defn, the output schema must go on the fn name. If you
-      don't supply a name, schema will gensym one for you and attach
-      the schema.
-    - Unlike s/defn, the function schema is stored in metadata on the
-      fn.  Clojure's implementation for metadata on fns currently
-      produces a wrapper fn, which will decrease performance and
-      negate the benefits of primitive type hints compared to
-      clojure.core/fn."
+  "DEPRECATED -- canonical version moved to schema.core"
   [& fn-args]
   (let [fn-args (if (symbol? (first fn-args))
                   fn-args
@@ -479,55 +425,7 @@
           macro-args)))
 
 (defmacro defn
-  "Like clojure.core/defn, except that schema-style typehints can be given on
-   the argument symbols and on the function name (for the return value).
-
-   You can call s/fn-schema on the defined function to get its schema back, or
-   use with-fn-validation to enable runtime checking of function inputs and
-   outputs.
-
-   (sm/defn foo :- s/Num
-    [x :- s/Int
-     y :- s/Num]
-    (* x y))
-
-   (s/fn-schema foo)
-   ==> (=> java.lang.Number Int java.lang.Number)
-
-   (sm/with-fn-validation (foo 1 2))
-   ==> 2
-
-   (sm/with-fn-validation (foo 1.5 2))
-   ==> Input to foo does not match schema: [(named (not (integer? 1.5)) x) nil]
-
-   See (doc schema.core) for details of the :- syntax for arguments and return
-   schemas.
-
-   The overhead for checking if run-time validation should be used is very
-   small -- about 5% of a very small fn call.  On top of that, actual
-   validation costs what it costs.
-
-   You can also turn on validation unconditionally for this fn only by
-   putting ^:always-validate metadata on the fn name.
-
-   Gotchas and limitations:
-    - The output schema always goes on the fn name, not the arg vector. This
-      means that all arities must share the same output schema. Schema will
-      automatically propagate primitive hints to the arg vector and class hints
-      to the fn name, so that you get the behavior you expect from Clojure.
-    - Schema metadata is only processed on top-level arguments.  I.e., you can
-      use destructuring, but you must put schema metadata on the top-level
-      arguments, not the destructured variables.
-
-      Bad:  (sm/defn foo [{:keys [x :- s/Int]}])
-      Good: (sm/defn foo [{:keys [x]} :- {:x s/Int}])
-    - Only a specific subset of rest-arg destructuring is supported:
-      - & rest works as expected
-      - & [a b] works, with schemas for individual elements parsed out of the binding,
-        or an overall schema on the vector
-      - & {} is not supported.
-    - Unlike clojure.core/defn, a final attr-map on multi-arity functions
-      is not supported."
+  "DEPRECATED -- canonical version moved to schema.core"
   [& defn-args]
   (let [[name & more-defn-args] (normalized-defn-args &env defn-args)
         {:keys [doc tag] :as standard-meta} (meta name)
@@ -548,17 +446,15 @@
          ~@fn-body)
        (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 
-(defmacro letfn [fnspecs# & body#]
-  (list 'clojure.core/let
-        (vec (interleave (map first fnspecs#)
-                         (map #(cons `schema.macros/fn %) fnspecs#)))
-        `(do ~@body#)))
+(defmacro letfn [fnspecs & body]
+  "DEPRECATED -- canonical version moved to schema.core"
+  (list `let
+        (vec (interleave (map first fnspecs)
+                         (map #(cons `fn %) fnspecs)))
+        `(do ~@body)))
 
 (defmacro with-fn-validation
-  "Execute body with input and ouptut schema validation turned on for
-   all s/defn and s/fn instances globally (across all threads). After
-   all forms have been executed, resets function validation to its
-   previously set value. Not concurrency-safe."
+  "DEPRECATED -- canonical version moved to schema.core"
   [& body]
   `(if (schema.core/fn-validation?)
      (do ~@body)
@@ -566,10 +462,7 @@
          (try ~@body (finally (schema.core/set-fn-validation! false))))))
 
 (defmacro without-fn-validation
-  "Execute body with input and ouptut schema validation turned off for
-   all s/defn and s/fn instances globally (across all threads). After
-   all forms have been executed, resets function validation to its
-   previously set value. Not concurrency-safe."
+  "DEPRECATED -- canonical version moved to schema.core"
   [& body]
   `(if (schema.core/fn-validation?)
      (do (schema.core/set-fn-validation! false)
@@ -577,17 +470,7 @@
      (do ~@body)))
 
 (defmacro def
-  "Like def, but takes a schema on the var name (with the same format
-   as the output schema of s/defn), requires an initial value, and
-   asserts that the initial value matches the schema on the var name
-   (regardless of the status of with-fn-validation).  Due to
-   limitations of add-watch!, cannot enforce validation of subsequent
-   rebindings of var.  Throws at compile-time for clj, and client-side
-   load-time for cljs.
-
-   Example:
-
-   (s/def foo :- long \"a long\" 2)"
+  "DEPRECATED -- canonical version moved to schema.core"
   [& def-args]
   (let [[name more-def-args] (extract-arrow-schematized-element &env def-args)
         [doc-string? more-def-args] (if (= (count more-def-args) 2)
@@ -601,20 +484,7 @@
          (schema.core/validate output-schema# ~init)))))
 
 (defmacro defmethod
-  "Like clojure.core/defmethod, except that schema-style typehints can be given on
-   the argument symbols and after the dispatch-val (for the return value).
-
-   See (doc schema.macros/defn) for details.
-
-   Examples:
-
-     (s/defmethod mymultifun :a-dispatch-value :- s/Num [x :- s/Int y :- s/Num] (* x y))
-
-     ;; You can also use meta tags like ^:always-validate by placing them
-     ;; before the multifunction name:
-
-     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
-  "
+  "DEPRECATED -- canonical version moved to schema.core"
   [multifn dispatch-val & fn-tail]
   `(if-cljs
     (cljs.core/-add-method ~(with-meta multifn {:tag 'cljs.core/MultiFn}) ~dispatch-val (schema.macros/fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
