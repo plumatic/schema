@@ -104,7 +104,9 @@
 (clojure.core/defn normalized-metadata
   "Take an object with optional metadata, which may include a :tag and/or explicit
    :schema/:s/:s?/:tag data, plus an optional explicit schema, and normalize the
-   object to have a valid Clojure :tag plus a :schema field. :s? is deprecated."
+   object to have a valid Clojure :tag plus a :schema field.
+
+   :s and :s? are deprecated."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
     (assert! (< (count (remove nil? [s s? schema explicit-schema])) 2)
