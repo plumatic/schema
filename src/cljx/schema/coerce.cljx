@@ -4,7 +4,7 @@
    #+cljs [cljs.reader :as reader]
    #+clj [clojure.edn :as edn]
    #+clj [schema.macros :as macros]
-   [schema.core :as s]
+   [schema.core :as s :include-macros true]
    [schema.utils :as utils]
    [clojure.string :as str])
   #+cljs (:require-macros [schema.macros :as macros]))
@@ -14,16 +14,15 @@
 
 (def Schema
   "A Schema for Schemas"
-  #+clj (s/protocol s/Schema)
-  #+cljs (macros/protocol s/Schema))
+  (s/protocol s/Schema))
 
 (def CoercionMatcher
   "A function from schema to coercion function, or nil if no special coercion is needed.
    The returned function is applied to the corresponding data before validation (or walking/
    coercion of its sub-schemas, if applicable)"
-  (macros/=> (s/maybe (macros/=> s/Any s/Any)) Schema))
+  (s/=> (s/maybe (s/=> s/Any s/Any)) Schema))
 
-(macros/defn coercer
+(s/defn coercer
   "Produce a function that simultaneously coerces and validates a datum."
   [schema coercion-matcher :- CoercionMatcher]
   (s/start-walker
@@ -44,7 +43,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Coercion helpers
 
-(macros/defn first-matcher :- CoercionMatcher
+(s/defn first-matcher :- CoercionMatcher
   "A matcher that takes the first match from matchers."
   [matchers :- [CoercionMatcher]]
   (fn [schema] (first (keep #(% schema) matchers))))

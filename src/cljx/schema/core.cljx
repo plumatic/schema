@@ -30,19 +30,20 @@
    with details described below), plus helpers below that provide optional values,
    enumerations, arbitrary predicates, and more.
 
-   Schema also provides macros (defined in schema.macros, and imported into this ns
-   in Clojure) for defining records with schematized elements (sm/defrecord), and
-   named or anonymous functions (sm/fn and sm/defn) with schematized inputs and
-   return values.  In addition to producing better-documented records and functions,
-   these macros allow you to retrieve the schema associated with the defined record
-   or function.  Moreover, functions include optional *validation*, which will throw
-   an error if the inputs or outputs do not match the provided schemas:
+   Assuming you (:require [schema.core :as s :include-macros true]),
+   Schema also provides macros for defining records with schematized elements
+   (s/defrecord), and named or anonymous functions (s/fn and s/defn) with
+   schematized inputs and return values.  In addition to producing better-documented
+   records and functions, these macros allow you to retrieve the schema associated
+   with the defined record or function.  Moreover, functions include optional
+   *validation*, which will throw an error if the inputs or outputs do not
+   match the provided schemas:
 
-   (sm/defrecord FooBar
+   (s/defrecord FooBar
     [foo :- Int
      bar :- String])
 
-   (sm/defn quux :- Int
+   (s/defn quux :- Int
     [foobar :- Foobar
      mogrifier :- Number]
     (* mogrifier (+ (:foo foobar) (Long/parseLong (:bar foobar)))))
@@ -53,7 +54,7 @@
    (fn-schema quux)
    ==> (=> Int (record user.FooBar {:foo Int, :bar java.lang.String}) java.lang.Number)
 
-   (sm/with-fn-validation (quux (FooBar. 10.2 \"5\") 2))
+   (s/with-fn-validation (quux (FooBar. 10.2 \"5\") 2))
    ==> Input to quux does not match schema: [(named {:foo (not (integer? 10.2))} foobar) nil]
 
    As you can see, the preferred syntax for providing type hints to schema's defrecord,
@@ -65,7 +66,7 @@
 
    If you don't like this style, standard Clojure-style typehints are also supported:
 
-   (fn-schema (sm/fn [^String x]))
+   (fn-schema (s/fn [^String x]))
    ==> (=> Any java.lang.String)
 
    **DEPRECATED SYNTAX BELOW, TO BE REMOVED**
@@ -73,16 +74,15 @@
    schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
    the schema in a {:s schema} map like so:
 
-   (fn-schema (sm/fn [^{:s [String]} x]))
+   (fn-schema (s/fn [^{:s [String]} x]))
    (=> Any [java.lang.String])
 
    (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
-   of defrecord, fn, and defn in schema.macros for more details about how to use
-   these macros."
-  (:refer-clojure :exclude [Keyword Symbol])
+   of defrecord, fn, and defn for more details about how to use these macros."
+  ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
+  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
   (:require
    [clojure.string :as str]
-   #+clj potemkin
    #+clj [schema.macros :as macros]
    [schema.utils :as utils])
   #+cljs (:require-macros [schema.macros :as macros]))
@@ -118,7 +118,7 @@
 
 ;; Schemas print as their explains
 #+clj
-(do (defmethod print-method schema.core.Schema [s writer]
+(do (clojure.core/defmethod print-method schema.core.Schema [s writer]
       (print-method (explain s) writer))
     (prefer-method print-method schema.core.Schema clojure.lang.IRecord)
     (prefer-method print-method schema.core.Schema java.util.Map)
@@ -132,13 +132,13 @@
    subschema-walker as an argument because some behaviors (e.g. recursive schema walkers)
    seem to require mind-bending things like fixed-point combinators that way, but are
    simple this way."
-  (fn [s]
+  (clojure.core/fn [s]
     (macros/error!
      (str "Walking is unsupported outside of start-walker; "
           "all composite schemas must eagerly bind subschema-walkers "
           "outside the returned walker."))))
 
-(defn start-walker
+(clojure.core/defn start-walker
   "The entry point for creating walkers.  Binds the provided walker to subschema-walker,
    then calls it on the provided schema.  For simple validation, pass walker as sub-walker.
    More sophisticated behavior (coercion, etc), can be achieved by passing a sub-walker
@@ -147,19 +147,19 @@
   (binding [subschema-walker sub-walker]
     (subschema-walker schema)))
 
-(defn checker
+(clojure.core/defn checker
   "Compile an efficient checker for schema, which returns nil for valid values and
    error descriptions otherwise."
   [schema]
   (comp utils/error-val (start-walker (utils/memoize-id walker) schema)))
 
-(defn check
+(clojure.core/defn check
   "Return nil if x matches schema; otherwise, returns a value that looks like the
    'bad' parts of x with ValidationErrors at the leaves describing the failures."
   [schema x]
   ((checker schema) x))
 
-(defn validate
+(clojure.core/defn validate
   "Throw an exception if value does not satisfy schema; otherwise, return value."
   [schema value]
   (when-let [error (check schema value)]
@@ -181,7 +181,7 @@
                          ;; do extra validation for records and such
                          (subschema-walker more-schema)
                          identity)]
-      (fn [x]
+      (clojure.core/fn [x]
         (or (when #+clj (not (instance? this x))
                   #+cljs (or (nil? x)
                              (not (or (identical? this (.-constructor x))
@@ -231,7 +231,7 @@
 
 ;;; Any matches anything (including nil)
 
-(defrecord AnythingSchema [_]
+(clojure.core/defrecord AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
   ;; loses type info, which makes this unusable in schema-fn.
   ;; http://dev.clojure.org/jira/browse/CLJ-1093
@@ -245,34 +245,34 @@
 
 ;;; eq (to a single allowed value)
 
-(defrecord EqSchema [v]
+(clojure.core/defrecord EqSchema [v]
   Schema
   (walker [this]
-    (fn [x]
-      (if (= v x)
-        x
-        (macros/validation-error this x (list '= v (utils/value-name x))))))
+          (clojure.core/fn [x]
+            (if (= v x)
+              x
+              (macros/validation-error this x (list '= v (utils/value-name x))))))
   (explain [this] (list 'eq v)))
 
-(defn eq
+(clojure.core/defn eq
   "A value that must be (= v)."
   [v]
   (EqSchema. v))
 
 ;;; isa (a child of parent)
 
-(defrecord Isa [h parent]
+(clojure.core/defrecord Isa [h parent]
   Schema
   (walker [this]
-    (fn [child]
-      (if (or (and h (isa? h child parent))
-              (isa? child parent))
-        child
-        (macros/validation-error this child (list 'isa? child parent)))))
+          (clojure.core/fn [child]
+            (if (or (and h (isa? h child parent))
+                    (isa? child parent))
+              child
+              (macros/validation-error this child (list 'isa? child parent)))))
   (explain [this]
-    (list 'isa? parent)))
+           (list 'isa? parent)))
 
-(defn isa
+(clojure.core/defn isa
   "A value that must be a child of parent."
   ([parent]
      (Isa. nil parent))
@@ -282,16 +282,16 @@
 
 ;;; enum (in a set of allowed values)
 
-(defrecord EnumSchema [vs]
+(clojure.core/defrecord EnumSchema [vs]
   Schema
   (walker [this]
-    (fn [x]
-      (if (contains? vs x)
-        x
-        (macros/validation-error this x (list vs (utils/value-name x))))))
+          (clojure.core/fn [x]
+            (if (contains? vs x)
+              x
+              (macros/validation-error this x (list vs (utils/value-name x))))))
   (explain [this] (cons 'enum vs)))
 
-(defn enum
+(clojure.core/defn enum
   "A value that must be = to some element of vs."
   [& vs]
   (EnumSchema. (set vs)))
@@ -299,21 +299,21 @@
 
 ;;; pred (matches all values for which p? returns truthy)
 
-(defrecord Predicate [p? pred-name]
+(clojure.core/defrecord Predicate [p? pred-name]
   Schema
   (walker [this]
-    (fn [x]
-      (if-let [reason (macros/try-catchall (when-not (p? x) 'not) (catch e 'throws?))]
-        (macros/validation-error this x (list pred-name (utils/value-name x)) reason)
-        x)))
+          (clojure.core/fn [x]
+            (if-let [reason (macros/try-catchall (when-not (p? x) 'not) (catch e 'throws?))]
+              (macros/validation-error this x (list pred-name (utils/value-name x)) reason)
+              x)))
   (explain [this]
-    (cond (= p? integer?) 'Int
-          (= p? keyword?) 'Keyword
-          (= p? symbol?) 'Symbol
-          (= p? string?) 'Str
-          :else (list 'pred pred-name))))
+           (cond (= p? integer?) 'Int
+                 (= p? keyword?) 'Keyword
+                 (= p? symbol?) 'Symbol
+                 (= p? string?) 'Str
+                 :else (list 'pred pred-name))))
 
-(defn pred
+(clojure.core/defn pred
   "A value for which p? returns true (and does not throw).
    Optional pred-name can be passed for nicer validation errors."
   ([p?] (pred p? p?))
@@ -325,27 +325,29 @@
 
 ;;; protocol (which value must `satisfies?`)
 
-(defn protocol-name [protocol]
+(clojure.core/defn protocol-name [protocol]
   #+clj (-> protocol :p :var meta :name)
   #+cljs (-> protocol meta :proto-sym))
 
 ;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
 ;; and put it in metadata of the record so that equality is preserved, along with the name.
-(defrecord Protocol [p]
+(clojure.core/defrecord Protocol [p]
   Schema
   (walker [this]
-    (fn [x]
-      (if #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
-          x
-          (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x))))))
+          (clojure.core/fn [x]
+            (if #+clj (satisfies? p x) #+cljs ((:proto-pred (meta this)) x)
+                x
+                (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x))))))
   (explain [this] (list 'protocol (protocol-name this))))
 
-#+clj ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
-(defn protocol
+;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
+(defmacro protocol
   "A value that must satsify? protocol p"
   [p]
-  (macros/assert! (:on p) "Cannot make protocol schema for non-protocol %s" p)
-  (Protocol. p))
+  `(macros/if-cljs
+    (macros/protocol ~p)
+    (do (macros/assert! (:on ~p) "Cannot make protocol schema for non-protocol %s" ~p)
+        (Protocol. ~p))))
 
 
 ;;; regex (validates matching Strings)
@@ -354,7 +356,7 @@
   #+clj java.util.regex.Pattern
   #+cljs js/RegExp
   (walker [this]
-    (fn [x]
+    (clojure.core/fn [x]
       (cond (not (string? x))
             (macros/validation-error this x (list 'string? (utils/value-name x)))
 
@@ -415,16 +417,16 @@
 
 ;;; maybe (nil)
 
-(defrecord Maybe [schema]
+(clojure.core/defrecord Maybe [schema]
   Schema
   (walker [this]
-    (let [sub-walker (subschema-walker schema)]
-      (fn [x]
-        (when-not (nil? x)
-          (sub-walker x)))))
+          (let [sub-walker (subschema-walker schema)]
+            (clojure.core/fn [x]
+              (when-not (nil? x)
+                (sub-walker x)))))
   (explain [this] (list 'maybe (explain schema))))
 
-(defn maybe
+(clojure.core/defn maybe
   "A value that must either be nil or satisfy schema"
   [schema]
   (Maybe. schema))
@@ -432,14 +434,14 @@
 
 ;;; named (schema elements)
 
-(defrecord NamedSchema [schema name]
+(clojure.core/defrecord NamedSchema [schema name]
   Schema
   (walker [this]
-    (let [sub-walker (subschema-walker schema)]
-      (fn [x] (utils/wrap-error-name name (sub-walker x)))))
+          (let [sub-walker (subschema-walker schema)]
+            (clojure.core/fn [x] (utils/wrap-error-name name (sub-walker x)))))
   (explain [this] (list 'named (explain schema) name)))
 
-(defn named
+(clojure.core/defn named
   "A value that must satisfy schema, and has a name for documentation purposes."
   [schema name]
   (NamedSchema. schema name))
@@ -447,23 +449,23 @@
 
 ;;; either (satisfies this schema or that one)
 
-(defrecord Either [schemas]
+(clojure.core/defrecord Either [schemas]
   Schema
   (walker [this]
-    (let [sub-walkers (mapv subschema-walker schemas)]
-      (fn [x]
-        (loop [sub-walkers (seq sub-walkers)]
-          (if-not sub-walkers
-            (macros/validation-error
-             this x
-             (list 'some (list 'check '% (utils/value-name x)) 'schemas))
-            (let [res ((first sub-walkers) x)]
-              (if-not (utils/error? res)
-                res
-                (recur (next sub-walkers)))))))))
+          (let [sub-walkers (mapv subschema-walker schemas)]
+            (clojure.core/fn [x]
+              (loop [sub-walkers (seq sub-walkers)]
+                (if-not sub-walkers
+                  (macros/validation-error
+                   this x
+                   (list 'some (list 'check '% (utils/value-name x)) 'schemas))
+                  (let [res ((first sub-walkers) x)]
+                    (if-not (utils/error? res)
+                      res
+                      (recur (next sub-walkers)))))))))
   (explain [this] (cons 'either (map explain schemas))))
 
-(defn either
+(clojure.core/defn either
   "A value that must satisfy at least one schema in schemas."
   [& schemas]
   (Either. schemas))
@@ -471,24 +473,24 @@
 
 ;;; both (satisfies this schema and that one)
 
-(defrecord Both [schemas]
+(clojure.core/defrecord Both [schemas]
   Schema
   (walker [this]
-    (let [sub-walkers (mapv subschema-walker schemas)]
-      ;; Both doesn't really have a clean semantics for non-identity walks, but we can
-      ;; do something pretty reasonable and assume we walk in order passing the result
-      ;; of each walk to the next, and failing at the first error
-      (fn [x]
-        (reduce
-         (fn [x sub-walker]
-           (if (utils/error? x)
-             x
-             (sub-walker x)))
-         x
-         sub-walkers))))
+          (let [sub-walkers (mapv subschema-walker schemas)]
+            ;; Both doesn't really have a clean semantics for non-identity walks, but we can
+            ;; do something pretty reasonable and assume we walk in order passing the result
+            ;; of each walk to the next, and failing at the first error
+            (clojure.core/fn [x]
+              (reduce
+               (clojure.core/fn [x sub-walker]
+                 (if (utils/error? x)
+                   x
+                   (sub-walker x)))
+               x
+               sub-walkers))))
   (explain [this] (cons 'both (map explain schemas))))
 
-(defn both
+(clojure.core/defn both
   "A value that must satisfy every schema in schemas."
   [& schemas]
   (Both. schemas))
@@ -496,21 +498,21 @@
 
 ;;; conditional (choice of schema, based on predicates on the value)
 
-(defrecord ConditionalSchema [preds-and-schemas]
+(clojure.core/defrecord ConditionalSchema [preds-and-schemas]
   Schema
   (walker [this]
-    (let [preds-and-walkers (mapv (fn [[pred schema]] [pred (subschema-walker schema)])
-                                  preds-and-schemas)]
-      (fn [x]
-        (if-let [[_ match] (first (filter (fn [[pred]] (pred x)) preds-and-walkers))]
-          (match x)
-          (macros/validation-error this x (list 'matches-some-condition? (utils/value-name x)))))))
+          (let [preds-and-walkers (mapv (clojure.core/fn [[pred schema]] [pred (subschema-walker schema)])
+                                        preds-and-schemas)]
+            (clojure.core/fn [x]
+              (if-let [[_ match] (first (filter (clojure.core/fn [[pred]] (pred x)) preds-and-walkers))]
+                (match x)
+                (macros/validation-error this x (list 'matches-some-condition? (utils/value-name x)))))))
   (explain [this]
-    (->> preds-and-schemas
-         (mapcat (fn [[pred schema]] [pred (explain schema)]))
-         (cons 'conditional))))
+           (->> preds-and-schemas
+                (mapcat (clojure.core/fn [[pred schema]] [pred (explain schema)]))
+                (cons 'conditional))))
 
-(defn conditional
+(clojure.core/defn conditional
   "Define a conditional schema.  Takes args like cond,
    (conditional pred1 schema1 pred2 schema2 ...),
    and checks the first schema where pred is true on the value.
@@ -535,27 +537,27 @@
 
 #+clj
 (do
-  (defn var-name [v]
+  (clojure.core/defn var-name [v]
     (let [{:keys [ns name]} (meta v)]
       (symbol (str (ns-name ns) "/" name))))
 
-  (defrecord Recursive [derefable]
+  (clojure.core/defrecord Recursive [derefable]
     Schema
     (walker [this]
-      (let [a (atom nil)]
-        (reset! a (start-walker
-                   (let [old subschema-walker]
-                     (fn [s] (if (= s this) #(@a %) (old s))))
-                   @derefable))))
+            (let [a (atom nil)]
+              (reset! a (start-walker
+                         (let [old subschema-walker]
+                           (clojure.core/fn [s] (if (= s this) #(@a %) (old s))))
+                         @derefable))))
     (explain [this]
-      (list 'recursive
-            (if (var? derefable)
-              (list 'var (var-name derefable))
-              (format "%s@%x"
-                      (.getName (class derefable))
-                      (System/identityHashCode derefable))))))
+             (list 'recursive
+                   (if (var? derefable)
+                     (list 'var (var-name derefable))
+                     (format "%s@%x"
+                             (.getName (class derefable))
+                             (System/identityHashCode derefable))))))
 
-  (defn recursive
+  (clojure.core/defn recursive
     "Support for (mutually) recursive schemas by passing a var that points to a schema,
        e.g (recursive #'ExampleRecursiveSchema)."
     [schema]
@@ -590,41 +592,41 @@
   "A sentinel value representing missing portions of the input data."
   ::missing)
 
-(defrecord RequiredKey [k])
+(clojure.core/defrecord RequiredKey [k])
 
-(defn required-key
+(clojure.core/defn required-key
   "A required key in a map"
   [k]
   (if (keyword? k)
     k
     (RequiredKey. k)))
 
-(defn required-key? [ks]
+(clojure.core/defn required-key? [ks]
   (or (keyword? ks)
       (instance? RequiredKey ks)))
 
-(defrecord OptionalKey [k])
+(clojure.core/defrecord OptionalKey [k])
 
-(defn optional-key
+(clojure.core/defn optional-key
   "An optional key in a map"
   [k]
   (OptionalKey. k))
 
-(defn optional-key? [ks]
+(clojure.core/defn optional-key? [ks]
   (instance? OptionalKey ks))
 
 
-(defn explicit-schema-key [ks]
+(clojure.core/defn explicit-schema-key [ks]
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
         (optional-key? ks) (.-k ^OptionalKey ks)
         :else (macros/error! (utils/format* "Bad explicit key: %s" ks))))
 
-(defn specific-key? [ks]
+(clojure.core/defn specific-key? [ks]
   (or (required-key? ks)
       (optional-key? ks)))
 
-(defn- explain-kspec [kspec]
+(clojure.core/defn- explain-kspec [kspec]
   (if (specific-key? kspec)
     (if (keyword? kspec)
       kspec
@@ -635,64 +637,64 @@
 
 ;; A schema for a single map entry.  kspec is either a keyword, required or optional key,
 ;; or key schema.  val-schema is a value schema.
-(defrecord MapEntry [kspec val-schema]
+(clojure.core/defrecord MapEntry [kspec val-schema]
   Schema
   (walker [this]
-    (let [val-walker (subschema-walker val-schema)]
-      (if (specific-key? kspec)
-        (let [optional? (optional-key? kspec)
-              k (explicit-schema-key kspec)]
-          (fn [x]
-            (cond (identical? +missing+ x)
-                  (when-not optional?
-                    (utils/error [k 'missing-required-key]))
+          (let [val-walker (subschema-walker val-schema)]
+            (if (specific-key? kspec)
+              (let [optional? (optional-key? kspec)
+                    k (explicit-schema-key kspec)]
+                (clojure.core/fn [x]
+                  (cond (identical? +missing+ x)
+                        (when-not optional?
+                          (utils/error [k 'missing-required-key]))
 
-                  (not (= 2 (count x)))
-                  (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+                        (not (= 2 (count x)))
+                        (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
 
-                  :else
-                  (let [[xk xv] x]
-                    (assert (= xk k))
-                    (let [vres (val-walker xv)]
-                      (if-let [ve (utils/error-val vres)]
-                        (utils/error [xk ve])
-                        [xk vres]))))))
-        (let [key-walker (subschema-walker kspec)]
-          (fn [x]
-            (if-not (= 2 (count x))
-              (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
-              (let [out-k (key-walker (key x))
-                    out-ke (utils/error-val out-k)
-                    out-v (val-walker (val x))
-                    out-ve (utils/error-val out-v)]
-                (if (or out-ke out-ve)
-                  (utils/error [(or out-ke (key x)) (or out-ve 'invalid-key)])
-                  [out-k out-v]))))))))
+                        :else
+                        (let [[xk xv] x]
+                          (assert (= xk k))
+                          (let [vres (val-walker xv)]
+                            (if-let [ve (utils/error-val vres)]
+                              (utils/error [xk ve])
+                              [xk vres]))))))
+              (let [key-walker (subschema-walker kspec)]
+                (clojure.core/fn [x]
+                  (if-not (= 2 (count x))
+                    (macros/validation-error this x (list = 2 (list 'count (utils/value-name x))))
+                    (let [out-k (key-walker (key x))
+                          out-ke (utils/error-val out-k)
+                          out-v (val-walker (val x))
+                          out-ve (utils/error-val out-v)]
+                      (if (or out-ke out-ve)
+                        (utils/error [(or out-ke (key x)) (or out-ve 'invalid-key)])
+                        [out-k out-v]))))))))
   (explain [this]
-    (list
-     'map-entry
-     (explain-kspec kspec)
-     (explain val-schema))))
+           (list
+            'map-entry
+            (explain-kspec kspec)
+            (explain val-schema))))
 
-(defn map-entry [kspec val-schema]
+(clojure.core/defn map-entry [kspec val-schema]
   (MapEntry. kspec val-schema))
 
 
 ;;; Implementation helper functions
 
-(defn find-extra-keys-schema [map-schema]
+(clojure.core/defn find-extra-keys-schema [map-schema]
   (let [key-schemata (remove specific-key? (keys map-schema))]
     (macros/assert! (< (count key-schemata) 2)
                     "More than one non-optional/required key schemata: %s"
                     (vec key-schemata))
     (first key-schemata)))
 
-(defn- preserve-map-type [original walker-result]
+(clojure.core/defn- preserve-map-type [original walker-result]
   (if (and (utils/record? original) (not (utils/error? walker-result)))
     (into original walker-result)
     walker-result))
 
-(defn- map-walker [map-schema]
+(clojure.core/defn- map-walker [map-schema]
   (let [extra-keys-schema (find-extra-keys-schema map-schema)
         extra-walker (when extra-keys-schema
                        (subschema-walker (apply map-entry (find map-schema extra-keys-schema))))
@@ -709,7 +711,7 @@
                                          (filter #(> (count %) 1))
                                          (apply concat)
                                          (mapv explain-kspec)))))
-    (fn [x]
+    (clojure.core/fn [x]
       (if-not (map? x)
         (macros/validation-error map-schema x (list 'map? (utils/value-name x)))
         (preserve-map-type
@@ -718,18 +720,18 @@
            (if-not explicit-walkers
              (reduce
               (if extra-walker
-                (fn [out e]
+                (clojure.core/fn [out e]
                   (err-conj out (extra-walker e)))
-                (fn [out [k _]]
+                (clojure.core/fn [out [k _]]
                   (err-conj out (utils/error [k 'disallowed-key]))))
               out
-              (remove (fn [[k v]] (ok-key k)) x))
+              (remove (clojure.core/fn [[k v]] (ok-key k)) x))
              (let [[wk wv] (first explicit-walkers)]
                (recur (conj ok-key wk)
                       (next explicit-walkers)
                       (err-conj out (wv (or (find x wk) +missing+))))))))))))
 
-(defn- map-explain [this]
+(clojure.core/defn- map-explain [this]
   (into {} (for [[k v] this] (vec (next (explain (map-entry k v)))))))
 
 (extend-protocol Schema
@@ -753,7 +755,7 @@
   (walker [this]
     (macros/assert! (= (count this) 1) "Set schema must have exactly one element")
     (let [sub-walker (subschema-walker (first this))]
-      (fn [x]
+      (clojure.core/fn [x]
         (or (when-not (set? x)
               (macros/validation-error this x (list 'set? (utils/value-name x))))
             (let [[good bad] ((juxt remove keep) utils/error-val (map sub-walker x))]
@@ -772,19 +774,19 @@
 ;; Finally, rest-schema is any schema, which must match any remaining elements.
 ;; (if optional elements are present, they must be matched before the rest-schema is applied).
 
-(defrecord One [schema optional? name])
+(clojure.core/defrecord One [schema optional? name])
 
-(defn one
+(clojure.core/defn one
   "A single required element of a sequence (not repeated, the implicit default)"
   ([schema name]
      (One. schema false name)))
 
-(defn optional
+(clojure.core/defn optional
   "A single optional element of a sequence (not repeated, the implicit default)"
   ([schema name]
      (One. schema true name)))
 
-(defn parse-sequence-schema [s]
+(clojure.core/defn parse-sequence-schema [s]
   "Parses and validates a sequence schema, returning a vector in the form
   [singles multi] where singles is a sequence of 'one' and 'optional' schemas
   and multi is the rest-schema (which may be nil). A valid sequence schema is
@@ -804,8 +806,8 @@
           single-walkers (vec (for [^One s singles]
                                 [s (subschema-walker (.-schema s))]))
           multi-walker (when multi (subschema-walker multi))
-          err-conj (utils/result-builder (fn [m] (vec (repeat (count m) nil))))]
-      (fn [x]
+          err-conj (utils/result-builder (clojure.core/fn [m] (vec (repeat (count m) nil))))]
+      (clojure.core/fn [x]
         (or (when-not (or (nil? x) (sequential? x))
               (macros/validation-error this x (list 'sequential? (utils/value-name x))))
             (loop [single-walkers single-walkers x x out []]
@@ -843,7 +845,7 @@
         (when multi
           [(explain multi)]))))))
 
-(defn pair
+(clojure.core/defn pair
   "A schema for a pair of schemas and their names"
   [first-schema first-name second-schema second-name]
   [(one first-schema first-name)
@@ -857,26 +859,26 @@
 ;; also satisfy a map schema.  An optional :extra-validator-fn can also be passed to do
 ;; additional validation.
 
-(defrecord Record [klass schema]
+(clojure.core/defrecord Record [klass schema]
   Schema
   (walker [this]
-    (let [map-checker (subschema-walker schema)
-          pred-checker (when-let [evf (:extra-validator-fn this)]
-                         (subschema-walker (pred evf)))]
-      (fn [r]
-        (or (when-not (instance? klass r)
-              (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
-            (let [res (map-checker r)]
-              (if (utils/error? res)
-                res
-                (let [pred-res (when pred-checker (pred-checker r))]
-                  (if (utils/error? pred-res)
-                    pred-res
-                    res))))))))
+          (let [map-checker (subschema-walker schema)
+                pred-checker (when-let [evf (:extra-validator-fn this)]
+                               (subschema-walker (pred evf)))]
+            (clojure.core/fn [r]
+              (or (when-not (instance? klass r)
+                    (macros/validation-error this r (list 'instance? klass (utils/value-name r))))
+                  (let [res (map-checker r)]
+                    (if (utils/error? res)
+                      res
+                      (let [pred-res (when pred-checker (pred-checker r))]
+                        (if (utils/error? pred-res)
+                          pred-res
+                          res))))))))
   (explain [this]
-    (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
+           (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
-(defn record
+(clojure.core/defn record
   "A Record instance of type klass, whose elements match map schema 'schema'."
   [klass schema]
   #+clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass))
@@ -893,32 +895,32 @@
 
 ;; Currently function schemas are purely descriptive, and do not carry any validation logic.
 
-(defn explain-input-schema [input-schema]
+(clojure.core/defn explain-input-schema [input-schema]
   (let [[required more] (split-with #(instance? One %) input-schema)]
     (concat (map #(explain (.-schema ^One %)) required)
             (when (seq more)
               ['& (mapv explain more)]))))
 
-(defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
+(clojure.core/defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
   (walker [this]
-    (fn [x]
-      (if (ifn? x)
-        x
-        (macros/validation-error this x (list 'ifn? (utils/value-name x))))))
+          (clojure.core/fn [x]
+            (if (ifn? x)
+              x
+              (macros/validation-error this x (list 'ifn? (utils/value-name x))))))
   (explain [this]
-    (if (> (count input-schemas) 1)
-      (list* '=>* (explain output-schema) (map explain-input-schema input-schemas))
-      (list* '=> (explain output-schema) (explain-input-schema (first input-schemas))))))
+           (if (> (count input-schemas) 1)
+             (list* '=>* (explain output-schema) (map explain-input-schema input-schemas))
+             (list* '=> (explain output-schema) (explain-input-schema (first input-schemas))))))
 
-(defn- arity [input-schema]
+(clojure.core/defn- arity [input-schema]
   (if (seq input-schema)
     (if (instance? One (last input-schema))
       (count input-schema)
       #+clj Long/MAX_VALUE #+cljs js/Number.MAX_VALUE)
     0))
 
-(defn make-fn-schema
+(clojure.core/defn make-fn-schema
   "A function outputting a value in output schema, whose argument vector must match one of
    input-schemas, each of which should be a sequence schema.
    Currently function schemas are purely descriptive; they validate against any function,
@@ -930,52 +932,21 @@
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
 
-;; => and =>* are convenience macros for making function schemas.
-;; Clojurescript users must use them from schema.macros, but Clojure users can get them here.
-#+clj (potemkin/import-vars macros/=> macros/=>*)
+(defmacro =>*
+  "Produce a function schema from an output schema and a list of arity input schema specs,
+   each of which is a vector of argument schemas, ending with an optional '& more-schema'
+   specification where more-schema must be a sequence schema.
 
+   Currently function schemas are purely descriptive; there is no validation except for
+   functions defined directly by s/fn or s/defn"
+  [output-schema & arity-schema-specs]
+  `(macros/=>* ~output-schema ~@arity-schema-specs))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Schematized defrecord and (de,let)fn macros
-
-;; In Clojure, we can suck the defrecord/fn/defn/let macros into this namespace
-;; In ClojureScript, you have to use them from clj schema.macros
-#+clj
-(do
-  (doseq [s ['fn 'defn 'letfn 'defrecord 'defmethod]] (ns-unmap *ns* s))
-  (potemkin/import-vars
-   macros/defrecord
-   macros/fn
-   macros/defn
-   macros/letfn
-   macros/with-fn-validation
-   macros/without-fn-validation
-   macros/def
-   macros/defmethod)
-  (reset! macros/*use-potemkin* true) ;; Use potemkin for s/defrecord by default.
-  (set! *warn-on-reflection* false))
-
-(defn fn-validation?
-  "Get the current global schema validation setting."
-  []
-  (.get_cell utils/use-fn-validation))
-
-(defn set-fn-validation!
-  "Globally turn on schema validation for all s/fn and s/defn instances."
-  [on?]
-  (.set_cell utils/use-fn-validation on?))
-
-(clojure.core/defn schematize-fn
-  "Attach the schema to fn f at runtime, extractable by fn-schema."
-  [f schema]
-  (vary-meta f assoc :schema schema))
-
-(clojure.core/defn ^FnSchema fn-schema
-  "Produce the schema for a function defined with s/fn or s/defn."
-  [f]
-  (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
-  (or (utils/class-schema (utils/fn-schema-bearer f))
-      (macros/safe-get (meta f) :schema)))
+(defmacro =>
+  "Convenience function for defining function schemas with a single arity; like =>*, but
+   there is no vector around the argument schemas for this arity."
+  [output-schema & arg-schemas]
+  `(macros/=> ~output-schema ~@arg-schemas))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -989,4 +960,210 @@
   "Returns the name of a schema attached via schema-with-name (or defschema)."
   (-> schema meta :name))
 
-#+clj (potemkin/import-vars macros/defschema)
+(defmacro defschema
+  "Convenience macro to make it clear to reader that body is meant to be used as a schema.
+   The name of the schema is recorded in the metadata."
+  ([name form]
+     `(defschema ~name "" ~form))
+  ([name docstring form]
+     `(macros/defschema ~name ~docstring ~form)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Schematized defrecord and (de,let)fn macros
+
+(defmacro defrecord
+  "Define a record with a schema.  If *use-potemkin* is true, the resulting record
+   is a potemkin/defrecord+, otherwise it is a defrecord.
+
+   In addition to the ordinary behavior of defrecord, this macro produces a schema
+   for the Record, which will automatically be used when validating instances of
+   the Record class:
+
+   (m/defrecord FooBar
+    [foo :- Int
+     bar :- String])
+
+   (schema.utils/class-schema FooBar)
+   ==> (record user.FooBar {:foo Int, :bar java.lang.String})
+
+   (s/check FooBar (FooBar. 1.2 :not-a-string))
+   ==> {:foo (not (integer? 1.2)), :bar (not (instance? java.lang.String :not-a-string))}
+
+   See (doc schema.core) for details of the :- syntax for record elements.
+
+   Moreover, optional arguments extra-key-schema? and extra-validator-fn? can be
+   passed to augment the record schema.
+    - extra-key-schema is a map schema that defines validation for additional
+      key-value pairs not in the record base (the default is to not allow extra
+       mappings).
+    - extra-validator-fn? is an additional predicate that will be used as part
+      of validating the record value.
+
+   The remaining opts+specs (i.e., protocol and interface implementations) are
+   passed through directly to defrecord.
+
+   Finally, this macro replaces Clojure's map->name constructor with one that is
+   more than an order of magnitude faster (as of Clojure 1.5), and provides a
+   new strict-map->name constructor that throws or drops extra keys not in the
+   record base."
+  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  [& args]
+  `(macros/defrecord ~@args))
+
+(clojure.core/defn fn-validation?
+  "Get the current global schema validation setting."
+  []
+  (.get_cell utils/use-fn-validation))
+
+(clojure.core/defn set-fn-validation!
+  "Globally turn on schema validation for all s/fn and s/defn instances."
+  [on?]
+  (.set_cell utils/use-fn-validation on?))
+
+(defmacro with-fn-validation
+  "Execute body with input and ouptut schema validation turned on for
+   all s/defn and s/fn instances globally (across all threads). After
+   all forms have been executed, resets function validation to its
+   previously set value. Not concurrency-safe."
+  [& body]
+  `(macros/with-fn-validation ~@body))
+
+(defmacro without-fn-validation
+  "Execute body with input and ouptut schema validation turned off for
+   all s/defn and s/fn instances globally (across all threads). After
+   all forms have been executed, resets function validation to its
+   previously set value. Not concurrency-safe."
+  [& body]
+  `(macros/without-fn-validation ~@body))
+
+(clojure.core/defn schematize-fn
+  "Attach the schema to fn f at runtime, extractable by fn-schema."
+  [f schema]
+  (vary-meta f assoc :schema schema))
+
+(clojure.core/defn ^FnSchema fn-schema
+  "Produce the schema for a function defined with s/fn or s/defn."
+  [f]
+  (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
+  (or (utils/class-schema (utils/fn-schema-bearer f))
+      (macros/safe-get (meta f) :schema)))
+
+;; work around bug in extend-protocol (refers to bare 'fn, so we can't exclude it).
+#+clj (ns-unmap *ns* 'fn)
+
+(defmacro fn
+  "s/fn : s/defn :: clojure.core/fn : clojure.core/defn
+
+   See (doc s/defn) for details.
+
+   Additional gotchas and limitations:
+    - Like s/defn, the output schema must go on the fn name. If you
+      don't supply a name, schema will gensym one for you and attach
+      the schema.
+    - Unlike s/defn, the function schema is stored in metadata on the
+      fn.  Clojure's implementation for metadata on fns currently
+      produces a wrapper fn, which will decrease performance and
+      negate the benefits of primitive type hints compared to
+      clojure.core/fn."
+  [& fn-args]
+  `(macros/fn ~@fn-args))
+
+(defmacro defn
+  "Like clojure.core/defn, except that schema-style typehints can be given on
+   the argument symbols and on the function name (for the return value).
+
+   You can call s/fn-schema on the defined function to get its schema back, or
+   use with-fn-validation to enable runtime checking of function inputs and
+   outputs.
+
+   (s/defn foo :- s/Num
+    [x :- s/Int
+     y :- s/Num]
+    (* x y))
+
+   (s/fn-schema foo)
+   ==> (=> java.lang.Number Int java.lang.Number)
+
+   (s/with-fn-validation (foo 1 2))
+   ==> 2
+
+   (s/with-fn-validation (foo 1.5 2))
+   ==> Input to foo does not match schema: [(named (not (integer? 1.5)) x) nil]
+
+   See (doc schema.core) for details of the :- syntax for arguments and return
+   schemas.
+
+   The overhead for checking if run-time validation should be used is very
+   small -- about 5% of a very small fn call.  On top of that, actual
+   validation costs what it costs.
+
+   You can also turn on validation unconditionally for this fn only by
+   putting ^:always-validate metadata on the fn name.
+
+   Gotchas and limitations:
+    - The output schema always goes on the fn name, not the arg vector. This
+      means that all arities must share the same output schema. Schema will
+      automatically propagate primitive hints to the arg vector and class hints
+      to the fn name, so that you get the behavior you expect from Clojure.
+    - Schema metadata is only processed on top-level arguments.  I.e., you can
+      use destructuring, but you must put schema metadata on the top-level
+      arguments, not the destructured variables.
+
+      Bad:  (s/defn foo [{:keys [x :- s/Int]}])
+      Good: (s/defn foo [{:keys [x]} :- {:x s/Int}])
+    - Only a specific subset of rest-arg destructuring is supported:
+      - & rest works as expected
+      - & [a b] works, with schemas for individual elements parsed out of the binding,
+        or an overall schema on the vector
+      - & {} is not supported.
+    - Unlike clojure.core/defn, a final attr-map on multi-arity functions
+      is not supported."
+  [& defn-args]
+  `(macros/defn ~@defn-args))
+
+(defmacro defmethod
+  "Like clojure.core/defmethod, except that schema-style typehints can be given on
+   the argument symbols and after the dispatch-val (for the return value).
+
+   See (doc s/defn) for details.
+
+   Examples:
+
+     (s/defmethod mymultifun :a-dispatch-value :- s/Num [x :- s/Int y :- s/Num] (* x y))
+
+     ;; You can also use meta tags like ^:always-validate by placing them
+     ;; before the multifunction name:
+
+     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
+  "
+  [multifn dispatch-val & fn-tail]
+  `(macros/defmethod ~multifn ~dispatch-val ~@fn-tail))
+
+(defmacro letfn
+  "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
+  [fnspecs & body]
+  `(macros/letfn ~fnspecs ~@body))
+
+(defmacro def
+  "Like def, but takes a schema on the var name (with the same format
+   as the output schema of s/defn), requires an initial value, and
+   asserts that the initial value matches the schema on the var name
+   (regardless of the status of with-fn-validation).  Due to
+   limitations of add-watch!, cannot enforce validation of subsequent
+   rebindings of var.  Throws at compile-time for clj, and client-side
+   load-time for cljs.
+
+   Example:
+
+   (s/def foo :- long \"a long\" 2)"
+  [& def-args]
+  `(macros/def ~@def-args))
+
+#+clj
+(do
+  ;; Use potemkin for s/defrecord by default
+  ;; **WARNING** -- this default will go away soon, and be replaced with
+  ;; an explicit way to configure the use of potemkin if desired
+  (reset! macros/*use-potemkin* true)
+  (set! *warn-on-reflection* false))

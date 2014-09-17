@@ -1,5 +1,11 @@
 ## 0.2.7
+ * **BREAKING** increase minimum clojurescript version 2120 to support :include-macros
+ * **Deprecate** direct use of `schema.macros` in client code -- prefer canonical versions in `schema.core`
+   in both Clojure and ClojureScript, using `:include-macros true` in cljs.
  * **Deprecate** old `^{:s schema}` syntax for providing schemas.
+ * **Deprecate** `*use-potemkin*` flag and behavior to default to potemkin s/defrecords in Clojure;
+   in future releases, you will have to provide your own potemkin and explicitly opt-in to this behavior.
+ * (Hopefully) fix issues with AOT compilation, by removing dependence on potemkin/import-vars.
  * Add `isa` schema for Clojure hierarchies.
  * Preserve the types of maps (including Records) when coercing with map schemas.
  * Smarter code generation in s/defrecord to avoid dead code warnings
