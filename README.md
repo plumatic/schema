@@ -54,7 +54,7 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
 The simplest schemas describe leaf values like Keywords, Numbers, and instances of Classes (on the JVM) and prototypes (in ClojureScript):
 
 ```clojure
-;; s/Any, s/Bool, s/Num, s/Keyword, s/Symbol, s/Integer, and s/Str are cross-platform schemas.
+;; s/Any, s/Bool, s/Num, s/Keyword, s/Symbol, s/Int, and s/Str are cross-platform schemas.
 
 (s/validate s/Num 42)
 ;; 42
