@@ -1067,7 +1067,7 @@
       negate the benefits of primitive type hints compared to
       clojure.core/fn."
   [& fn-args]
-  `(macros/fn ~@fn-args))
+  (vary-meta `(macros/fn ~@fn-args) #(merge (meta &form) %)))
 
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on

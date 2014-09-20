@@ -883,6 +883,14 @@
       (s/with-fn-validation
         (is (= 120 (f 5 1)))))))
 
+(deftest fn-metadata-test
+  (let [->mkeys #(set (keys (meta %)))
+        u (fn [& s] (set (apply concat s)))]
+    (is (= (u #{:blah} (->mkeys (s/fn [])))
+           (->mkeys ^:blah (s/fn []))))
+    (is (= (u #{:blah} (->mkeys (s/fn [^String s] (str \+ s)))
+              (->mkeys ^:blah (s/fn [^String s] (str \+ s))))))))
+
 ;;; defn
 
 (def OddLongString
