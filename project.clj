@@ -13,7 +13,6 @@
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.2"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
-                   :hooks [leiningen.cljsbuild]
                    :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
                                                      cljx.repl-middleware/wrap-cljx]}
                    :cljx {:builds [{:source-paths ["src/cljx"]
@@ -30,14 +29,16 @@
                                     :rules :cljs}]}}
              :1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}}
 
-  :aliases {"all" ["with-profile" "dev:dev,1.5"]}
+  :aliases {"all" ["with-profile" "dev:dev,1.5"]
+            "deploy" ["do" "clean," "cljx" "once," "deploy" "clojars"]
+            "test" ["do" "clean," "cljx" "once," "test," "with-profile" "dev" "cljsbuild" "test"]}
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
                  :shell ["lein" "deploy" "clojars"]}
 
-  :prep-tasks ["cljx" "javac" "compile"]
+  :auto-clean false
 
   :source-paths ["target/generated/src/clj" "src/clj"]
 
@@ -60,6 +61,7 @@
                                  :optimizations :whitespace
 
                                  :pretty-print true}}}}
+
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
           :src-dir-uri "http://github.com/prismatic/schema/blob/master/"
           :src-linenum-anchor-prefix "L"})
