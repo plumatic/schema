@@ -883,13 +883,11 @@
       (s/with-fn-validation
         (is (= 120 (f 5 1)))))))
 
+#+clj ;; in ClojureScript, metadata on ordinary fn form does not propagate to fn either.
 (deftest fn-metadata-test
-  (let [->mkeys #(set (keys (meta %)))
-        u (fn [& s] (set (apply concat s)))]
-    (is (= (u #{:blah} (->mkeys (s/fn [])))
-           (->mkeys ^:blah (s/fn []))))
-    (is (= (u #{:blah} (->mkeys (s/fn [^String s] (str \+ s)))
-              (->mkeys ^:blah (s/fn [^String s] (str \+ s))))))))
+  (let [->mkeys #(set (keys (meta %)))]
+    (is (= (into (->mkeys (s/fn [])) [:blah])
+           (->mkeys ^:blah (s/fn []))))))
 
 ;;; defn
 
