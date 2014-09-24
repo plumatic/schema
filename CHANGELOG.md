@@ -1,4 +1,4 @@
-## 0.2.7
+## 0.3.0
  * **BREAKING** increase minimum clojurescript version 2120 to support :include-macros
  * **Deprecate** direct use of `schema.macros` in client code -- prefer canonical versions in `schema.core`
    in both Clojure and ClojureScript, using `:include-macros true` in cljs.

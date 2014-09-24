@@ -1,4 +1,4 @@
-(defproject prismatic/schema "0.2.7-SNAPSHOT"
+(defproject prismatic/schema "0.3.0-SNAPSHOT"
   :description "Clojure(Script) library for declarative data description and validation"
   :url "http://github.com/prismatic/schema"
   :license {:name "Eclipse Public License"
@@ -36,7 +36,7 @@
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
-                 :shell ["lein" "deploy" "clojars"]}
+                 :shell ["lein" "deploy"]}
 
   :auto-clean false
 
