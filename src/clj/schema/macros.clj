@@ -204,6 +204,18 @@
                   ~'%))
               body))))
 
+(clojure.core/defn enable-validation?
+  "Returns true if validation is enabled, otherwise false.
+   Validation is enabled, except when:
+   *   function has :never-validate metadata
+   *   *assert* is false (at compile time) and function is not :always-validate"
+  [env fn-name]
+  (let [fn-meta (meta fn-name)]
+    (and
+     (not (:never-validate fn-meta))
+     (or (:always-validate fn-meta)
+         *assert*))))
+
 (clojure.core/defn process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which has asserts for validation purposes added that are
@@ -219,7 +231,7 @@
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")
-        enable-validation (not (:never-validate (meta fn-name)))
+        enable-validation (enable-validation? env fn-name)
         input-checker-sym (gensym "input-checker")
         output-checker-sym (gensym "output-checker")]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]

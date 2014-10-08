@@ -947,13 +947,14 @@
       (invalid-call! f "a")))
   (s/with-fn-validation
     (is (= 7 (validated-pre-post-defn 7)))
-    (is (thrown? AssertionError (validated-pre-post-defn 0)))
-    (is (thrown? AssertionError (validated-pre-post-defn 11)))
-    (is (thrown? AssertionError (validated-pre-post-defn 1)))
+    (invalid-call! validated-pre-post-defn 0)
+    (invalid-call! validated-pre-post-defn 11)
+    (invalid-call! validated-pre-post-defn 1)
     (invalid-call! validated-pre-post-defn "a"))
   (let [e (try (s/with-fn-validation (simple-validated-defn 2)) nil
                (catch js/Error e e))]
-    (is (>= (.indexOf (str e) +bad-input-str+) 0)))
+    (when e ;; validation can be disabled at compile time, and exception not thrown
+      (is (>= (.indexOf (str e) +bad-input-str+) 0))))
   (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn))))
 
 #+clj
@@ -1063,12 +1064,11 @@
            (y (x))))))
 
 (deftest error-letfn-test
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (s/with-fn-validation
-                 (s/letfn
-                     [(x :- s/Num [] "1")
-                      (y :- s/Str [m :- s/Num] (str m))]
-                   (y (x)))))))
+  (s/with-fn-validation
+    (s/letfn
+        [(x :- s/Num [] "1")
+         (y :- s/Str [m :- s/Num] (str m))]
+      (invalid-call! y (x)))))
 
 ;; Primitive validation testing for JVM
 #+clj
@@ -1157,15 +1157,11 @@
 
 (deftest defmethod-input-error-test
   (s/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] (+ x y))
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (s/with-fn-validation
-                 (s/with-fn-validation (m {:k :v} 1 "2"))))))
+  (s/with-fn-validation (invalid-call! m {:k :v} 1 "2")))
 
 (deftest defmethod-output-error-test
   (s/defmethod m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
-  (is (thrown? #+clj RuntimeException #+cljs js/Error
-               (s/with-fn-validation
-                 (s/with-fn-validation (m {:k :v} 1 2))))))
+  (s/with-fn-validation (invalid-call! m {:k :v} 1 2)))
 
 (deftest defmethod-metadata-test
   (s/defmethod ^:always-validate m :v :- s/Num [m :- {:k s/Keyword} x :- s/Num y :- s/Num] "wrong")
