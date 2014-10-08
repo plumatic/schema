@@ -256,7 +256,8 @@
                                                       '~fn-name (pr-str error#))
                                        {:schema ~output-schema-sym :value o# :error error#})))
                            o#))))
-                   (cons bind body))}))
+                   (cons (into regular-args (when rest-arg ['& rest-arg]))
+                         body))}))
 
 (clojure.core/defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"

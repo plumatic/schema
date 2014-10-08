@@ -793,14 +793,34 @@
     (invalid-call! f 2)
     (invalid-call! f -1)))
 
+
+(s/defn ^:never-validate never-validated-test-fn :- (s/pred even?)
+  [x :- (s/pred pos?)]
+  (inc x))
+
 (deftest never-validated-fn-test
-  (let [f (s/fn ^:never-validate test-fn :- (s/pred even?)
-            [x :- (s/pred pos?)]
-            (inc x))]
+  (doseq [f [never-validated-test-fn
+             (s/fn ^:never-validate test-fn :- (s/pred even?)
+               [x :- (s/pred pos?)]
+               (inc x))]]
     (s/with-fn-validation
       (is (= 2 (f 1)))
       (is (= 3 (f 2)))
       (is (= 0 (f -1))))))
+
+(s/defn ^:never-validate never-validated-rest-test-fn :- (s/pred even?)
+  [arg0 & [rest0 :- (s/pred pos?)]]
+  (+ arg0 (or rest0 2)))
+
+(deftest never-validated-rest-test
+  (doseq [f [never-validated-rest-test-fn
+             (s/fn ^:never-validate rest-test-fn :- (s/pred even?)
+               [arg0 & [rest0 :- (s/pred pos?)]]
+               (+ arg0 (or rest0 2)))]]
+    (s/with-fn-validation
+      (is (= 2 (f 0)))
+      (is (= 4 (f 2 2)))
+      (is (= 1 (f 2 -1))))))
 
 (defn parse-long [x]
   #+clj (Long/parseLong x)
