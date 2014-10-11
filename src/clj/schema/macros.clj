@@ -7,6 +7,8 @@
    [schema.utils :as utils]
    potemkin))
 
+(def ^:dynamic *compile-fn-validation* true)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
@@ -204,14 +206,16 @@
                   ~'%))
               body))))
 
-(clojure.core/defn enable-validation?
-  "Returns true if validation is enabled, otherwise false.
-   Validation is enabled, except when:
+(clojure.core/defn compile-fn-validation?
+  "Returns true if validation should be included at compile time, otherwise false.
+   Validation is elided for any of the following cases:
    *   function has :never-validate metadata
+   *   *compile-fn-validation* is false
    *   *assert* is false (at compile time) and function is not :always-validate"
   [env fn-name]
   (let [fn-meta (meta fn-name)]
     (and
+     *compile-fn-validation*
      (not (:never-validate fn-meta))
      (or (:always-validate fn-meta)
          *assert*))))
@@ -231,16 +235,16 @@
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")
-        enable-validation (enable-validation? env fn-name)
         input-checker-sym (gensym "input-checker")
-        output-checker-sym (gensym "output-checker")]
+        output-checker-sym (gensym "output-checker")
+        compile-validation (compile-fn-validation? env fn-name)]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
-     :more-bindings (when enable-validation
+     :more-bindings (when compile-validation
                       [input-checker-sym `(schema.core/checker ~input-schema-sym)
                        output-checker-sym `(schema.core/checker ~output-schema-sym)])
      :arglist bind
      :raw-arglist original-arglist
-     :arity-form (if enable-validation
+     :arity-form (if compile-validation
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]

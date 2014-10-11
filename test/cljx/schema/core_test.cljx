@@ -584,7 +584,16 @@
     (testing "no-tag" (test-meta-extraction [x] [x]))
     (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
+    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
+
+  (deftest compile-fn-validation?-test
+    (is (schema.macros/compile-fn-validation? {} 'foo))
+    (is (not (schema.macros/compile-fn-validation? {} (with-meta 'foo {:never-validate true}))))
+    (binding [schema.macros/*compile-fn-validation* false]
+      (is (not (schema.macros/compile-fn-validation? {} 'foo))))
+    (binding [*assert* false]
+      (is (not (schema.macros/compile-fn-validation? {} 'foo)))
+      (is (schema.macros/compile-fn-validation? {} (with-meta 'foo {:always-validate true}))))))
 
 (defprotocol PProtocol
   (do-something [this]))

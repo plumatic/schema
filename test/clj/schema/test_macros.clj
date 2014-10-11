@@ -22,5 +22,5 @@
 (defmacro invalid-call!
   "Assert that f throws (presumably due to schema validation error) when called on args."
   [f & args]
-  (when (sm/enable-validation? &env f)
+  (when (sm/compile-fn-validation? &env f)
     `(~'is (~'thrown? ~'Throwable (~f ~@args)))))
