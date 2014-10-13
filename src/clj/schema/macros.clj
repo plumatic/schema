@@ -278,7 +278,8 @@
 (clojure.core/defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name fn-body]
-  (let [output-schema (extract-schema-form name)
+  (let [compile-validation (compile-fn-validation? env name)
+        output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
         bind-meta (or (when-let [t (:tag (meta name))]
                         (when (primitive-sym? t)
@@ -291,7 +292,8 @@
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
-                           `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
+                           (when compile-validation
+                             `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))
