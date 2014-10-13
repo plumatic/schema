@@ -584,16 +584,7 @@
     (testing "no-tag" (test-meta-extraction [x] [x]))
     (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z])))
-
-  (deftest compile-fn-validation?-test
-    (is (schema.macros/compile-fn-validation? {} 'foo))
-    (is (not (schema.macros/compile-fn-validation? {} (with-meta 'foo {:never-validate true}))))
-    (binding [schema.macros/*compile-fn-validation* false]
-      (is (not (schema.macros/compile-fn-validation? {} 'foo))))
-    (binding [*assert* false]
-      (is (not (schema.macros/compile-fn-validation? {} 'foo)))
-      (is (schema.macros/compile-fn-validation? {} (with-meta 'foo {:always-validate true}))))))
+    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
 
 (defprotocol PProtocol
   (do-something [this]))
@@ -830,6 +821,26 @@
       (is (= 2 (f 0)))
       (is (= 4 (f 2 2)))
       (is (= 1 (f 2 -1))))))
+
+(s/set-compile-fn-validation! false)
+
+(s/defn elided-validation-test-fn :- (s/pred even?)
+  [x :- (s/pred pos?)]
+  (inc x))
+
+(s/defn ^:always-validate elided-validation-always-test-fn :- (s/pred even?)
+  [x :- (s/pred pos?)]
+  (inc x))
+
+(s/set-compile-fn-validation! true)
+
+(deftest elided-validation-test
+  (doseq [f [elided-validation-test-fn
+             elided-validation-always-test-fn]]
+    (s/with-fn-validation
+      (is (= 2 (f 1)))
+      (is (= 3 (f 2)))
+      (is (= 0 (f -1))))))
 
 (defn parse-long [x]
   #+clj (Long/parseLong x)

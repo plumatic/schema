@@ -7,8 +7,6 @@
    [schema.utils :as utils]
    potemkin))
 
-(def ^:dynamic *compile-fn-validation* true)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
@@ -206,16 +204,18 @@
                   ~'%))
               body))))
 
+(def ^:dynamic *compile-fn-validation* (atom true))
+
 (clojure.core/defn compile-fn-validation?
   "Returns true if validation should be included at compile time, otherwise false.
    Validation is elided for any of the following cases:
    *   function has :never-validate metadata
    *   *compile-fn-validation* is false
-   *   *assert* is false (at compile time) and function is not :always-validate"
+   *   *assert* is false AND function is not :always-validate"
   [env fn-name]
   (let [fn-meta (meta fn-name)]
     (and
-     *compile-fn-validation*
+     @*compile-fn-validation*
      (not (:never-validate fn-meta))
      (or (:always-validate fn-meta)
          *assert*))))
@@ -471,6 +471,13 @@
         (vec (interleave (map first fnspecs)
                          (map #(cons `fn %) fnspecs)))
         `(do ~@body)))
+
+(clojure.core/defn set-compile-fn-validation!
+  "Globally turn on or off function validation from being compiled into s/fn and s/defn.
+   Enabled by default.
+   See (doc compile-fn-validation?) for all conditions which control fn validation compilation"
+  [on?]
+  (reset! *compile-fn-validation* on?))
 
 (defmacro with-fn-validation
   "DEPRECATED -- canonical version moved to schema.core"
