@@ -2,7 +2,6 @@
   "Macros used in and provided by schema, separated out for Clojurescript's sake."
   (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
   (:require
-   [clojure.data :as data]
    [clojure.string :as str]
    [schema.utils :as utils]
    potemkin))
@@ -357,7 +356,7 @@
                   (vec bad-keys#)))
        ~(when extra-validator-fn?
           `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                    (class ~extra-validator-fn?)))
+                    (type ~extra-validator-fn?)))
        (~(defrecord-constructor &env) ~name ~field-schema ~@more-args)
        (utils/declare-class-schema!
         ~name
@@ -389,9 +388,8 @@
                    " keys are required, and no extra keys are allowed.  Even faster than map->")
              [~map-sym & [drop-extra-keys?#]]
              (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (error! (utils/format* "Record has wrong set of keys: %s"
-                                      (data/diff (set (keys ~map-sym))
-                                                 ~(set (map keyword field-schema))))))
+               (error! (utils/format* "Wrong number of keys: expected %s, got %s"
+                                      (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
              (new ~(symbol (str name))
                   ~@(map (clojure.core/fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
