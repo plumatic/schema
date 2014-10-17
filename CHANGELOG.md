@@ -1,3 +1,6 @@
+## 0.3.1
+ * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages. 
+
 ## 0.3.0
  * **BREAKING** increase minimum clojurescript version 2120 to support :include-macros
  * **Deprecate** direct use of `schema.macros` in client code -- prefer canonical versions in `schema.core`
