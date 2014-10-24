@@ -260,7 +260,7 @@
 
 (clojure.core/defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
-  [env name fn-body]
+  [process-fn-arity env name fn-body]
   (let [output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
         bind-meta (or (when-let [t (:tag (meta name))]
@@ -404,7 +404,7 @@
                   fn-args
                   (cons (gensym "fn") fn-args))
         [name more-fn-args] (extract-arrow-schematized-element &env fn-args)
-        {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
+        {:keys [outer-bindings schema-form fn-body]} (process-fn- process-fn-arity &env name more-fn-args)]
     `(let ~outer-bindings
        (schema.core/schematize-fn
         ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
@@ -430,7 +430,7 @@
   [& defn-args]
   (let [[name & more-defn-args] (normalized-defn-args &env defn-args)
         {:keys [doc tag] :as standard-meta} (meta name)
-        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (process-fn- &env name more-defn-args)]
+        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (process-fn- process-fn-arity &env name more-defn-args)]
     `(let ~outer-bindings
        (clojure.core/defn ~(with-meta name {})
          ~(assoc (apply dissoc standard-meta (when (primitive-sym? tag) [:tag]))
