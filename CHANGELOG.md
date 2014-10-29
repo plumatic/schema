@@ -1,3 +1,6 @@
+## 0.3.2
+ * Fix `s/protocol` in Clojure (didn't work properly with extends created later)
+
 ## 0.3.1
  * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages. 
 

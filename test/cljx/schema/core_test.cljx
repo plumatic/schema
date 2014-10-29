@@ -119,6 +119,12 @@
     (is (= '(pred odd?) (s/explain schema)))))
 
 (defprotocol ATestProtocol)
+
+(s/defn ^:always-validate a-test-protocol-fn
+  "Compile the schema before extending, make sure it works as expected"
+  [x :- (s/protocol ATestProtocol)]
+  x)
+
 (defrecord DirectTestProtocolSatisfier [] ATestProtocol)
 (defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
 (defrecord NonTestProtocolSatisfier [])
@@ -130,6 +136,9 @@
     (invalid! schema (NonTestProtocolSatisfier.))
     (invalid! schema nil)
     (invalid! schema 117 "(not (satisfies? ATestProtocol 117))")
+    (is (a-test-protocol-fn (DirectTestProtocolSatisfier.)))
+    (is (a-test-protocol-fn (IndirectTestProtocolSatisfier.)))
+    (invalid-call! a-test-protocol-fn (NonTestProtocolSatisfier.))
     (is (= '(protocol ATestProtocol) (s/explain schema)))))
 
 (deftest regex-test
