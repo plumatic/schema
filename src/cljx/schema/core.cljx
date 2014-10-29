@@ -399,7 +399,14 @@
 
 (def Regex
   "A regular expression"
-  #+clj java.util.regex.Pattern #+cljs js/RegExp)
+  #+clj java.util.regex.Pattern
+  #+cljs (reify Schema ;; Closure doesn't like if you just def as js/RegExp
+           (walker [this] (clojure.core/fn [x]
+                            (if (instance? js/RegExp x)
+                              x
+                              (macros/validation-error
+                               this x (list 'instance? 'js/RegExp (utils/value-name x))))))
+           (explain [this] 'Regex)))
 
 (def Inst
   "The local representation of #inst ..."

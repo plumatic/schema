@@ -1,8 +1,9 @@
 ## 0.3.2
  * Fix `s/protocol` in Clojure (didn't work properly with extends created later)
+ * Fix ClojureScript (Closure) warning about reference to global RegExp object.
 
 ## 0.3.1
- * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages. 
+ * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages.
 
 ## 0.3.0
  * **BREAKING** increase minimum clojurescript version 2120 to support :include-macros
