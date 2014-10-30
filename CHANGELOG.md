@@ -1,6 +1,7 @@
 ## 0.3.2
  * Fix `s/protocol` in Clojure (didn't work properly with extends created later)
  * Fix ClojureScript (Closure) warning about reference to global RegExp object.
+ * Add `set-compile-fn-validation!` function to turn off emission of validation globally, and turn off emission of validation code for non- ^:always-validate functions when *assert* is false. 
 
 ## 0.3.1
  * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages.
