@@ -2,7 +2,8 @@
   "Macros to help cross-language testing of schemas."
   (:require
    clojure.test
-   [schema.core :as s :include-macros true]))
+   [schema.core :as s :include-macros true]
+   [schema.macros :as sm]))
 
 (defmacro valid!
   "Assert that x satisfies schema s, and the walked value is equal to the original."
@@ -21,4 +22,5 @@
 (defmacro invalid-call!
   "Assert that f throws (presumably due to schema validation error) when called on args."
   [f & args]
-  `(~'is (~'thrown? ~'Throwable (~f ~@args))))
+  (when (sm/compile-fn-validation? &env f)
+    `(~'is (~'thrown? ~'Throwable (~f ~@args)))))

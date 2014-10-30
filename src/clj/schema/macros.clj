@@ -203,6 +203,22 @@
                   ~'%))
               body))))
 
+(def ^:dynamic *compile-fn-validation* (atom true))
+
+(clojure.core/defn compile-fn-validation?
+  "Returns true if validation should be included at compile time, otherwise false.
+   Validation is elided for any of the following cases:
+   *   function has :never-validate metadata
+   *   *compile-fn-validation* is false
+   *   *assert* is false AND function is not :always-validate"
+  [env fn-name]
+  (let [fn-meta (meta fn-name)]
+    (and
+     @*compile-fn-validation*
+     (not (:never-validate fn-meta))
+     (or (:always-validate fn-meta)
+         *assert*))))
+
 (clojure.core/defn process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which has asserts for validation purposes added that are
@@ -218,16 +234,16 @@
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
         input-schema-sym (gensym "input-schema")
-        enable-validation (not (:never-validate (meta fn-name)))
         input-checker-sym (gensym "input-checker")
-        output-checker-sym (gensym "output-checker")]
+        output-checker-sym (gensym "output-checker")
+        compile-validation (compile-fn-validation? env fn-name)]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
-     :more-bindings (when enable-validation
+     :more-bindings (when compile-validation
                       [input-checker-sym `(schema.core/checker ~input-schema-sym)
                        output-checker-sym `(schema.core/checker ~output-schema-sym)])
      :arglist bind
      :raw-arglist original-arglist
-     :arity-form (if enable-validation
+     :arity-form (if compile-validation
                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
                          rest-sym (when rest-arg (gensym "rest"))
                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
@@ -261,7 +277,8 @@
 (clojure.core/defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name fn-body]
-  (let [output-schema (extract-schema-form name)
+  (let [compile-validation (compile-fn-validation? env name)
+        output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
         bind-meta (or (when-let [t (:tag (meta name))]
                         (when (primitive-sym? t)
@@ -274,7 +291,8 @@
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
-                           `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation]
+                           (when compile-validation
+                             `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))
@@ -453,6 +471,13 @@
         (vec (interleave (map first fnspecs)
                          (map #(cons `fn %) fnspecs)))
         `(do ~@body)))
+
+(clojure.core/defn set-compile-fn-validation!
+  "Globally turn on or off function validation from being compiled into s/fn and s/defn.
+   Enabled by default.
+   See (doc compile-fn-validation?) for all conditions which control fn validation compilation"
+  [on?]
+  (reset! *compile-fn-validation* on?))
 
 (defmacro with-fn-validation
   "DEPRECATED -- canonical version moved to schema.core"

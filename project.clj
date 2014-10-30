@@ -49,7 +49,10 @@
 
   :cljsbuild {:test-commands {"unit" ["phantomjs" :runner
                                       "this.literal_js_was_evaluated=true"
-                                      "target/unit-test.js"]}
+                                      "target/unit-test.js"]
+                              "unit-no-assert" ["phantomjs" :runner
+                                                "this.literal_js_was_evaluated=true"
+                                                "target/unit-test-no-assert.js"]}
               :builds
               {:dev {:source-paths ["src/clj" "target/generated/src/cljs"]
                      :compiler {:output-to "target/main.js"
@@ -60,8 +63,14 @@
                                      "target/generated/test/cljs"]
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
-
-                                 :pretty-print true}}}}
+                                 :pretty-print true}}
+               :test-no-assert {:source-paths ["src/clj" "test/clj"
+                                               "target/generated/src/cljs"
+                                               "target/generated/test/cljs"]
+                                :assert false
+                                :compiler {:output-to "target/unit-test-no-assert.js"
+                                           :optimizations :whitespace
+                                           :pretty-print true}}}}
 
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
           :src-dir-uri "http://github.com/prismatic/schema/blob/master/"

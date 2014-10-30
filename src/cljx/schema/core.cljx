@@ -1017,6 +1017,11 @@
   [& args]
   `(macros/defrecord ~@args))
 
+(defmacro set-compile-fn-validation!
+  [on?]
+  (macros/set-compile-fn-validation! on?)
+  nil)
+
 (clojure.core/defn fn-validation?
   "Get the current global schema validation setting."
   []

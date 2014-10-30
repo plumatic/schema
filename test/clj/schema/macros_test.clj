@@ -18,3 +18,14 @@
       (testing (vec full-args)
         (is (= (concat ['abc (merge explicit-meta schema-attrs doc-attrs attr-map) simple-body])
                (concat [name (meta name) more])))))))
+
+(deftest compile-fn-validation?-test
+  (is (macros/compile-fn-validation? {} 'foo))
+  (is (not (macros/compile-fn-validation? {} (with-meta 'foo {:never-validate true}))))
+  (macros/set-compile-fn-validation! false)
+  (is (not (macros/compile-fn-validation? {} 'foo)))
+  (is (not (macros/compile-fn-validation? {} (with-meta 'foo {:always-validate true}))))
+  (macros/set-compile-fn-validation! true)
+  (binding [*assert* false]
+    (is (not (macros/compile-fn-validation? {} 'foo)))
+    (is (macros/compile-fn-validation? {} (with-meta 'foo {:always-validate true})))))
