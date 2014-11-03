@@ -515,6 +515,33 @@
     (invalid! schema ["user1" 42 42])
     (valid! schema ["user2" 41]) ))
 
+(deftest delimited-test
+  (testing "delimited schema checks both halves of sequence"
+    (let [schema (s/delimited [s/Int] :delimiter [s/Str])]
+      (valid! schema [1 2 :delimiter "a" "b"])
+      (valid! schema [:delimiter "a" "b"])
+      (valid! schema [1 2 :delimiter])
+      (valid! schema [:delimiter])
+      (invalid! schema [1 2 "a" "b"])
+      (invalid! schema [1 :delimiter 2 "a" "b"])
+      (invalid! schema [1 2 "a" :delimiter "b"])))
+
+  (testing "non-greedy delimited uses first instance of delimiter"
+    (let [schema (s/delimited [s/Int] :delimiter [s/Keyword])]
+      (valid! schema [1 2 :delimiter :x :y])
+      (valid! schema [1 2 :delimiter :x :delimiter :y])
+      (let [schema (s/delimited [s/Keyword] :delimiter [s/Int])]
+        (valid! schema [:a :b :delimiter 1 2])
+        (invalid! schema [:a :delimiter :b :delimiter 1 2]))))
+
+  (testing "greedy delimited uses last instance of delimiter"
+    (let [schema (s/delimited-greedy [s/Int] :delimiter [s/Keyword])]
+      (valid! schema [1 2 :delimiter :x :y])
+      (invalid! schema [1 2 :delimiter :x :delimiter :y])
+      (let [schema (s/delimited-greedy [s/Keyword] :delimiter [s/Int])]
+        (valid! schema [:a :b :delimiter 1 2])
+        (valid! schema [:a :delimiter :b :delimiter 1 2])))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
 

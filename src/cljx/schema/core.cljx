@@ -858,6 +858,50 @@
    (one second-schema second-name)])
 
 
+;; A delimited sequence schema matches sequences where the first part
+;; of the sequence matches the left-schema, and the last part of the
+;; sequence matches the right-schema. The transition point is
+;; indicated by the location of the delimiter.  All matched sequences
+;; must contain at least one delimiter; when the sequence contains
+;; multiple delimiters, the greedy? flag indicates whether to split at
+;; the first or last occurence of the delimiter.
+
+(clojure.core/defrecord DelimitedSequence [delimiter greedy? left-schema right-schema]
+  Schema
+  (walker [this]
+          (let [[left-walker right-walker] (mapv subschema-walker [left-schema right-schema])]
+            (fn [x]
+              (if-let [delimiter-index
+                       ((if greedy? last first)
+                        (keep-indexed (fn [i element] (when (= delimiter element) i)) x))]
+                (let [[left-x [delim & right-x]] (split-at delimiter-index x)
+                      left-walk (left-walker left-x)
+                      right-walk (right-walker right-x)
+                      error? (some utils/error? [left-walk right-walk])]
+                  ((if error? utils/error identity)
+                   (apply
+                    concat
+                    (map
+                     (clojure.core/fn [m]
+                       (or
+                        (utils/error-val m)
+                        (if error? (vec (repeat (count m) nil)) m)))
+                     [left-walk [delimiter] right-walk]))))
+                (macros/validation-error this x (list 'delimiter-present? delimiter (utils/value-name x)))))))
+  (explain [this]
+           [(explain left-schema) delimiter (explain right-schema)]))
+
+(clojure.core/defn delimited
+  "A schema for a sequence containing a delimiter (splits on first occurence of delimiter)"
+  [left-schema delimiter right-schema]
+  (DelimitedSequence. delimiter false left-schema right-schema))
+
+(clojure.core/defn delimited-greedy
+  "A schema for a sequence containing a delimiter (splits on last occurence of delimiter)"
+  [left-schema delimiter right-schema]
+  (DelimitedSequence. delimiter true left-schema right-schema))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
 
