@@ -325,21 +325,15 @@
 
 ;;; protocol (which value must `satisfies?`)
 
-(clojure.core/defn protocol-name [protocol]
-  (-> protocol meta :proto-sym))
-
-;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
-;; and put it in metadata of the record so that equality is preserved, along with the name.
-(clojure.core/defrecord Protocol [p]
+(clojure.core/defrecord Protocol [protocol-sym protocol-pred]
   Schema
   (walker [this]
           (clojure.core/fn [x]
-            (if ((:proto-pred (meta this)) x)
+            (if (protocol-pred x)
               x
-              (macros/validation-error this x (list 'satisfies? (protocol-name this) (utils/value-name x))))))
-  (explain [this] (list 'protocol (protocol-name this))))
+              (macros/validation-error this x (list 'satisfies? protocol-sym (utils/value-name x))))))
+  (explain [this] (list 'protocol protocol-sym)))
 
-;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
 (defmacro protocol
   "A value that must satsify? protocol p.
    Internaly, we must make sure not to capture the value of the protocol at

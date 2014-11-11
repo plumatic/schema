@@ -325,9 +325,7 @@
 (defmacro protocol
   "DEPRECATED -- canonical version moved to schema.core"
   [p]
-  `(with-meta (schema.core/->Protocol ~p)
-     {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
+  `(schema.core/->Protocol '~p #(satisfies? ~p %)))
 
 (defmacro =>*
   "DEPRECATED -- canonical version moved to schema.core"
