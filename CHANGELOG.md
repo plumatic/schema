@@ -1,3 +1,6 @@
+## 0.3.3
+ * Fix bug in `defschema` which clobbered metadata, breaking `s/protocol` in Clojure in 0.3.2.
+
 ## 0.3.2
  * Fix `s/protocol` in Clojure (didn't work properly with extends created later)
  * Fix ClojureScript (Closure) warning about reference to global RegExp object.
