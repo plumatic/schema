@@ -960,7 +960,7 @@
 
 (clojure.core/defn schema-with-name [schema name]
   "Records name in schema's metadata."
-  (with-meta schema {:name name}))
+  (vary-meta schema assoc :name name))
 
 (clojure.core/defn schema-name [schema]
   "Returns the name of a schema attached via schema-with-name (or defschema)."
