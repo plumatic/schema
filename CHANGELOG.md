@@ -1,3 +1,6 @@
+## 0.3.5
+ * Make primitive schemas work better in some cases under partial AOT compilation
+	
 ## 0.3.3
  * Fix bug in `defschema` which clobbered metadata, breaking `s/protocol` in Clojure in 0.3.2.
 
