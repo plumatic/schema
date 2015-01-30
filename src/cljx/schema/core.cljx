@@ -200,7 +200,7 @@
 #+clj
 (do
   (defmacro extend-primitive [cast-sym class-sym]
-    (let [qualified-cast-sym (symbol (str "clojure.core$" (name cast-sym)))]
+    (let [qualified-cast-sym `(class @(resolve '~cast-sym))]
       `(extend-protocol Schema
          ~qualified-cast-sym
          (walker [this#]
