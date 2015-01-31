@@ -1,3 +1,6 @@
+## 0.3.6
+ * Support java.util.List instances as valid data for sequence schemas
+ 
 ## 0.3.5
  * Make primitive schemas work better in some cases under partial AOT compilation
 	
