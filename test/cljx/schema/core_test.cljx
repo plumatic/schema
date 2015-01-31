@@ -515,6 +515,17 @@
     (invalid! schema ["user1" 42 42])
     (valid! schema ["user2" 41]) ))
 
+#+clj
+(deftest java-list-test
+  (let [schema [s/Str]]
+    (valid! schema (java.util.ArrayList. ["hi" "bye"]))
+    (invalid! schema (java.util.ArrayList. [1 2]))
+    (valid! schema (java.util.LinkedList. ["hi" "bye"]))
+    (invalid! schema (java.util.LinkedList. [1 2]))
+    (valid! schema java.util.Collections/EMPTY_LIST)
+    (invalid! schema java.util.Collections/EMPTY_MAP)
+    (invalid! schema #{"hi" "bye"})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
 

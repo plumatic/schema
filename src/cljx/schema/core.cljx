@@ -814,7 +814,7 @@
           multi-walker (when multi (subschema-walker multi))
           err-conj (utils/result-builder (clojure.core/fn [m] (vec (repeat (count m) nil))))]
       (clojure.core/fn [x]
-        (or (when-not (or (nil? x) (sequential? x))
+        (or (when-not (or (nil? x) (sequential? x) #+clj (instance? java.util.List x))
               (macros/validation-error this x (list 'sequential? (utils/value-name x))))
             (loop [single-walkers single-walkers x x out []]
               (if-let [[^One first-single single-walker] (first single-walkers)]
