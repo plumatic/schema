@@ -2,7 +2,7 @@
 
 A Clojure(Script) library for declarative data description and validation.
 
-Leiningen dependency (Clojars): `[prismatic/schema "0.3.6"]`. [Latest codox API docs](http://prismatic.github.io/schema).
+Leiningen dependency (Clojars): `[prismatic/schema "0.3.7"]`. [Latest codox API docs](http://prismatic.github.io/schema).
 
 **This is an alpha release. The API and organizational structure are
 subject to change. Comments and contributions are much appreciated.**
