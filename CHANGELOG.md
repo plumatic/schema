@@ -1,3 +1,6 @@
+## 0.3.7
+ * Add coercion handler for s/Uuid from string input
+
 ## 0.3.6
  * Support java.util.List instances as valid data for sequence schemas
  

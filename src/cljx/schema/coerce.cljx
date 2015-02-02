@@ -83,10 +83,21 @@
                l
                x)))))
 
+(def string->uuid
+  "Returns instance of UUID if input is a string.
+   Note: in CLJS, this does not guarantee a specific UUID string representation,
+         similar to #uuid reader"
+  #+clj
+  (safe #(java.util.UUID/fromString ^String %))
+  #+cljs
+  #(if (string? %) (cljs.core.UUID. %) %))
+
+
 (def ^:no-doc +json-coercions+
   (merge
    {s/Keyword string->keyword
-    s/Bool string->boolean}
+    s/Bool string->boolean
+    s/Uuid string->uuid}
    #+clj {clojure.lang.Keyword string->keyword
           s/Int safe-long-cast
           Long safe-long-cast
