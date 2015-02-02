@@ -18,7 +18,8 @@
    (s/optional-key :k1) {s/Int s/Keyword}
    (s/optional-key :k2) s/Keyword
    (s/optional-key :e) (s/enum :a :b :c)
-   (s/optional-key :set) #{s/Keyword}})
+   (s/optional-key :set) #{s/Keyword}
+   (s/optional-key :u) s/Uuid})
 
 (def JSON
   {(s/optional-key :is) [s/Int]})
@@ -58,8 +59,8 @@
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]
-    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a}
-           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a"})))
+    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :u #uuid "550e8400-e29b-41d4-a716-446655440000"}
+           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a" :u "550e8400-e29b-41d4-a716-446655440000"})))
     (is (= #{:i} (err-ks (coercer {:i "1.1"})))))
 
   #+clj (testing "jvm specific"

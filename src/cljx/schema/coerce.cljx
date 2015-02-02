@@ -57,6 +57,21 @@
   [s]
   (if (string? s) (= "true" (str/lower-case s)) s))
 
+(defn string->uuid
+  "Returns instance of UUID if input is a string.
+   Note: in CLJS, this does not guarantee a specific UUID string representation,
+         similar to #uuid reader"
+  [x]
+  #+clj
+  (if (string? x)
+    (try (java.util.UUID/fromString x)
+         (catch IllegalArgumentException _ x))
+    x)
+  #+cljs
+  (if (string? x)
+    (cljs.core.UUID. x)
+    x))
+
 (defn keyword-enum-matcher [schema]
   (when (and (instance? #+clj schema.core.EnumSchema #+cljs s/EnumSchema schema)
              (every? keyword? (.-vs ^schema.core.EnumSchema schema)))
@@ -86,7 +101,8 @@
 (def ^:no-doc +json-coercions+
   (merge
    {s/Keyword string->keyword
-    s/Bool string->boolean}
+    s/Bool string->boolean
+    s/Uuid string->uuid}
    #+clj {clojure.lang.Keyword string->keyword
           s/Int safe-long-cast
           Long safe-long-cast
