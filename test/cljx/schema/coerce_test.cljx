@@ -55,7 +55,10 @@
             (is (= {:jb false} (coercer {:jb "Yes"})))
             (is (= #{:l :jk} (err-ks (coercer {:l 1.2 :jk 1.0}))))
             (is (= #{:d} (err-ks (coercer {:d nil}))))
-            (is (= #{:d} (err-ks (coercer {:d "1.0"})))))))
+            (is (= #{:d} (err-ks (coercer {:d "1.0"}))))))
+  #+clj (testing "malformed uuid"
+          (let [coercer (coerce/coercer Generic coerce/json-coercion-matcher)]
+            (is (= #{:u} (err-ks (coercer {:i 1 :u "uuid-wannabe"})))))))
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]
