@@ -8,9 +8,9 @@
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
                                   [org.clojure/clojurescript "0.0-2120"]
-                                  [com.keminglabs/cljx "0.3.1"]
+                                  [com.keminglabs/cljx "0.6.0"]
                                   [org.clojure/tools.nrepl "0.2.5"]]
-                   :plugins [[com.keminglabs/cljx "0.3.1"]
+                   :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.2"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
@@ -29,7 +29,7 @@
                                     :output-path "target/generated/test/cljs"
                                     :rules :cljs}]}}
              :1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
-             :1.7 {:dependencies [[org.clojure/clojure "1.7.0-alpha4"]]}}
+             :1.7 {:dependencies [[org.clojure/clojure "1.7.0-alpha5"]]}}
 
   :aliases {"all" ["with-profile" "dev:dev,1.5:dev,1.7"]
             "deploy" ["do" "clean," "cljx" "once," "deploy" "clojars"]
