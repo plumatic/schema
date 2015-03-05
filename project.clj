@@ -6,14 +6,11 @@
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
                                   [org.clojure/clojurescript "0.0-2665"]
-                                  [com.keminglabs/cljx "0.6.0"]
                                   [org.clojure/tools.nrepl "0.2.5"]]
                    :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.5"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
-                   :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl
-                                                     cljx.repl-middleware/wrap-cljx]}
                    :cljx {:builds [{:source-paths ["src/cljx"]
                                     :output-path "target/generated/src/clj"
                                     :rules :clj}
