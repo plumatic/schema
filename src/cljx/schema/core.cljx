@@ -979,13 +979,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord and (de,let)fn macros
 
-(def defrecord-constructor-atom
-  "Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+)."
-  (atom `clojure.core/defrecord))
-
 (defmacro defrecord
-  "Define a record with a schema.  The underlying defrecord constructor can be
-   configured by setting defrecord-constructor-atom.
+  "Define a record with a schema.
 
    In addition to the ordinary behavior of defrecord, this macro produces a schema
    for the Record, which will automatically be used when validating instances of
@@ -1020,52 +1015,15 @@
    record base."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
-  (let [[extra-key-schema? more-args] (macros/maybe-split-first map? more-args)
-        [extra-validator-fn? more-args] (macros/maybe-split-first (complement symbol?) more-args)
-        field-schema (macros/process-arrow-schematized-args &env field-schema)]
-    `(do
-       (let [bad-keys# (seq (filter #(required-key? %)
-                                    (keys ~extra-key-schema?)))]
-         (macros/assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
-                         (vec bad-keys#)))
-       ~(when extra-validator-fn?
-          `(macros/assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                           (type ~extra-validator-fn?)))
-       (~(deref defrecord-constructor-atom) ~name ~field-schema ~@more-args)
-       (utils/declare-class-schema!
-        ~name
-        (utils/assoc-when
-         (record
-          ~name
-          (merge ~(into {}
-                        (for [k field-schema]
-                          [(keyword (clojure.core/name k))
-                           (do (macros/assert! (symbol? k)
-                                               "Non-symbol in record binding form: %s" k)
-                               (macros/extract-schema-form k))]))
-                 ~extra-key-schema?))
-         :extra-validator-fn ~extra-validator-fn?))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
-                   " slower than ->x like the clojure.core version")
-             [~map-sym]
-             (let [base# (new ~(symbol (str name))
-                              ~@(map (clojure.core/fn [s] `(get ~map-sym ~(keyword s))) field-schema))
-                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
-               (if (seq remaining#)
-                 (merge base# remaining#)
-                 base#))))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
-                   " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym & [drop-extra-keys?#]]
-             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (macros/error! (utils/format* "Wrong number of keys: expected %s, got %s"
-                                             (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
-             (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(macros/safe-get ~map-sym ~(keyword s))) field-schema)))))))
+  (apply macros/emit-defrecord 'clojure.core/defrecord &env name field-schema more-args))
+
+#+clj
+(defmacro defrecord+
+  "Like defrecord, but emits a record using potemkin/defrecord+.  You must provide
+   your own dependency on potemkin to use this."
+  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  [name field-schema & more-args]
+  (apply macros/emit-defrecord 'potemkin/defrecord+ &env name field-schema more-args))
 
 (defmacro set-compile-fn-validation!
   [on?]

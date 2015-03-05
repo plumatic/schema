@@ -1,6 +1,5 @@
 (ns schema.macros
   "Macros and macro helpers used in schema.core."
-  (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
   (:require
    [clojure.string :as str]
    [schema.utils :as utils]))
@@ -8,7 +7,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
 
-(clojure.core/defn cljs-env?
+(defn cljs-env?
   "Take the &env from a macro, and tell whether we are expanding into cljs."
   [env]
   (boolean (:ns env)))
@@ -65,7 +64,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
 
-(clojure.core/defn maybe-split-first [pred s]
+(defn maybe-split-first [pred s]
   (if (pred (first s))
     [(first s) (next s)]
     [nil s]))
@@ -73,10 +72,10 @@
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
 
-(clojure.core/defn valid-tag? [env tag]
+(defn valid-tag? [env tag]
   (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
 
-(clojure.core/defn normalized-metadata
+(defn normalized-metadata
   "Take an object with optional metadata, which may include a :tag,
    plus an optional explicit schema, and normalize the
    object to have a valid Clojure :tag plus a :schema field."
@@ -92,14 +91,14 @@
                                      (when (valid-tag? env t)
                                        t))))))))
 
-(clojure.core/defn extract-schema-form
+(defn extract-schema-form
   "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
   [symbol]
   (let [s (:schema (meta symbol))]
     (assert! s "%s is missing a schema" symbol)
     s))
 
-(clojure.core/defn extract-arrow-schematized-element
+(defn extract-arrow-schematized-element
   "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
    a list of [first-element-with-schema-attached rest-elements]"
   [env s]
@@ -109,7 +108,7 @@
       [(normalized-metadata env f (second more)) (drop 2 more)]
       [(normalized-metadata env f nil) more])))
 
-(clojure.core/defn process-arrow-schematized-args
+(defn process-arrow-schematized-args
   "Take an arg vector, in which each argument is followed by an optional :- schema,
    and transform into an ordinary arg vector where the schemas are metadata on the args."
   [env args]
@@ -123,7 +122,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for schematized fn/defn
 
-(clojure.core/defn split-rest-arg [env bind]
+(defn split-rest-arg [env bind]
   (let [[pre-& [_ rest-arg :as post-&]] (split-with #(not= % '&) bind)]
     (if (seq post-&)
       (do (assert! (= (count post-&) 2) "& must be followed by a single binding" (vec post-&))
@@ -138,17 +137,17 @@
              rest-arg)])
       [bind nil])))
 
-(clojure.core/defn single-arg-schema-form [rest? [index arg]]
+(defn single-arg-schema-form [rest? [index arg]]
   `(~(if rest? `schema.core/optional `schema.core/one)
     ~(extract-schema-form arg)
     ~(if (symbol? arg)
        `'~arg
        `'~(symbol (str (if rest? "rest" "arg") index)))))
 
-(clojure.core/defn simple-arglist-schema-form [rest? regular-args]
+(defn simple-arglist-schema-form [rest? regular-args]
   (mapv (partial single-arg-schema-form rest?) (map-indexed vector regular-args)))
 
-(clojure.core/defn rest-arg-schema-form [arg]
+(defn rest-arg-schema-form [arg]
   (let [s (extract-schema-form arg)]
     (if (= s `schema.core/Any)
       (if (vector? arg)
@@ -157,26 +156,26 @@
       (do (assert! (vector? s) "Expected seq schema for rest args, got %s" s)
           s))))
 
-(clojure.core/defn input-schema-form [regular-args rest-arg]
+(defn input-schema-form [regular-args rest-arg]
   (let [base (simple-arglist-schema-form false regular-args)]
     (if rest-arg
       (vec (concat base (rest-arg-schema-form rest-arg)))
       base)))
 
-(clojure.core/defn apply-prepost-conditions
+(defn apply-prepost-conditions
   "Replicate pre/postcondition logic from clojure.core/fn."
   [body]
   (let [[conds body] (maybe-split-first #(and (map? %) (next body)) body)]
-    (concat (map (clojure.core/fn [c] `(assert ~c)) (:pre conds))
+    (concat (map (fn [c] `(assert ~c)) (:pre conds))
             (if-let [post (:post conds)]
               `((let [~'% (do ~@body)]
-                  ~@(map (clojure.core/fn [c] `(assert ~c)) post)
+                  ~@(map (fn [c] `(assert ~c)) post)
                   ~'%))
               body))))
 
 (def ^:dynamic *compile-fn-validation* (atom true))
 
-(clojure.core/defn compile-fn-validation?
+(defn compile-fn-validation?
   "Returns true if validation should be included at compile time, otherwise false.
    Validation is elided for any of the following cases:
    *   function has :never-validate metadata
@@ -190,7 +189,7 @@
      (or (:always-validate fn-meta)
          *assert*))))
 
-(clojure.core/defn process-fn-arity
+(defn process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which has asserts for validation purposes added that are
    executed when turned on, and have very low overhead otherwise.
@@ -245,7 +244,7 @@
                    (cons (into regular-args (when rest-arg ['& rest-arg]))
                          body))}))
 
-(clojure.core/defn process-fn-
+(defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name fn-body]
   (let [compile-validation (compile-fn-validation? env name)
@@ -272,23 +271,71 @@
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-body fn-forms}))
 
-(clojure.core/defn parse-arity-spec
+(defn parse-arity-spec
   "Helper for schema.core/=>*."
   [spec]
   (assert! (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
-        fixed (mapv (clojure.core/fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
+        fixed (mapv (fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
     (if (empty? more)
       fixed
       (do (assert! (and (= (count more) 2) (vector? (second more)))
                    "An arity with & must be followed by a single sequence schema")
           (into fixed (second more))))))
 
+(defn emit-defrecord
+  [defrecord-constructor-sym env name field-schema & more-args]
+  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
+        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
+        field-schema (process-arrow-schematized-args env field-schema)]
+    `(do
+       (let [bad-keys# (seq (filter #(schema.core/required-key? %)
+                                    (keys ~extra-key-schema?)))]
+         (assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
+                  (vec bad-keys#)))
+       ~(when extra-validator-fn?
+          `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                    (type ~extra-validator-fn?)))
+       (~defrecord-constructor-sym ~name ~field-schema ~@more-args)
+       (utils/declare-class-schema!
+        ~name
+        (utils/assoc-when
+         (schema.core/record
+          ~name
+          (merge ~(into {}
+                        (for [k field-schema]
+                          [(keyword (clojure.core/name k))
+                           (do (assert! (symbol? k)
+                                        "Non-symbol in record binding form: %s" k)
+                               (extract-schema-form k))]))
+                 ~extra-key-schema?))
+         :extra-validator-fn ~extra-validator-fn?))
+       ~(let [map-sym (gensym "m")]
+          `(defn ~(symbol (str 'map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
+                   " slower than ->x like the clojure.core version")
+             [~map-sym]
+             (let [base# (new ~(symbol (str name))
+                              ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
+                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
+               (if (seq remaining#)
+                 (merge base# remaining#)
+                 base#))))
+       ~(let [map-sym (gensym "m")]
+          `(defn ~(symbol (str 'strict-map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
+                   " keys are required, and no extra keys are allowed.  Even faster than map->")
+             [~map-sym & [drop-extra-keys?#]]
+             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
+               (error! (utils/format* "Wrong number of keys: expected %s, got %s"
+                                      (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
+             (new ~(symbol (str name))
+                  ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: helpers for schematized functions
 
-(clojure.core/defn normalized-defn-args
+(defn normalized-defn-args
   "Helper for defining defn-like macros with schemas.  Env is &env
    from the macro body.  Reads optional docstring, return type and
    attribute-map and normalizes them into the metadata of the name,
@@ -303,7 +350,7 @@
                      (when maybe-docstring {:doc maybe-docstring}))
           macro-args)))
 
-(clojure.core/defn set-compile-fn-validation!
+(defn set-compile-fn-validation!
   "Globally turn on or off function validation from being compiled into s/fn and s/defn.
    Enabled by default.
    See (doc compile-fn-validation?) for all conditions which control fn validation compilation"
