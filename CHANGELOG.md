@@ -1,3 +1,6 @@
+## 0.4.0
+ * **BREAKING** Remove support for old `^{:schema ..}` style annotations and bare `^Protocol` annotations.  `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints (as well as vars that refer to schemas).	
+
 ## 0.3.7
  * Add coercion handler for s/Uuid from string input
 

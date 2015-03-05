@@ -79,21 +79,6 @@
     [(first s) (next s)]
     [nil s]))
 
-(clojure.core/defn looks-like-a-protocol-var?
-  "There is no 'protocol?'in Clojure, so here's a half-assed attempt."
-  [v]
-  (and (var? v)
-       (map? @v)
-       (= (:var @v) v)
-       (:on @v)))
-
-(clojure.core/defn fix-protocol-tag [env tag]
-  (or (when (symbol? tag)
-        (when-let [v (resolve env tag)]
-          (when (looks-like-a-protocol-var? v)
-            `(schema.core/protocol (deref ~v)))))
-      tag))
-
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
 
@@ -101,21 +86,16 @@
   (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
 
 (clojure.core/defn normalized-metadata
-  "Take an object with optional metadata, which may include a :tag and/or explicit
-   :schema/:s/:s?/:tag data, plus an optional explicit schema, and normalize the
-   object to have a valid Clojure :tag plus a :schema field.
-
-   :s and :s? are deprecated."
+  "Take an object with optional metadata, which may include a :tag,
+   plus an optional explicit schema, and normalize the
+   object to have a valid Clojure :tag plus a :schema field."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
-    (assert! (< (count (remove nil? [s s? schema explicit-schema])) 2)
-             "Expected single schema, got meta %s, explicit %s" (meta imeta) explicit-schema)
-    (let [schema (fix-protocol-tag
-                  env
-                  (or s schema (when s? `(schema.core/maybe ~s?)) explicit-schema tag `schema.core/Any))]
+    (assert! (not (or s s? schema)) "^{:s schema} style schemas are no longer supported.")
+    (let [schema (or explicit-schema tag `schema.core/Any)]
       (with-meta imeta
         (-> (or (meta imeta) {})
-            (dissoc :tag :s :s? :schema)
+            (dissoc :tag)
             (utils/assoc-when :schema schema
                               :tag (let [t (or tag schema)]
                                      (when (valid-tag? env t)

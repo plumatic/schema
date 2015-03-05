@@ -69,16 +69,11 @@
    (fn-schema (s/fn [^String x]))
    ==> (=> Any java.lang.String)
 
-   **DEPRECATED SYNTAX BELOW, TO BE REMOVED**
-   You can directly type hint a symbol as a class, primitive, protocol, or simple
-   schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
-   the schema in a {:s schema} map like so:
+   You can directly type hint a symbol as a class, primitive, or simple
+   schema.
 
-   (fn-schema (s/fn [^{:s [String]} x]))
-   (=> Any [java.lang.String])
-
-   (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
-   of defrecord, fn, and defn for more details about how to use these macros."
+   See the docstrings of defrecord, fn, and defn for more details about how
+   to use these macros."
   ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
   (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
   (:require
