@@ -16,8 +16,7 @@
      `(~'is (s/check ~s ~x)))
   ([s x expected]
      `(do (invalid! ~s ~x)
-          (when *clojure-version* ;; not in cljs
-            (~'is (= ~expected (pr-str (s/check ~s ~x))))))))
+          (sm/if-cljs nil (~'is (= ~expected (pr-str (s/check ~s ~x))))))))
 
 (defmacro invalid-call!
   "Assert that f throws (presumably due to schema validation error) when called on args."
