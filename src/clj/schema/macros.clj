@@ -3,8 +3,7 @@
   (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
   (:require
    [clojure.string :as str]
-   [schema.utils :as utils]
-   potemkin))
+   [schema.utils :as utils]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
@@ -289,23 +288,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: schematized defrecord
 
-(def ^:dynamic ^:deprecated *use-potemkin*
-  "**DEPRECATED**
-   Should we generate records based on potemkin/defrecord+, rather than Clojure's
-   defrecord? Turned on by default for Clojure at the bottom of schema.core."
-  (atom false))
-
 (def defrecord-constructor-atom
-  "EXPERIMENTAL (use at your own risk):
-   Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+).
-   Takes effect when the deprecated *use-potemkin* flag is false."
+  "Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+)."
   (atom `clojure.core/defrecord))
-
-(defn- defrecord-constructor
-  [env]
-  (if (and @*use-potemkin* (not (cljs-env? env)))
-    `potemkin/defrecord+
-    @defrecord-constructor-atom))
 
 (defmacro defrecord
   "DEPRECATED -- canonical version moved to schema.core"
@@ -321,7 +306,7 @@
        ~(when extra-validator-fn?
           `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
                     (type ~extra-validator-fn?)))
-       (~(defrecord-constructor &env) ~name ~field-schema ~@more-args)
+       (~(deref defrecord-constructor-atom) ~name ~field-schema ~@more-args)
        (utils/declare-class-schema!
         ~name
         (utils/assoc-when

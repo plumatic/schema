@@ -980,8 +980,8 @@
 ;;; Schematized defrecord and (de,let)fn macros
 
 (defmacro defrecord
-  "Define a record with a schema.  If *use-potemkin* is true, the resulting record
-   is a potemkin/defrecord+, otherwise it is a defrecord.
+  "Define a record with a schema.  The underlying defrecord constructor can be
+   configured by setting schema.macros/defrecord-constructor-atom.
 
    In addition to the ordinary behavior of defrecord, this macro produces a schema
    for the Record, which will automatically be used when validating instances of
@@ -1173,9 +1173,4 @@
   `(macros/def ~@def-args))
 
 #+clj
-(do
-  ;; Use potemkin for s/defrecord by default
-  ;; **WARNING** -- this default will go away soon, and be replaced with
-  ;; an explicit way to configure the use of potemkin if desired
-  (reset! macros/*use-potemkin* true)
-  (set! *warn-on-reflection* false))
+(set! *warn-on-reflection* false)

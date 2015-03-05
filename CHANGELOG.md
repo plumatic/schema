@@ -1,6 +1,7 @@
 ## 0.4.0
  * **BREAKING** Remove support for old `^{:schema ..}` style annotations and bare `^Protocol` annotations.  `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints (as well as vars that refer to schemas).	
  * **BREAKING** Remove deprecated macros (`defn`, `defrecord`, etc) from schema.macros.  The identical versions in schema.core remain.
+ * **BREAKING** Remove potemkin as a dependency, and the `*use-potemkin*` flag.  To get this behavior, you can still bring your own potemkin and set `schema.macros/defrecord-constructor-atom` to `potemkin/defrecord+`.
 
 ## 0.3.7
  * Add coercion handler for s/Uuid from string input
