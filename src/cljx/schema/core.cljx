@@ -69,16 +69,11 @@
    (fn-schema (s/fn [^String x]))
    ==> (=> Any java.lang.String)
 
-   **DEPRECATED SYNTAX BELOW, TO BE REMOVED**
-   You can directly type hint a symbol as a class, primitive, protocol, or simple
-   schema.  For complex schemas, due to Clojure's rules about ^, you must enclose
-   the schema in a {:s schema} map like so:
+   You can directly type hint a symbol as a class, primitive, or simple
+   schema.
 
-   (fn-schema (s/fn [^{:s [String]} x]))
-   (=> Any [java.lang.String])
-
-   (We highly prefer the :- syntax to this abomination, however.)  See the docstrings
-   of defrecord, fn, and defn for more details about how to use these macros."
+   See the docstrings of defrecord, fn, and defn for more details about how
+   to use these macros."
   ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
   (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
   (:require
@@ -342,11 +337,17 @@
 ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
 (defmacro protocol
   "A value that must satsify? protocol p.
+
    Internaly, we must make sure not to capture the value of the protocol at
    schema creation time, since that's impossible in cljs and breaks later
-   extends in Clojure."
+   extends in Clojure.
+
+   A macro for cljs sake, since `satisfies?` is a macro in cljs.
+"
   [p]
-  `(macros/protocol ~p))
+  `(with-meta (->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
 
 
 ;;; regex (validates matching Strings)
@@ -946,13 +947,13 @@
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
   [output-schema & arity-schema-specs]
-  `(macros/=>* ~output-schema ~@arity-schema-specs))
+  `(make-fn-schema ~output-schema ~(mapv macros/parse-arity-spec arity-schema-specs)))
 
 (defmacro =>
   "Convenience function for defining function schemas with a single arity; like =>*, but
    there is no vector around the argument schemas for this arity."
   [output-schema & arg-schemas]
-  `(macros/=> ~output-schema ~@arg-schemas))
+  `(=>* ~output-schema ~(vec arg-schemas)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -972,15 +973,14 @@
   ([name form]
      `(defschema ~name "" ~form))
   ([name docstring form]
-     `(macros/defschema ~name ~docstring ~form)))
+     `(def ~name ~docstring (schema-with-name ~form '~name))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord and (de,let)fn macros
 
 (defmacro defrecord
-  "Define a record with a schema.  If *use-potemkin* is true, the resulting record
-   is a potemkin/defrecord+, otherwise it is a defrecord.
+  "Define a record with a schema.
 
    In addition to the ordinary behavior of defrecord, this macro produces a schema
    for the Record, which will automatically be used when validating instances of
@@ -1014,8 +1014,16 @@
    new strict-map->name constructor that throws or drops extra keys not in the
    record base."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
-  [& args]
-  `(macros/defrecord ~@args))
+  [name field-schema & more-args]
+  (apply macros/emit-defrecord 'clojure.core/defrecord &env name field-schema more-args))
+
+#+clj
+(defmacro defrecord+
+  "Like defrecord, but emits a record using potemkin/defrecord+.  You must provide
+   your own dependency on potemkin to use this."
+  {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
+  [name field-schema & more-args]
+  (apply macros/emit-defrecord 'potemkin/defrecord+ &env name field-schema more-args))
 
 (defmacro set-compile-fn-validation!
   [on?]
@@ -1038,7 +1046,10 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(macros/with-fn-validation ~@body))
+  `(if (fn-validation?)
+     (do ~@body)
+     (do (set-fn-validation! true)
+         (try ~@body (finally (set-fn-validation! false))))))
 
 (defmacro without-fn-validation
   "Execute body with input and ouptut schema validation turned off for
@@ -1046,7 +1057,10 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(macros/without-fn-validation ~@body))
+  `(if (fn-validation?)
+     (do (set-fn-validation! false)
+         (try ~@body (finally (set-fn-validation! true))))
+     (do ~@body)))
 
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
@@ -1078,7 +1092,15 @@
       negate the benefits of primitive type hints compared to
       clojure.core/fn."
   [& fn-args]
-  (vary-meta `(macros/fn ~@fn-args) #(merge (meta &form) %)))
+  (let [fn-args (if (symbol? (first fn-args))
+                  fn-args
+                  (cons (gensym "fn") fn-args))
+        [name more-fn-args] (macros/extract-arrow-schematized-element &env fn-args)
+        {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
+    `(let ~outer-bindings
+       (schematize-fn
+        ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
+        ~schema-form))))
 
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on
@@ -1131,7 +1153,24 @@
     - Unlike clojure.core/defn, a final attr-map on multi-arity functions
       is not supported."
   [& defn-args]
-  `(macros/defn ~@defn-args))
+  (let [[name & more-defn-args] (macros/normalized-defn-args &env defn-args)
+        {:keys [doc tag] :as standard-meta} (meta name)
+        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (macros/process-fn- &env name more-defn-args)]
+    `(let ~outer-bindings
+       (clojure.core/defn ~(with-meta name {})
+         ~(assoc (apply dissoc standard-meta (when (macros/primitive-sym? tag) [:tag]))
+            :doc (str
+                  (str "Inputs: " (if (= 1 (count raw-arglists))
+                                    (first raw-arglists)
+                                    (apply list raw-arglists)))
+                  (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
+                    (str "\n  Returns: " ret))
+                  (when doc (str  "\n\n  " doc)))
+            :raw-arglists (list 'quote raw-arglists)
+            :arglists (list 'quote arglists)
+            :schema schema-form)
+         ~@fn-body)
+       (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
@@ -1146,15 +1185,25 @@
      ;; You can also use meta tags like ^:always-validate by placing them
      ;; before the multifunction name:
 
-     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
-  "
+     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))"
   [multifn dispatch-val & fn-tail]
-  `(macros/defmethod ~multifn ~dispatch-val ~@fn-tail))
+  `(macros/if-cljs
+    (cljs.core/-add-method
+     ~(with-meta multifn {:tag 'cljs.core/MultiFn})
+     ~dispatch-val
+     (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
+       addMethod
+       ~dispatch-val
+       (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
 
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
   [fnspecs & body]
-  `(macros/letfn ~fnspecs ~@body))
+  (list `let
+        (vec (interleave (map first fnspecs)
+                         (map #(cons `fn %) fnspecs)))
+        `(do ~@body)))
 
 (defmacro def
   "Like def, but takes a schema on the var name (with the same format
@@ -1169,12 +1218,16 @@
 
    (s/def foo :- long \"a long\" 2)"
   [& def-args]
-  `(macros/def ~@def-args))
+  (let [[name more-def-args] (macros/extract-arrow-schematized-element &env def-args)
+        [doc-string? more-def-args] (if (= (count more-def-args) 2)
+                                      (macros/maybe-split-first string? more-def-args)
+                                      [nil more-def-args])
+        init (first more-def-args)]
+    (macros/assert! (= 1 (count more-def-args)) "Illegal args passed to schema def: %s" def-args)
+    `(let [output-schema# ~(macros/extract-schema-form name)]
+       (def ~name
+         ~@(when doc-string? [doc-string?])
+         (validate output-schema# ~init)))))
 
 #+clj
-(do
-  ;; Use potemkin for s/defrecord by default
-  ;; **WARNING** -- this default will go away soon, and be replaced with
-  ;; an explicit way to configure the use of potemkin if desired
-  (reset! macros/*use-potemkin* true)
-  (set! *warn-on-reflection* false))
+(set! *warn-on-reflection* false)

@@ -529,7 +529,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
 
-(defrecord Foo [x ^{:s s/Int} y])
+(defrecord Foo [x y])
 
 (deftest record-test
   (let [schema (s/record Foo {:x s/Any (s/optional-key :y) s/Int})]
@@ -586,11 +586,9 @@
 
   (deftest normalized-metadata-test
     (testing "empty" (test-normalized-meta 'foo nil {:schema s/Any}))
-    (testing "protocol" (test-normalized-meta ^ATestProtocol foo nil {:schema (s/protocol ATestProtocol)}))
     (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
     (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
     (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
-    (testing "both" (test-normalized-meta ^{:tag Object :schema String} foo nil {:tag Object :schema String}))
     (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
 
   (defmacro test-meta-extraction [meta-form arrow-form]
@@ -604,7 +602,7 @@
     (testing "no-tag" (test-meta-extraction [x] [x]))
     (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
-    (testing "multi vars" (test-meta-extraction [x ^{:schema [String]} y z] [x y :- [String] z]))))
+    (testing "multi vars" (test-meta-extraction [x ^String y z] [x y :- String z]))))
 
 (defprotocol PProtocol
   (do-something [this]))
@@ -627,7 +625,8 @@
   (do-something [this] 3))
 
 (s/defrecord Bar4
-    [^{:s [s/Int]} foo ^{:s? {s/Str s/Str}} bar]
+    [foo :- [s/Int]
+     bar :- (s/maybe {s/Str s/Str})]
   PProtocol
   (do-something [this] 4))
 
@@ -685,8 +684,7 @@
 
 (def LongOrString (s/either s/Int s/Str))
 
-#+clj (s/defrecord Nested [^Bar4 b ^LongOrString c ^PProtocol p])
-#+clj (s/defrecord NestedNew [b :- Bar4 c :- LongOrString p :- PProtocol])
+#+clj (s/defrecord Nested [^Bar4 b ^LongOrString c p :- (s/protocol PProtocol)])
 (s/defrecord NestedExplicit [b :- Bar4 c :- LongOrString p :- (s/protocol PProtocol)])
 
 (defn test-fancier-defrecord-schema [klass constructor]
@@ -702,12 +700,8 @@
     (invalid! klass (constructor (Bar4. [1] {:foo :bar}) 1 bar2))
     (invalid! klass (constructor nil "hi" bar2))))
 
-#+clj
-(deftest implicit-protocol-fancier-defrecord-schema-test
-  (test-fancier-defrecord-schema Nested ->Nested)
-  (test-fancier-defrecord-schema NestedNew ->NestedNew))
-
-(deftest explicit-protocol-fancier-defrecord-schema-test
+(deftest fancier-defrecord-schema-test
+  #+clj (test-fancier-defrecord-schema Nested ->Nested)
   (test-fancier-defrecord-schema NestedExplicit ->NestedExplicit))
 
 
@@ -778,7 +772,7 @@
 
 (deftest simple-validated-fn-test
   (let [f (s/fn test-fn :- (s/pred even?)
-            [^s/Int x ^{:s {:foo (s/both s/Int (s/pred odd?))}} y]
+            [^s/Int x y :- {:foo (s/both s/Int (s/pred odd?))}]
             (+ x (:foo y -100)))]
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
@@ -889,7 +883,7 @@
 (deftest infinite-arity-fn-test
   (let [f (s/fn foo :- s/Int
             ([^s/Int arg0] (inc arg0))
-            ([^s/Int arg0  & ^{:s [s/Str]} strs]
+            ([^s/Int arg0  & strs :- [s/Str]]
                (reduce + (foo arg0) (map count strs))))]
     (is (= (s/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
@@ -954,13 +948,7 @@
 (def OddLongString
   (s/both s/Str (s/pred #(odd? (parse-long %)) 'odd-str?)))
 
-(s/defn ^{:s OddLongString :tag String} simple-validated-defn
-  "I am a simple schema fn"
-  {:metadata :bla}
-  [^OddLong arg0]
-  (str arg0))
-
-(s/defn ^{:tag String} simple-validated-defn-new :- OddLongString
+(s/defn ^{:tag String} simple-validated-defn :- OddLongString
   "I am a simple schema fn"
   {:metadata :bla}
   [arg0 :- OddLong]
@@ -980,11 +968,10 @@
 
 #+cljs
 (deftest simple-validated-defn-test
-  (doseq [f [simple-validated-defn simple-validated-defn-new]]
-    (s/with-fn-validation
-      (is (= "3" (f 3)))
-      (invalid-call! f 4)
-      (invalid-call! f "a")))
+  (s/with-fn-validation
+    (is (= "3" (simple-validated-defn 3)))
+    (invalid-call! simple-validated-defn 4)
+    (invalid-call! simple-validated-defn "a"))
   (s/with-fn-validation
     (is (= 7 (validated-pre-post-defn 7)))
     (invalid-call! validated-pre-post-defn 0)
@@ -1008,12 +995,9 @@
 
 #+clj
 (deftest simple-validated-defn-test
-  (is (= "Inputs: [arg0]\n\n  I am a simple schema fn"
+  (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn))))
   (is (= '([arg0]) (:arglists (meta #'simple-validated-defn))))
-  (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
-         (:doc (meta #'simple-validated-defn-new))))
-  (is (= '([arg0]) (:arglists (meta #'simple-validated-defn-new))))
   (is (= "Inputs: ([arg0 :- OddLong] [arg0 :- OddLong arg1 :- Long])\n  Returns: OddLongString\n\n  I am a multi-arglist schema fn"
          (:doc (meta #'multi-arglist-validated-defn))))
   (is (= '([arg0] [arg0 arg1]) (:arglists (meta #'multi-arglist-validated-defn))))
@@ -1027,20 +1011,18 @@
       (is (thrown-with-msg? AssertionError #"Assert failed: \(< 5 %\)"
                             (validated-pre-post-defn 1)))
       (invalid-call! validated-pre-post-defn "a")))
-  (doseq [[label v] {"old" #'simple-validated-defn "new" #'simple-validated-defn-new}]
-    (testing label
-      (let [{:keys [tag schema metadata]} (meta v)]
-        #+clj (is (= tag s/Str))
-        (is (= +simple-validated-defn-schema+ schema))
-        (is (= metadata :bla)))
-      (is (= +simple-validated-defn-schema+ (s/fn-schema @v)))
+  (let [{:keys [tag schema metadata]} (meta #'simple-validated-defn)]
+    #+clj (is (= tag s/Str))
+    (is (= +simple-validated-defn-schema+ schema))
+    (is (= metadata :bla)))
+  (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))
 
-      (s/with-fn-validation
-        (is (= "3" (@v 3)))
-        (invalid-call! @v 4)
-        (invalid-call! @v "a"))
+  (s/with-fn-validation
+    (is (= "3" (simple-validated-defn 3)))
+    (invalid-call! simple-validated-defn 4)
+    (invalid-call! simple-validated-defn "a"))
 
-      (is (= "4" (@v 4)))))
+  (is (= "4" (simple-validated-defn 4)))
   (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
     (is (.contains (.getMessage e) +bad-input-str+))
     (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
@@ -1117,27 +1099,21 @@
   (def +primitive-validated-defn-schema+
     (s/=> long OddLong))
 
-  (s/defn ^long primitive-validated-defn
-    [^long ^{:s OddLong} arg0]
-    (inc arg0))
-
-  (s/defn primitive-validated-defn-new :- long
+  (s/defn primitive-validated-defn :- long
     [^long arg0 :- OddLong]
     (inc arg0))
 
 
   (deftest simple-primitive-validated-defn-test
-    (doseq [[label f] {"old" primitive-validated-defn "new" primitive-validated-defn-new}]
-      (testing label
-        (is (= +primitive-validated-defn-schema+ (s/fn-schema f)))
+    (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
 
-        (is ((ancestors (class f)) clojure.lang.IFn$LL))
-        (s/with-fn-validation
-          (is (= 4 (f 3)))
-          (is (= 4 (.invokePrim f 3)))
-          (is (thrown? Exception (f 4))))
+    (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
+    (s/with-fn-validation
+      (is (= 4 (primitive-validated-defn 3)))
+      (is (= 4 (.invokePrim primitive-validated-defn 3)))
+      (is (thrown? Exception (primitive-validated-defn 4))))
 
-        (is (= 5 (f 4))))))
+    (is (= 5 (primitive-validated-defn 4))))
 
   (s/defn another-primitive-fn :- double
     [^long arg0]
