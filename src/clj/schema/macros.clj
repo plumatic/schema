@@ -59,14 +59,6 @@
   `(when-not ~form
      (error! (utils/format* ~@format-args))))
 
-(defmacro ^:deprecated assert-c!
-  "DEPRECATED.  (No longer necessary now that macroexpansion properly detects context).
-   Like assert! but throws a RuntimeException and takes args to format.  Only
-   for use during compilation."
-  [form & format-args]
-  `(when-not ~form
-     (throw (RuntimeException. (format ~@format-args)))))
-
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(schema.utils/error
     (utils/->ValidationError ~schema ~value (delay ~expectation) ~fail-explanation)))
