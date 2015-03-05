@@ -81,8 +81,10 @@
    object to have a valid Clojure :tag plus a :schema field."
   [env imeta explicit-schema]
   (let [{:keys [tag s s? schema]} (meta imeta)]
-    (assert! (not (or s s? schema)) "^{:s schema} style schemas are no longer supported.")
-    (let [schema (or explicit-schema tag `schema.core/Any)]
+    (assert! (not (or s s?)) "^{:s schema} style schemas are no longer supported.")
+    (assert! (< (count (remove nil? [schema explicit-schema])) 2)
+             "Expected single schema, got meta %s, explicit %s" (meta imeta) explicit-schema)
+    (let [schema (or explicit-schema schema tag `schema.core/Any)]
       (with-meta imeta
         (-> (or (meta imeta) {})
             (dissoc :tag)
