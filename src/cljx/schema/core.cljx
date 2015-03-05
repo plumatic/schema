@@ -979,9 +979,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord and (de,let)fn macros
 
+(def defrecord-constructor-atom
+  "Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+)."
+  (atom `clojure.core/defrecord))
+
 (defmacro defrecord
   "Define a record with a schema.  The underlying defrecord constructor can be
-   configured by setting schema.macros/defrecord-constructor-atom.
+   configured by setting defrecord-constructor-atom.
 
    In addition to the ordinary behavior of defrecord, this macro produces a schema
    for the Record, which will automatically be used when validating instances of
@@ -1015,8 +1019,53 @@
    new strict-map->name constructor that throws or drops extra keys not in the
    record base."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
-  [& args]
-  `(macros/defrecord ~@args))
+  [name field-schema & more-args]
+  (let [[extra-key-schema? more-args] (macros/maybe-split-first map? more-args)
+        [extra-validator-fn? more-args] (macros/maybe-split-first (complement symbol?) more-args)
+        field-schema (macros/process-arrow-schematized-args &env field-schema)]
+    `(do
+       (let [bad-keys# (seq (filter #(required-key? %)
+                                    (keys ~extra-key-schema?)))]
+         (macros/assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
+                         (vec bad-keys#)))
+       ~(when extra-validator-fn?
+          `(macros/assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
+                           (type ~extra-validator-fn?)))
+       (~(deref defrecord-constructor-atom) ~name ~field-schema ~@more-args)
+       (utils/declare-class-schema!
+        ~name
+        (utils/assoc-when
+         (record
+          ~name
+          (merge ~(into {}
+                        (for [k field-schema]
+                          [(keyword (clojure.core/name k))
+                           (do (macros/assert! (symbol? k)
+                                               "Non-symbol in record binding form: %s" k)
+                               (macros/extract-schema-form k))]))
+                 ~extra-key-schema?))
+         :extra-validator-fn ~extra-validator-fn?))
+       ~(let [map-sym (gensym "m")]
+          `(clojure.core/defn ~(symbol (str 'map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
+                   " slower than ->x like the clojure.core version")
+             [~map-sym]
+             (let [base# (new ~(symbol (str name))
+                              ~@(map (clojure.core/fn [s] `(get ~map-sym ~(keyword s))) field-schema))
+                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
+               (if (seq remaining#)
+                 (merge base# remaining#)
+                 base#))))
+       ~(let [map-sym (gensym "m")]
+          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
+             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
+                   " keys are required, and no extra keys are allowed.  Even faster than map->")
+             [~map-sym & [drop-extra-keys?#]]
+             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
+               (macros/error! (utils/format* "Wrong number of keys: expected %s, got %s"
+                                             (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
+             (new ~(symbol (str name))
+                  ~@(map (clojure.core/fn [s] `(macros/safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
 (defmacro set-compile-fn-validation!
   [on?]
@@ -1039,7 +1088,10 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(macros/with-fn-validation ~@body))
+  `(if (fn-validation?)
+     (do ~@body)
+     (do (set-fn-validation! true)
+         (try ~@body (finally (set-fn-validation! false))))))
 
 (defmacro without-fn-validation
   "Execute body with input and ouptut schema validation turned off for
@@ -1047,7 +1099,10 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(macros/without-fn-validation ~@body))
+  `(if (fn-validation?)
+     (do (set-fn-validation! false)
+         (try ~@body (finally (set-fn-validation! true))))
+     (do ~@body)))
 
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
@@ -1079,7 +1134,15 @@
       negate the benefits of primitive type hints compared to
       clojure.core/fn."
   [& fn-args]
-  (vary-meta `(macros/fn ~@fn-args) #(merge (meta &form) %)))
+  (let [fn-args (if (symbol? (first fn-args))
+                  fn-args
+                  (cons (gensym "fn") fn-args))
+        [name more-fn-args] (macros/extract-arrow-schematized-element &env fn-args)
+        {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
+    `(let ~outer-bindings
+       (schematize-fn
+        ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
+        ~schema-form))))
 
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on
@@ -1132,7 +1195,24 @@
     - Unlike clojure.core/defn, a final attr-map on multi-arity functions
       is not supported."
   [& defn-args]
-  `(macros/defn ~@defn-args))
+  (let [[name & more-defn-args] (macros/normalized-defn-args &env defn-args)
+        {:keys [doc tag] :as standard-meta} (meta name)
+        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (macros/process-fn- &env name more-defn-args)]
+    `(let ~outer-bindings
+       (clojure.core/defn ~(with-meta name {})
+         ~(assoc (apply dissoc standard-meta (when (macros/primitive-sym? tag) [:tag]))
+            :doc (str
+                  (str "Inputs: " (if (= 1 (count raw-arglists))
+                                    (first raw-arglists)
+                                    (apply list raw-arglists)))
+                  (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
+                    (str "\n  Returns: " ret))
+                  (when doc (str  "\n\n  " doc)))
+            :raw-arglists (list 'quote raw-arglists)
+            :arglists (list 'quote arglists)
+            :schema schema-form)
+         ~@fn-body)
+       (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
@@ -1147,15 +1227,25 @@
      ;; You can also use meta tags like ^:always-validate by placing them
      ;; before the multifunction name:
 
-     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))
-  "
+     (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))"
   [multifn dispatch-val & fn-tail]
-  `(macros/defmethod ~multifn ~dispatch-val ~@fn-tail))
+  `(macros/if-cljs
+    (cljs.core/-add-method
+     ~(with-meta multifn {:tag 'cljs.core/MultiFn})
+     ~dispatch-val
+     (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
+       addMethod
+       ~dispatch-val
+       (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
 
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
   [fnspecs & body]
-  `(macros/letfn ~fnspecs ~@body))
+  (list `let
+        (vec (interleave (map first fnspecs)
+                         (map #(cons `fn %) fnspecs)))
+        `(do ~@body)))
 
 (defmacro def
   "Like def, but takes a schema on the var name (with the same format
@@ -1170,7 +1260,16 @@
 
    (s/def foo :- long \"a long\" 2)"
   [& def-args]
-  `(macros/def ~@def-args))
+  (let [[name more-def-args] (macros/extract-arrow-schematized-element &env def-args)
+        [doc-string? more-def-args] (if (= (count more-def-args) 2)
+                                      (macros/maybe-split-first string? more-def-args)
+                                      [nil more-def-args])
+        init (first more-def-args)]
+    (macros/assert! (= 1 (count more-def-args)) "Illegal args passed to schema def: %s" def-args)
+    `(let [output-schema# ~(macros/extract-schema-form name)]
+       (def ~name
+         ~@(when doc-string? [doc-string?])
+         (validate output-schema# ~init)))))
 
 #+clj
 (set! *warn-on-reflection* false)

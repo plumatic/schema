@@ -1,5 +1,5 @@
 (ns schema.macros
-  "Macros used in and provided by schema, separated out for Clojurescript's sake."
+  "Macros and macro helpers used in schema.core."
   (:refer-clojure :exclude [defrecord fn defn letfn defmethod])
   (:require
    [clojure.string :as str]
@@ -286,78 +286,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Public: schematized defrecord
-
-(def defrecord-constructor-atom
-  "Allow pluggability for the implementation of defrecord (e.g., potemkin/defrecord+)."
-  (atom `clojure.core/defrecord))
-
-(defmacro defrecord
-  "DEPRECATED -- canonical version moved to schema.core"
-  [name field-schema & more-args]
-  (let [[extra-key-schema? more-args] (maybe-split-first map? more-args)
-        [extra-validator-fn? more-args] (maybe-split-first (complement symbol?) more-args)
-        field-schema (process-arrow-schematized-args &env field-schema)]
-    `(do
-       (let [bad-keys# (seq (filter #(schema.core/required-key? %)
-                                    (keys ~extra-key-schema?)))]
-         (assert! (not bad-keys#) "extra-key-schema? can not contain required keys: %s"
-                  (vec bad-keys#)))
-       ~(when extra-validator-fn?
-          `(assert! (fn? ~extra-validator-fn?) "Extra-validator-fn? not a fn: %s"
-                    (type ~extra-validator-fn?)))
-       (~(deref defrecord-constructor-atom) ~name ~field-schema ~@more-args)
-       (utils/declare-class-schema!
-        ~name
-        (utils/assoc-when
-         (schema.core/record
-          ~name
-          (merge ~(into {}
-                        (for [k field-schema]
-                          [(keyword (clojure.core/name k))
-                           (do (assert! (symbol? k)
-                                        "Non-symbol in record binding form: %s" k)
-                               (extract-schema-form k))]))
-                 ~extra-key-schema?))
-         :extra-validator-fn ~extra-validator-fn?))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
-                   " slower than ->x like the clojure.core version")
-             [~map-sym]
-             (let [base# (new ~(symbol (str name))
-                              ~@(map (clojure.core/fn [s] `(get ~map-sym ~(keyword s))) field-schema))
-                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
-               (if (seq remaining#)
-                 (merge base# remaining#)
-                 base#))))
-       ~(let [map-sym (gensym "m")]
-          `(clojure.core/defn ~(symbol (str 'strict-map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
-                   " keys are required, and no extra keys are allowed.  Even faster than map->")
-             [~map-sym & [drop-extra-keys?#]]
-             (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
-               (error! (utils/format* "Wrong number of keys: expected %s, got %s"
-                                      (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
-             (new ~(symbol (str name))
-                  ~@(map (clojure.core/fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Public: schematized functions
-
-(defmacro fn
-  "DEPRECATED -- canonical version moved to schema.core"
-  [& fn-args]
-  (let [fn-args (if (symbol? (first fn-args))
-                  fn-args
-                  (cons (gensym "fn") fn-args))
-        [name more-fn-args] (extract-arrow-schematized-element &env fn-args)
-        {:keys [outer-bindings schema-form fn-body]} (process-fn- &env name more-fn-args)]
-    `(let ~outer-bindings
-       (schema.core/schematize-fn
-        ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
-        ~schema-form))))
+;;; Public: helpers for schematized functions
 
 (clojure.core/defn normalized-defn-args
   "Helper for defining defn-like macros with schemas.  Env is &env
@@ -374,81 +303,9 @@
                      (when maybe-docstring {:doc maybe-docstring}))
           macro-args)))
 
-(defmacro defn
-  "DEPRECATED -- canonical version moved to schema.core"
-  [& defn-args]
-  (let [[name & more-defn-args] (normalized-defn-args &env defn-args)
-        {:keys [doc tag] :as standard-meta} (meta name)
-        {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (process-fn- &env name more-defn-args)]
-    `(let ~outer-bindings
-       (clojure.core/defn ~(with-meta name {})
-         ~(assoc (apply dissoc standard-meta (when (primitive-sym? tag) [:tag]))
-            :doc (str
-                  (str "Inputs: " (if (= 1 (count raw-arglists))
-                                    (first raw-arglists)
-                                    (apply list raw-arglists)))
-                  (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
-                    (str "\n  Returns: " ret))
-                  (when doc (str  "\n\n  " doc)))
-            :raw-arglists (list 'quote raw-arglists)
-            :arglists (list 'quote arglists)
-            :schema schema-form)
-         ~@fn-body)
-       (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
-
-(defmacro letfn [fnspecs & body]
-  "DEPRECATED -- canonical version moved to schema.core"
-  (list `let
-        (vec (interleave (map first fnspecs)
-                         (map #(cons `fn %) fnspecs)))
-        `(do ~@body)))
-
 (clojure.core/defn set-compile-fn-validation!
   "Globally turn on or off function validation from being compiled into s/fn and s/defn.
    Enabled by default.
    See (doc compile-fn-validation?) for all conditions which control fn validation compilation"
   [on?]
   (reset! *compile-fn-validation* on?))
-
-(defmacro with-fn-validation
-  "DEPRECATED -- canonical version moved to schema.core"
-  [& body]
-  `(if (schema.core/fn-validation?)
-     (do ~@body)
-     (do (schema.core/set-fn-validation! true)
-         (try ~@body (finally (schema.core/set-fn-validation! false))))))
-
-(defmacro without-fn-validation
-  "DEPRECATED -- canonical version moved to schema.core"
-  [& body]
-  `(if (schema.core/fn-validation?)
-     (do (schema.core/set-fn-validation! false)
-         (try ~@body (finally (schema.core/set-fn-validation! true))))
-     (do ~@body)))
-
-(defmacro def
-  "DEPRECATED -- canonical version moved to schema.core"
-  [& def-args]
-  (let [[name more-def-args] (extract-arrow-schematized-element &env def-args)
-        [doc-string? more-def-args] (if (= (count more-def-args) 2)
-                                      (maybe-split-first string? more-def-args)
-                                      [nil more-def-args])
-        init (first more-def-args)]
-    (assert! (= 1 (count more-def-args)) "Illegal args passed to schema def: %s" def-args)
-    `(let [output-schema# ~(extract-schema-form name)]
-       (def ~name
-         ~@(when doc-string? [doc-string?])
-         (schema.core/validate output-schema# ~init)))))
-
-(defmacro defmethod
-  "DEPRECATED -- canonical version moved to schema.core"
-  [multifn dispatch-val & fn-tail]
-  `(if-cljs
-    (cljs.core/-add-method
-     ~(with-meta multifn {:tag 'cljs.core/MultiFn})
-     ~dispatch-val
-     (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
-    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
-       addMethod
-       ~dispatch-val
-       (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
