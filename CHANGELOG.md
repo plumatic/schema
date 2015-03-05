@@ -1,15 +1,16 @@
 ## 0.4.0
  * **BREAKING** Remove support for old `^{:schema ..}` style annotations and bare `^Protocol` annotations.  `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints (as well as vars that refer to schemas).	
+ * **BREAKING** Remove deprecated macros (`defn`, `defrecord`, etc) from schema.macros.  The identical versions in schema.core remain.
 
 ## 0.3.7
  * Add coercion handler for s/Uuid from string input
 
 ## 0.3.6
  * Support java.util.List instances as valid data for sequence schemas
- 
+
 ## 0.3.5
  * Make primitive schemas work better in some cases under partial AOT compilation
-	
+
 ## 0.3.3
  * Fix bug in `defschema` which clobbered metadata, breaking `s/protocol` in Clojure in 0.3.2.
 

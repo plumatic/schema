@@ -273,7 +273,9 @@
      :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
      :fn-body fn-forms}))
 
-(defn- parse-arity-spec [spec]
+(clojure.core/defn parse-arity-spec
+  "Helper for schema.core/=>*."
+  [spec]
   (assert! (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
         fixed (mapv (clojure.core/fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
@@ -282,34 +284,6 @@
       (do (assert! (and (= (count more) 2) (vector? (second more)))
                    "An arity with & must be followed by a single sequence schema")
           (into fixed (second more))))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Public: miscellaneous macros and helpers
-
-(defmacro defschema
-  "DEPRECATED -- canonical version moved to schema.core"
-  ([name form]
-     `(defschema ~name "" ~form))
-  ([name docstring form]
-     `(def ~name ~docstring (schema.core/schema-with-name ~form '~name))))
-
-(defmacro protocol
-  "DEPRECATED -- canonical version moved to schema.core"
-  [p]
-  `(with-meta (schema.core/->Protocol ~p)
-     {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
-
-(defmacro =>*
-  "DEPRECATED -- canonical version moved to schema.core"
-  [output-schema & arity-schema-specs]
-  `(schema.core/make-fn-schema ~output-schema ~(mapv parse-arity-spec arity-schema-specs)))
-
-(defmacro =>
-  "DEPRECATED -- canonical version moved to schema.core"
-  [output-schema & arg-schemas]
-  `(=>* ~output-schema ~(vec arg-schemas)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

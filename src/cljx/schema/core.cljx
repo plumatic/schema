@@ -337,11 +337,17 @@
 ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
 (defmacro protocol
   "A value that must satsify? protocol p.
+
    Internaly, we must make sure not to capture the value of the protocol at
    schema creation time, since that's impossible in cljs and breaks later
-   extends in Clojure."
+   extends in Clojure.
+
+   A macro for cljs sake, since `satisfies?` is a macro in cljs.
+"
   [p]
-  `(macros/protocol ~p))
+  `(with-meta (->Protocol ~p)
+     {:proto-pred #(satisfies? ~p %)
+      :proto-sym '~p}))
 
 
 ;;; regex (validates matching Strings)
@@ -941,13 +947,13 @@
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
   [output-schema & arity-schema-specs]
-  `(macros/=>* ~output-schema ~@arity-schema-specs))
+  `(make-fn-schema ~output-schema ~(mapv macros/parse-arity-spec arity-schema-specs)))
 
 (defmacro =>
   "Convenience function for defining function schemas with a single arity; like =>*, but
    there is no vector around the argument schemas for this arity."
   [output-schema & arg-schemas]
-  `(macros/=> ~output-schema ~@arg-schemas))
+  `(=>* ~output-schema ~(vec arg-schemas)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -967,7 +973,7 @@
   ([name form]
      `(defschema ~name "" ~form))
   ([name docstring form]
-     `(macros/defschema ~name ~docstring ~form)))
+     `(def ~name ~docstring (schema-with-name ~form '~name))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
