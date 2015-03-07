@@ -2,7 +2,7 @@
   "Macros to help cross-language testing of schemas."
   (:require
    clojure.test
-   [schema.core :as s :include-macros true]
+   [schema.core :as s]
    [schema.macros :as sm]))
 
 (defmacro valid!
