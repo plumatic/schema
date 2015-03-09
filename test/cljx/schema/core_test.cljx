@@ -14,7 +14,7 @@
   (:require
    clojure.data
    [schema.utils :as utils]
-   [schema.core :as s :include-macros true]
+   [schema.core :as s]
    #+clj [schema.macros :as macros]
    #+cljs cemerick.cljs.test))
 

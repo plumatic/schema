@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
-                                  [org.clojure/clojurescript "0.0-2665"]
+                                  [org.clojure/clojurescript "0.0-2760"]
                                   [org.clojure/tools.nrepl "0.2.5"]]
                    :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
                              [codox "0.8.8"]

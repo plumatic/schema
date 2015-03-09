@@ -80,7 +80,8 @@
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
    [schema.utils :as utils])
-  #+cljs (:require-macros [schema.macros :as macros]))
+  #+cljs (:require-macros [schema.macros :as macros]
+                          schema.core))
 
 #+clj (set! *warn-on-reflection* true)
 
