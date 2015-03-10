@@ -77,7 +77,7 @@
 (defmethod print-method ValidationError [err writer]
   (print-method (validation-error-explain err) writer))
 
-(defn ->ValidationError
+(defn make-ValidationError
   "for cljs sake (easier than normalizing imports in macros.clj)"
   [schema value expectation-delay fail-explanation]
   (ValidationError. schema value expectation-delay fail-explanation))
@@ -97,11 +97,6 @@
 #+clj ;; Validation errors print like forms that would return false
 (defmethod print-method NamedError [err writer]
   (print-method (named-error-explain err) writer))
-
-(defn ->NamedError
-  "for cljs sake (easier than normalizing imports in macros.clj)"
-  [name error]
-  (NamedError. name error))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -124,7 +119,7 @@
   "If maybe-error is an error, wrap the inner value in a NamedError; otherwise, return as-is"
   [name maybe-error]
   (if-let [e (error-val maybe-error)]
-    (error (->NamedError name e))
+    (error (NamedError. name e))
     maybe-error))
 
 (defn result-builder
