@@ -1,3 +1,6 @@
+## 0.4.1
+ * Fix some harmless warnings when using Schema with the latest version of ClojureScript (due to the addition of positional constructors for `deftype`).
+
 ## 0.4.0
  * **BREAKING** Remove support for old `^{:schema ..}` style annotations and bare `^Protocol` annotations.  `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints (as well as vars that refer to schemas).	
  * **BREAKING** Remove deprecated macros (`defn`, `defrecord`, etc) from schema.macros.  The identical versions in schema.core remain.
