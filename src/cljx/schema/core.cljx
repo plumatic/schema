@@ -1172,6 +1172,11 @@
          ~@fn-body)
        (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
 
+(defmacro defn-
+  "same as defn above, but instead yielding a non-public def."
+  [name & decls]
+  (list* `defn (with-meta name (assoc (meta name) :private true)) decls))
+
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
