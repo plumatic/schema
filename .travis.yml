@@ -1,0 +1,6 @@
+language: clojure
+script: ./script/test
+sudo: false
+cache:
+  directories:
+  - $HOME/.m2
