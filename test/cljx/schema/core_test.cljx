@@ -1197,8 +1197,16 @@
                     :b [:k 1 2 3]
                     :c :whatever})
     (invalid! schema {:a #{[1 2 3 4] [] [1 2] [:a :b]}
-                      :b [1 :a]}
-              "{:c missing-required-key, :b [(named (not (keyword? 1)) :k) (not (integer? :a))], :a #{[(not (integer? :a)) (not (integer? :b))]}}")))
+                      :b [:k]
+                      :c nil}
+              "{:a #{[(not (integer? :a)) (not (integer? :b))]}}")
+    (invalid! schema {:a #{}
+                      :b [1 :a]
+                      :c nil}
+              "{:b [(named (not (keyword? 1)) :k) (not (integer? :a))]}")
+    (invalid! schema {:a #{}
+                      :b [:k]}
+              "{:c missing-required-key}")))
 
 (s/defrecord Explainer
     [^s/Int foo ^s/Keyword bar]
