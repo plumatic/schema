@@ -330,7 +330,7 @@
              [~map-sym & [drop-extra-keys?#]]
              (when-not (or drop-extra-keys?# (= (count ~map-sym) ~(count field-schema)))
                (error! (utils/format* "Wrong number of keys: expected %s, got %s"
-                                      (sort (keys ~map-sym)) (sort ~(mapv keyword field-schema)))))
+                                      (sort ~(mapv keyword field-schema)) (sort (keys ~map-sym)))))
              (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
