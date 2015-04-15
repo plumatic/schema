@@ -951,7 +951,7 @@
   `(make-fn-schema ~output-schema ~(mapv macros/parse-arity-spec arity-schema-specs)))
 
 (defmacro =>
-  "Convenience function for defining function schemas with a single arity; like =>*, but
+  "Convenience macro for defining function schemas with a single arity; like =>*, but
    there is no vector around the argument schemas for this arity."
   [output-schema & arg-schemas]
   `(=>* ~output-schema ~(vec arg-schemas)))
