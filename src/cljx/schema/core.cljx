@@ -573,6 +573,26 @@
       (macros/error! (utils/format* "Not an IDeref: %s" schema)))
     (Recursive. schema)))
 
+#+cljs
+(do
+  (cljs.core/defrecord Recursive [derefable]
+    Schema
+    (walker [this]
+      (let [a (atom nil)]
+        (reset! a (start-walker
+                   (let [old subschema-walker]
+                     (clojure.core/fn [s] (if (= s this) #(@a %) (old s))))
+                   @derefable))))
+    (explain [this]
+      (let [{:keys [ns name]} (meta derefable)]
+        (list 'recursive (str ns "/" name)))))
+
+  (cljs.core/defn recursive
+  "Support for (mutually) recursive schemas by passing a var that points to a schema,
+  e.g (recursive #'ExampleRecursiveSchema)."
+  [schema]
+  (Recursive. schema)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
