@@ -301,20 +301,22 @@
   (invalid! TestBlackNode {:black {:black {}}})
   (invalid! TestBlackNode {:black {:red {}}})
 
-  #+clj(let [rec (promise)
-             schema {(s/optional-key :x) (s/recursive rec)}]
-         (deliver rec schema)
-         (valid! schema {})
-         (valid! schema {:x {:x {:x {}}}})
-         (invalid! schema {:x {:x {:y {}}}})
-         (let [explanation (first (s/explain schema))]
-           (is (= '(optional-key :x) (key explanation)))
-           (is (= 'recursive (first (val explanation))))
-           (is (re-matches #"clojure\.core\$promise.*"
-                           (second (val explanation))))))
+  #+clj
+  (let [rec (promise)
+        schema {(s/optional-key :x) (s/recursive rec)}]
+    (deliver rec schema)
+    (valid! schema {})
+    (valid! schema {:x {:x {:x {}}}})
+    (invalid! schema {:x {:x {:y {}}}})
+    (let [explanation (first (s/explain schema))]
+      (is (= '(optional-key :x) (key explanation)))
+      (is (= 'recursive (first (val explanation))))
+      (is (re-matches #"clojure\.core\$promise.*"
+                      (second (val explanation))))))
 
-  #+clj(is (= '{:black {(optional-key :red) (recursive (var schema.core-test/TestBlackNode))}}
-              (s/explain TestBlackNode))))
+  #+clj
+  (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/TestBlackNode))}}
+         (s/explain TestBlackNode))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
