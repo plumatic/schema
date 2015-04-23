@@ -539,9 +539,9 @@
   (conditional pred if-schema (constantly true) else-schema))
 
 
-;;; Recursive schemas (Clojure only)
+;;; Recursive schemas
 ;; Supports recursively defined schemas by using the level of indirection offered by by
-;; Clojure (but not ClojureScript) vars.
+;; Clojure and ClojureScript vars.
 
 #+clj
 (do
