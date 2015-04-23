@@ -539,39 +539,41 @@
   (conditional pred if-schema (constantly true) else-schema))
 
 
-;;; Recursive schemas (Clojure only)
+;;; Recursive schemas
 ;; Supports recursively defined schemas by using the level of indirection offered by by
-;; Clojure (but not ClojureScript) vars.
+;; Clojure and ClojureScript vars.
 
-#+clj
-(do
-  (clojure.core/defn var-name [v]
-    (let [{:keys [ns name]} (meta v)]
-      (symbol (str (ns-name ns) "/" name))))
+(#+clj clojure.core/defn #+cljs cljs.core/defn var-name [v]
+  (let [{:keys [ns name]} (meta v)]
+    (symbol (str #+clj (ns-name ns) #+cljs ns "/" name))))
 
-  (clojure.core/defrecord Recursive [derefable]
-    Schema
-    (walker [this]
-            (let [a (atom nil)]
-              (reset! a (start-walker
-                         (let [old subschema-walker]
-                           (clojure.core/fn [s] (if (= s this) #(@a %) (old s))))
-                         @derefable))))
-    (explain [this]
-             (list 'recursive
-                   (if (var? derefable)
-                     (list 'var (var-name derefable))
-                     (format "%s@%x"
-                             (.getName (class derefable))
-                             (System/identityHashCode derefable))))))
+(#+clj clojure.core/defrecord #+cljs cljs.core/defrecord Recursive [derefable]
+  Schema
+  (walker [this]
+          (let [a (atom nil)]
+            (reset! a (start-walker
+                       (let [old subschema-walker]
+                         (clojure.core/fn [s] (if (= s this) #(@a %) (old s))))
+                       @derefable))))
+  (explain [this]
+           #+clj
+           (list 'recursive
+                 (if (var? derefable)
+                   (list 'var (var-name derefable))
+                   (format "%s@%x"
+                           (.getName (class derefable))
+                           (System/identityHashCode derefable))))
+           #+cljs
+           (list 'recursive (list 'var (var-name derefable)))))
 
-  (clojure.core/defn recursive
-    "Support for (mutually) recursive schemas by passing a var that points to a schema,
+(#+clj clojure.core/defn #+cljs cljs.core/defn recursive
+  "Support for (mutually) recursive schemas by passing a var that points to a schema,
        e.g (recursive #'ExampleRecursiveSchema)."
-    [schema]
-    (when-not (instance? clojure.lang.IDeref schema)
-      (macros/error! (utils/format* "Not an IDeref: %s" schema)))
-    (Recursive. schema)))
+  [schema]
+  #+clj
+  (when-not (instance? clojure.lang.IDeref schema)
+    (macros/error! (utils/format* "Not an IDeref: %s" schema)))
+  (Recursive. schema))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
