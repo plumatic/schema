@@ -543,10 +543,9 @@
 ;; Supports recursively defined schemas by using the level of indirection offered by by
 ;; Clojure and ClojureScript vars.
 
-#+clj
-(clojure.core/defn var-name [v]
+(#+clj clojure.core/defn #+cljs cljs.core/defn var-name [v]
   (let [{:keys [ns name]} (meta v)]
-    (symbol (str (ns-name ns) "/" name))))
+    (symbol (str #+clj (ns-name ns) #+cljs ns "/" name))))
 
 (#+clj clojure.core/defrecord #+cljs cljs.core/defrecord Recursive [derefable]
   Schema
@@ -565,8 +564,7 @@
                            (.getName (class derefable))
                            (System/identityHashCode derefable))))
            #+cljs
-           (let [{:keys [ns name]} (meta derefable)]
-             (list 'recursive (str ns "/" name)))))
+           (list 'recursive (list 'var (var-name derefable)))))
 
 (#+clj clojure.core/defn #+cljs cljs.core/defn recursive
   "Support for (mutually) recursive schemas by passing a var that points to a schema,
