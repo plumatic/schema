@@ -75,7 +75,7 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
+  (:refer-clojure :exclude [Keyword Symbol defrecord defn defn- letfn defmethod])
   (:require
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
@@ -1172,6 +1172,11 @@
             :schema schema-form)
          ~@fn-body)
        (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
+
+(defmacro defn-
+  "same as defn above, but instead yielding a non-public def."
+  [name & decls]
+  (list* `defn (with-meta name (assoc (meta name) :private true)) decls))
 
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
