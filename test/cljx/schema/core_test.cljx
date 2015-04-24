@@ -309,10 +309,9 @@
     (invalid! schema {:x {:x {:y {}}}})
     (let [explanation (first (s/explain schema))]
       (is (= '(optional-key :x) (key explanation)))
-      (is (= 'recursive (first (val explanation))))
-      #+clj
-      (is (re-matches #"clojure\.lang\.Atom.*"
-                      (second (val explanation))))))
+      #+clj (is (= 'recursive (first (val explanation))))
+      #+clj (is (re-matches #"clojure.lang.Atom.*" (second (val explanation))))
+      #+cljs (is (= '(recursive ...) (val explanation)))))
 
   (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/TestBlackNode))}}
          (s/explain TestBlackNode))))

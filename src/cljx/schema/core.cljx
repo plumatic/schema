@@ -543,11 +543,11 @@
 ;; Supports recursively defined schemas by using the level of indirection offered by by
 ;; Clojure and ClojureScript vars.
 
-(#+clj clojure.core/defn #+cljs cljs.core/defn var-name [v]
+(clojure.core/defn var-name [v]
   (let [{:keys [ns name]} (meta v)]
     (symbol (str #+clj (ns-name ns) #+cljs ns "/" name))))
 
-(#+clj clojure.core/defrecord #+cljs cljs.core/defrecord Recursive [derefable]
+(clojure.core/defrecord Recursive [derefable]
   Schema
   (walker [this]
           (let [a (atom nil)]
@@ -556,23 +556,22 @@
                          (clojure.core/fn [s] (if (= s this) #(@a %) (old s))))
                        @derefable))))
   (explain [this]
-           #+clj
            (list 'recursive
-                 (if (var? derefable)
-                   (list 'var (var-name derefable))
-                   (format "%s@%x"
-                           (.getName (class derefable))
-                           (System/identityHashCode derefable))))
-           #+cljs
-           (list 'recursive (list 'var (var-name derefable)))))
+                 (if #+clj (var? derefable) #+cljs (instance? Var derefable)
+                     (list 'var (var-name derefable))
+                     #+clj
+                     (format "%s@%x"
+                             (.getName (class derefable))
+                             (System/identityHashCode derefable))
+                     #+cljs
+                     '...))))
 
-(#+clj clojure.core/defn #+cljs cljs.core/defn recursive
+(clojure.core/defn recursive
   "Support for (mutually) recursive schemas by passing a var that points to a schema,
-       e.g (recursive #'ExampleRecursiveSchema)."
+   e.g (recursive #'ExampleRecursiveSchema)."
   [schema]
-  #+clj
-  (when-not (instance? clojure.lang.IDeref schema)
-    (macros/error! (utils/format* "Not an IDeref: %s" schema)))
+  (when-not #+clj (instance? clojure.lang.IDeref schema) #+cljs (satisfies? IDeref schema)
+            (macros/error! (utils/format* "Not an IDeref: %s" schema)))
   (Recursive. schema))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
