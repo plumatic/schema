@@ -263,59 +263,58 @@
     (invalid! schema {:type :zzz :baz 10})))
 
 
-#+clj
-(do (def NestedVecs
-      [(s/one s/Num "Node ID")
-       (s/recursive #'NestedVecs)])
+(def NestedVecs
+  [(s/one s/Num "Node ID")
+   (s/recursive #'NestedVecs)])
 
-    (def NestedMaps
-      {:node-id s/Num
-       (s/optional-key :children) [(s/recursive #'NestedMaps)]})
+(def NestedMaps
+  {:node-id s/Num
+   (s/optional-key :children) [(s/recursive #'NestedMaps)]})
 
-    (declare BlackNode)
-    (def RedNode {(s/optional-key :red) (s/recursive #'BlackNode)})
-    (def BlackNode {:black RedNode})
+(declare TestBlackNode)
+(def TestRedNode {(s/optional-key :red) (s/recursive #'TestBlackNode)})
+(def TestBlackNode {:black TestRedNode})
 
-    (deftest recursive-test
-      (valid! NestedVecs [1 [2 [3 [4]]]])
-      (invalid! NestedVecs [1 [2 ["invalid-id" [4]]]])
-      (invalid! NestedVecs [1 [2 [3 "invalid-content"]]])
+(deftest recursive-test
+  (valid! NestedVecs [1 [2 [3 [4]]]])
+  (invalid! NestedVecs [1 [2 ["invalid-id" [4]]]])
+  (invalid! NestedVecs [1 [2 [3 "invalid-content"]]])
 
-      (valid! NestedMaps
-              {:node-id 1
-               :children [{:node-id 1
-                           :children [{:node-id 4}]}
-                          {:node-id 3}]})
-      (invalid! NestedMaps
-                {:node-id 1
-                 :children [{:invalid-node-id 1
-                             :children [{:node-id 4}]}
-                            {:node-id 3}]})
-      (invalid! NestedMaps
-                {:node-id 1
-                 :children [{:node-id 1
-                             :children [{:node-id 4}]}
-                            {:node-id "invalid-id"}]})
+  (valid! NestedMaps
+          {:node-id 1
+           :children [{:node-id 1
+                       :children [{:node-id 4}]}
+                      {:node-id 3}]})
+  (invalid! NestedMaps
+            {:node-id 1
+             :children [{:invalid-node-id 1
+                         :children [{:node-id 4}]}
+                        {:node-id 3}]})
+  (invalid! NestedMaps
+            {:node-id 1
+             :children [{:node-id 1
+                         :children [{:node-id 4}]}
+                        {:node-id "invalid-id"}]})
 
-      (valid! BlackNode {:black {}})
-      (valid! BlackNode {:black {:red {:black {}}}})
-      (invalid! BlackNode {:black {:black {}}})
-      (invalid! BlackNode {:black {:red {}}})
+  (valid! TestBlackNode {:black {}})
+  (valid! TestBlackNode {:black {:red {:black {}}}})
+  (invalid! TestBlackNode {:black {:black {}}})
+  (invalid! TestBlackNode {:black {:red {}}})
 
-      (let [rec (promise)
-            schema {(s/optional-key :x) (s/recursive rec)}]
-        (deliver rec schema)
-        (valid! schema {})
-        (valid! schema {:x {:x {:x {}}}})
-        (invalid! schema {:x {:x {:y {}}}})
-        (let [explanation (first (s/explain schema))]
-          (is (= '(optional-key :x) (key explanation)))
-          (is (= 'recursive (first (val explanation))))
-          (is (re-matches #"clojure\.core\$promise.*"
-                          (second (val explanation))))))
+  (let [rec (atom nil)
+        schema {(s/optional-key :x) (s/recursive rec)}]
+    (reset! rec schema)
+    (valid! schema {})
+    (valid! schema {:x {:x {:x {}}}})
+    (invalid! schema {:x {:x {:y {}}}})
+    (let [explanation (first (s/explain schema))]
+      (is (= '(optional-key :x) (key explanation)))
+      #+clj (is (= 'recursive (first (val explanation))))
+      #+clj (is (re-matches #"clojure.lang.Atom.*" (second (val explanation))))
+      #+cljs (is (= '(recursive ...) (val explanation)))))
 
-      (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/BlackNode))}}
-             (s/explain BlackNode)))))
+  (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/TestBlackNode))}}
+         (s/explain TestBlackNode))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
