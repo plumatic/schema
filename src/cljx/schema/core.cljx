@@ -969,9 +969,9 @@
   "Returns the name of a schema attached via schema-with-name (or defschema)."
   (-> schema meta :name))
 
-(clojure.core/defn full-schema-name [schema]
-  "Returns the full name of a schema attached via defschema."
-  (-> schema meta :full-name))
+(clojure.core/defn schema-ns [schema]
+  "Returns the namespace of a schema attached via defschema."
+  (-> schema meta :ns))
 
 (defmacro defschema
   "Convenience macro to make it clear to reader that body is meant to be used as a schema.
@@ -979,11 +979,10 @@
   ([name form]
      `(defschema ~name "" ~form))
   ([name docstring form]
-   (let [full-name (symbol (str (str *ns*) "/" name))]
      `(def ~name ~docstring
         (vary-meta
           (schema-with-name ~form '~name)
-          assoc :full-name '~full-name)))))
+          assoc :ns '~(.getName *ns*)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
