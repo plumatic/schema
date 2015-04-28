@@ -1231,13 +1231,26 @@
 (s/defschema TestFoo {:bar s/Str})
 
 (deftest test-defschema
-  (is (= 'TestFoo (:name (meta TestFoo)))))
+  (is (= 'TestFoo (:name (meta TestFoo))))
+  (is (= 'schema.core-test/TestFoo (:full-name (meta TestFoo)))))
 
 (deftest schema-with-name-test
   (let [schema (s/schema-with-name {:baz s/Num} 'Baz)]
     (valid! schema {:baz 123})
     (invalid! schema {:baz "abc"})
-    (is (= 'Baz (s/schema-name schema)))))
+    (is (= 'Baz (s/schema-name schema)))
+    (is (=  nil (s/full-schema-name schema)))))
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))
+
+(deftest full-schema-name-test
+  (is (= 'schema.core-test/TestFoo (s/full-schema-name TestFoo))))
+
+(s/defschema TestBar "BarTest" {:foo s/Str})
+
+#+clj ;; no Var meta-data on cljs
+(deftest defschema-var-metadata
+  (let [{:keys [line doc]} (-> TestBar s/full-schema-name resolve meta)]
+    (is (= line 1250))
+    (is (= doc "BarTest"))))
