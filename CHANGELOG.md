@@ -1,5 +1,6 @@
 ## 0.4.2
  * Add recursive schema support for ClojureScript
+ * Add ns metadata to defschema
 
 ## 0.4.1
  * Fix some harmless warnings when using Schema with the latest version of ClojureScript (due to the addition of positional constructors for `deftype`).
