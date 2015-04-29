@@ -1231,13 +1231,18 @@
 (s/defschema TestFoo {:bar s/Str})
 
 (deftest test-defschema
-  (is (= 'TestFoo (:name (meta TestFoo)))))
+  (is (= 'TestFoo (:name (meta TestFoo))))
+  (is (= 'schema.core-test (:ns (meta TestFoo)))))
 
 (deftest schema-with-name-test
   (let [schema (s/schema-with-name {:baz s/Num} 'Baz)]
     (valid! schema {:baz 123})
     (invalid! schema {:baz "abc"})
-    (is (= 'Baz (s/schema-name schema)))))
+    (is (= 'Baz (s/schema-name schema)))
+    (is (=  nil (s/schema-ns schema)))))
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))
+
+(deftest schema-ns-test
+  (is (= 'schema.core-test (s/schema-ns TestFoo))))
