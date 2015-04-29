@@ -982,7 +982,7 @@
      `(def ~name ~docstring
         (vary-meta
           (schema-with-name ~form '~name)
-          assoc :ns '~(.getName *ns*)))))
+          assoc :ns '~(ns-name *ns*)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
