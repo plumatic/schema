@@ -744,7 +744,7 @@
   (into {} (for [[k v] this] (vec (next (explain (map-entry k v)))))))
 
 (extend-protocol Schema
-  #+clj clojure.lang.APersistentMap
+  #+clj clojure.lang.IPersistentMap
   #+cljs cljs.core.PersistentArrayMap
   (walker [this] (map-walker this))
   (explain [this] (map-explain this))
