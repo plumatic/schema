@@ -961,16 +961,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for defining schemas (used in in-progress work, explanation coming soon)
 
-(clojure.core/defn schema-with-name [schema name]
+(clojure.core/defn schema-with-name
   "Records name in schema's metadata."
+  [schema name]
   (vary-meta schema assoc :name name))
 
-(clojure.core/defn schema-name [schema]
+(clojure.core/defn schema-name
   "Returns the name of a schema attached via schema-with-name (or defschema)."
+  [schema]
   (-> schema meta :name))
 
-(clojure.core/defn schema-ns [schema]
+(clojure.core/defn schema-ns
   "Returns the namespace of a schema attached via defschema."
+  [schema]
   (-> schema meta :ns))
 
 (defmacro defschema
