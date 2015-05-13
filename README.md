@@ -187,7 +187,7 @@ Alternatively, you can force validation for key functions (without the need for 
 
 Thus, each time you invoke `stamped-names`, Schema will perform validation.
 
-To reduce generated code size, you can use the `*assert*` flag and `set-compile-fn-validation!` functions to control when validation code is generated ([details](https://github.com/Prismatic/schema/blob/master/src/clj/schema/macros.clj#L209)).
+To reduce generated code size, you can use the `*assert*` flag and `set-compile-fn-validation!` functions to control when validation code is generated ([details](https://github.com/Prismatic/schema/blob/master/src/clj/schema/macros.clj#L181)).
 
 Finally, we use validation with coercion for API inputs and outputs.  See the coercion section below for details.
 
