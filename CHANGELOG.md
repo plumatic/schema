@@ -1,3 +1,6 @@
+## 0.4.3
+ * Fix AOT compilation issue when used with Clojure 1.7.0-RC1 and later.
+
 ## 0.4.2
  * Add recursive schema support for ClojureScript
  * Add ns metadata to defschema
