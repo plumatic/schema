@@ -74,14 +74,28 @@
 
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
-  ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod])
+  ;; don't exclude def because it's not a var.
+  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod fn])
   (:require
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
    [schema.utils :as utils])
   #+cljs (:require-macros [schema.macros :as macros]
                           schema.core))
+
+#+clj (def clj-1195-fixed?
+        (do (defprotocol CLJ1195Check
+              (dummy-method [this]))
+            (try
+             (eval '(extend-protocol CLJ1195Check nil
+                      (dummy-method [_])))
+             true
+             (catch RuntimeException _
+               false))))
+
+#+clj (when-not clj-1195-fixed?
+        ;; don't exclude fn because of bug in extend-protocol
+        (refer-clojure :exclude '[Keyword Symbol defrecord defn letfn defmethod]))
 
 #+clj (set! *warn-on-reflection* true)
 
@@ -1087,7 +1101,7 @@
       (macros/safe-get (meta f) :schema)))
 
 ;; work around bug in extend-protocol (refers to bare 'fn, so we can't exclude it).
-#+clj (ns-unmap *ns* 'fn)
+#+clj (when-not clj-1195-fixed? (ns-unmap *ns* 'fn))
 
 (defmacro fn
   "s/fn : s/defn :: clojure.core/fn : clojure.core/defn
