@@ -74,10 +74,8 @@
 
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
-  ;; don't exclude fn because of bug in extend-protocol, and def because it's not a var.
-  ;; for clj, only refer to what we need to initialize the namespace
-  #+clj (:refer-clojure :only [= -> second vals ffirst refer-clojure concat when])
-  #+cljs (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod fn])
+  ;; don't exclude def because it's not a var.
+  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod fn])
   (:require
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
@@ -86,12 +84,18 @@
                           schema.core))
 
 #+clj (def clj-1195-fixed?
-        (= 'clojure.core/fn
-           (-> (#'clojure.core/emit-impl [nil [[]]]) second vals ffirst)))
+        (do (defprotocol CLJ1195Check
+              (dummy-method [this]))
+            (try
+             (eval '(extend-protocol CLJ1195Check nil
+                      (dummy-method [_])))
+             true
+             (catch RuntimeException _
+               false))))
 
-;; now we know what we should refer to in clojure.core
-#+clj (refer-clojure :exclude (concat '[Keyword Symbol defrecord defn letfn defmethod]
-                                      (when clj-1195-fixed? '[fn])))
+#+clj (when-not clj-1195-fixed?
+        ;; don't exclude fn because of bug in extend-protocol
+        (refer-clojure :exclude '[Keyword Symbol defrecord defn letfn defmethod]))
 
 #+clj (set! *warn-on-reflection* true)
 
