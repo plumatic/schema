@@ -9,7 +9,8 @@
  * Fix some harmless warnings when using Schema with the latest version of ClojureScript (due to the addition of positional constructors for `deftype`).
 
 ## 0.4.0
- * **BREAKING** Remove support for old `^{:schema ..}` style annotations and bare `^Protocol` annotations.  `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints (as well as vars that refer to schemas).	
+ * **BREAKING** Remove support for old `^{:schema ..}` style annotations. `:- schema` is the preferred way, but metadata-style schemas are still allowed for valid Clojure typehints.
+ * **BREAKING** Remove support for bare `:- Protocol` annotations (use `:- (s/protocol Protocol)` instead).
  * **BREAKING** Remove deprecated macros (`defn`, `defrecord`, etc) from schema.macros.  The identical versions in schema.core remain.
  * **BREAKING** Remove potemkin as a dependency, and the `*use-potemkin*` flag.  To get the old behavior of potemkin defrecords, you can still bring your own potemkin and use `schema.core/defrecord+` in place of `schema.core/defrecord`.
 
