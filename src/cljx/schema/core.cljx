@@ -1062,7 +1062,7 @@
   (.get_cell utils/use-fn-validation))
 
 (clojure.core/defn set-fn-validation!
-  "Globally turn on schema validation for all s/fn and s/defn instances."
+  "Globally turn on (or off) schema validation for all s/fn and s/defn instances."
   [on?]
   (.set_cell utils/use-fn-validation on?))
 
