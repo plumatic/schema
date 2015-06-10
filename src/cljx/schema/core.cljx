@@ -1067,7 +1067,7 @@
   (.set_cell utils/use-fn-validation on?))
 
 (defmacro with-fn-validation
-  "Execute body with input and ouptut schema validation turned on for
+  "Execute body with input and output schema validation turned on for
    all s/defn and s/fn instances globally (across all threads). After
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
@@ -1078,7 +1078,7 @@
          (try ~@body (finally (set-fn-validation! false))))))
 
 (defmacro without-fn-validation
-  "Execute body with input and ouptut schema validation turned off for
+  "Execute body with input and output schema validation turned off for
    all s/defn and s/fn instances globally (across all threads). After
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
