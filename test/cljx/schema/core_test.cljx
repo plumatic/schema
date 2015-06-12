@@ -460,6 +460,18 @@
     (invalid! schema #{#{[3 4]}})
     (invalid! schema #{[[3 4]]})))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Queue Schemas
+
+(deftest queue-test
+  (testing "queues of simple values"
+    (let [schema (s/queue s/Int)]
+      (valid! schema (s/as-queue []))
+      (valid! schema (s/as-queue [1]))
+      (valid! schema (s/as-queue [1 2 3 4]))
+      (invalid! schema [1 2 3])
+      (invalid! schema (s/as-queue [1 :a 3])))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence Schemas
