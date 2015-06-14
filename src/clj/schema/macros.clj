@@ -313,16 +313,19 @@
                  ~extra-key-schema?))
          :extra-validator-fn ~extra-validator-fn?))
        ~(let [map-sym (gensym "m")]
-          `(defn ~(symbol (str 'map-> name))
-             ~(str "Factory function for class " name ", taking a map of keywords to field values, but not 400x"
-                   " slower than ->x like the clojure.core version")
-             [~map-sym]
-             (let [base# (new ~(symbol (str name))
-                              ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
-                   remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
-               (if (seq remaining#)
-                 (merge base# remaining#)
-                 base#))))
+          `(if-cljs
+            nil
+            (defn ~(symbol (str 'map-> name))
+              ~(str "Factory function for class " name ", taking a map of keywords to field values, but not much\n"
+                    " slower than ->x like the clojure.core version.\n"
+                    " (performance is fixed in Clojure 1.7, so this should eventually be removed.)")
+              [~map-sym]
+              (let [base# (new ~(symbol (str name))
+                               ~@(map (fn [s] `(get ~map-sym ~(keyword s))) field-schema))
+                    remaining# (dissoc ~map-sym ~@(map keyword field-schema))]
+                (if (seq remaining#)
+                  (merge base# remaining#)
+                  base#)))))
        ~(let [map-sym (gensym "m")]
           `(defn ~(symbol (str 'strict-map-> name))
              ~(str "Factory function for class " name ", taking a map of keywords to field values.  All"
