@@ -38,6 +38,15 @@
 (deftest validate-return-test
   (is (= 1 (s/validate s/Int 1))))
 
+(defn foo-bar [])
+
+(deftest fn-name-test
+  (is (= "odd?" (utils/fn-name odd?)))
+  (is (= #+clj "schema.core-test/foo-bar" #+cljs "foo-bar"
+         (utils/fn-name foo-bar)))
+  #+clj (is (= "schema.core-test$fn" (subs (utils/fn-name (fn foo [x] (+ x x))) 0 19)))
+  #+cljs (is (= "foo" (utils/fn-name (fn foo [x] (+ x x)))))
+  #+cljs (is (= "function" (utils/fn-name (fn [x] (+ x x))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific leaf Schemas
@@ -116,7 +125,8 @@
     (valid! schema 1)
     (invalid! schema 2 "(not (odd? 2))")
     (invalid! schema :foo "(throws? (odd? :foo))")
-    (is (= '(pred odd?) (s/explain schema)))))
+    (is (= '(pred odd?) (s/explain schema)))
+    (invalid! (s/pred odd?) 2 "(not (odd? 2))")))
 
 (defprotocol ATestProtocol)
 
@@ -228,6 +238,21 @@
     (invalid! schema {:str 1})
     (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
     (is (s/explain schema))))
+
+(deftest constrained-test
+  (let [schema (s/constrained
+                {s/Keyword s/Keyword}
+                (fn [m] (every? (fn [[k v]] (= k v)) m))
+                'equal-keys?)]
+    (valid! schema {})
+    (valid! schema {:foo :foo :bar :bar})
+    (invalid! schema {"foo" "foo"})
+    (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
+    (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
+    (is (= '(constrained [Int] vector?)
+           (s/explain (s/constrained [s/Int] vector? 'vector?))))
+    (is (= '(constrained Int odd?)
+           (s/explain (s/constrained s/Int odd?))))))
 
 (deftest both-test
   (let [schema (s/both
@@ -378,11 +403,10 @@
   SomeProtocol
   (stuff [_] x))
 
-(deftest preserve-type-in-map-schema-check
+(deftest keys-and-protocol-test
   (let [field-subset {:x s/Keyword :y s/Num s/Keyword s/Any}
-        protocol-schema (s/protocol SomeProtocol)
-        schema (s/both field-subset protocol-schema)]
-    (valid! schema (->SomeRecord :foo 42 "extra"))
+        schema (s/constrained field-subset #(satisfies? SomeProtocol %))]
+    (is (not (s/check schema (->SomeRecord :foo 42 "extra")))) ;; comes out as map
     (invalid! schema {:x :foo :y 42})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -702,18 +726,21 @@
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
     (is (= (utils/class-schema klass)
-           (s/record klass {:b Bar4
-                            :c LongOrString
-                            :p (s/protocol PProtocol)})))
-    (valid! klass (constructor (Bar4. [1] {}) 1 bar2))
-    (valid! klass (constructor (Bar4. [1] {}) "hi" bar2))
-    (invalid! klass (constructor (Bar4. [1] {}) "hi" bar1))
-    (invalid! klass (constructor (Bar4. [1] {:foo :bar}) 1 bar2))
-    (invalid! klass (constructor nil "hi" bar2))))
+           (s/record
+            klass
+            {:b Bar4
+             :c LongOrString
+             :p (s/protocol PProtocol)}
+            constructor)))
+    (valid! klass (constructor {:b (Bar4. [1] {}) :c 1 :p bar2}))
+    (valid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar2}))
+    (invalid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar1}))
+    (invalid! klass (constructor {:b (Bar4. [1] {:foo :bar}) :c 1 :p bar2}))
+    (invalid! klass (constructor {:b nil :c "hi" :p bar2}))))
 
 (deftest fancier-defrecord-schema-test
-  #+clj (test-fancier-defrecord-schema Nested ->Nested)
-  (test-fancier-defrecord-schema NestedExplicit ->NestedExplicit))
+  #+clj (test-fancier-defrecord-schema Nested map->Nested)
+  (test-fancier-defrecord-schema NestedExplicit map->NestedExplicit))
 
 
 (s/defrecord OddSum
