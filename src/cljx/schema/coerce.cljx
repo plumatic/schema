@@ -5,6 +5,7 @@
    #+clj [clojure.edn :as edn]
    #+clj [schema.macros :as macros]
    [schema.core :as s :include-macros true]
+   [schema.spec.core :as spec]
    [schema.utils :as utils]
    [clojure.string :as str])
   #+cljs (:require-macros [schema.macros :as macros]))
@@ -25,19 +26,19 @@
 (s/defn coercer
   "Produce a function that simultaneously coerces and validates a datum."
   [schema coercion-matcher :- CoercionMatcher]
-  (s/start-walker
-   (utils/memoize-id
-    (fn [s]
-      (let [walker (s/walker s)]
-        (if-let [coercer (coercion-matcher s)]
-          (fn [x]
-            (macros/try-catchall
-             (let [v (coercer x)]
-               (if (utils/error? v)
-                 v
-                 (walker v)))
-             (catch t (macros/validation-error s x t))))
-          walker))))
+  (spec/run-checker
+   (fn [s params]
+     (let [c (spec/checker (s/spec s) params)]
+       (if-let [coercer (coercion-matcher s)]
+         (fn [x]
+           (macros/try-catchall
+            (let [v (coercer x)]
+              (if (utils/error? v)
+                v
+                (c v)))
+            (catch t (macros/validation-error s x t))))
+         c)))
+   true
    schema))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

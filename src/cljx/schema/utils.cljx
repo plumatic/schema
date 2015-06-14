@@ -38,19 +38,6 @@
       value
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
-(defn memoize-id
-  "Identity version of memoize, because many schemas are records, and records
-   don't cache their hash codes (at least in Clojure 1.5.1).
-   Not thread safe, and doesn't cache falsey values."
-  [f]
-  #+clj (let [m (java.util.IdentityHashMap.)]
-          (fn [x]
-            (or (.get m x)
-                (let [res (f x)]
-                  (.put m x res)
-                  res))))
-  #+cljs (memoize f))
-
 (defn record? [x]
   #+clj (instance? clojure.lang.IRecord x)
   #+cljs (satisfies? IRecord x))
@@ -114,24 +101,6 @@
 (defn error-val [x]
   (when (error? x)
     (.-error ^ErrorContainer x)))
-
-(defn wrap-error-name
-  "If maybe-error is an error, wrap the inner value in a NamedError; otherwise, return as-is"
-  [name maybe-error]
-  (if-let [e (error-val maybe-error)]
-    (error (NamedError. name e))
-    maybe-error))
-
-(defn result-builder
-  "Build up a result by conjing values, producing an error if at least one
-   sub-value returns an error."
-  [lift-to-error]
-  (fn conjer [m e]
-    (if-let [err (error-val e)]
-      (error (conj (or (error-val m) (lift-to-error m)) err))
-      (if-let [merr (error-val m)]
-        (error (conj merr nil))
-        (conj m e)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

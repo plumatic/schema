@@ -378,11 +378,12 @@
   SomeProtocol
   (stuff [_] x))
 
-(deftest preserve-type-in-map-schema-check
+(deftest keys-and-protocol-test
+  ;; TODO: changelog, map type of records no longer preserved with map schema.
   (let [field-subset {:x s/Keyword :y s/Num s/Keyword s/Any}
         protocol-schema (s/protocol SomeProtocol)
-        schema (s/both field-subset protocol-schema)]
-    (valid! schema (->SomeRecord :foo 42 "extra"))
+        schema (s/constrained field-subset (:pre (s/spec protocol-schema)))]
+    (is (not (s/check schema (->SomeRecord :foo 42 "extra"))))
     (invalid! schema {:x :foo :y 42})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -690,18 +691,21 @@
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
     (is (= (utils/class-schema klass)
-           (s/record klass {:b Bar4
-                            :c LongOrString
-                            :p (s/protocol PProtocol)})))
-    (valid! klass (constructor (Bar4. [1] {}) 1 bar2))
-    (valid! klass (constructor (Bar4. [1] {}) "hi" bar2))
-    (invalid! klass (constructor (Bar4. [1] {}) "hi" bar1))
-    (invalid! klass (constructor (Bar4. [1] {:foo :bar}) 1 bar2))
-    (invalid! klass (constructor nil "hi" bar2))))
+           (s/record
+            klass
+            {:b Bar4
+             :c LongOrString
+             :p (s/protocol PProtocol)}
+            constructor)))
+    (valid! klass (constructor {:b (Bar4. [1] {}) :c 1 :p bar2}))
+    (valid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar2}))
+    (invalid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar1}))
+    (invalid! klass (constructor {:b (Bar4. [1] {:foo :bar}) :c 1 :p bar2}))
+    (invalid! klass (constructor {:b nil :c "hi" :p bar2}))))
 
 (deftest fancier-defrecord-schema-test
-  #+clj (test-fancier-defrecord-schema Nested ->Nested)
-  (test-fancier-defrecord-schema NestedExplicit ->NestedExplicit))
+  #+clj (test-fancier-defrecord-schema Nested map->Nested)
+  (test-fancier-defrecord-schema NestedExplicit map->NestedExplicit))
 
 
 (s/defrecord OddSum
