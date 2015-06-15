@@ -311,7 +311,7 @@
                                         "Non-symbol in record binding form: %s" k)
                                (extract-schema-form k))]))
                  ~extra-key-schema?)
-          (fn [m#] (~(symbol (str 'map-> name)) (into {} m#))))
+          ~(symbol (str 'map-> name)))
          :extra-validator-fn ~extra-validator-fn?))
        ~(let [map-sym (gensym "m")]
           `(if-cljs

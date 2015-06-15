@@ -833,12 +833,11 @@
   ([klass schema]
      `(record ~klass ~schema
               (macros/if-cljs
-               ~(let [bits (str/split (name klass) #"/")
-                      c (symbol (str/join "/" (concat (butlast bits) [(str "map->" (last bits))])))]
-                  `(clojure.core/fn [x#] (~c (into {} x#))))
-               (clojure.core/fn [x#] (~(symbol (str (name klass) "/create")) (into {} x#))))))
+               ~(let [bits (str/split (name klass) #"/")]
+                  (symbol (str/join "/" (concat (butlast bits) [(str "map->" (last bits))]))))
+               #(~(symbol (str (name klass) "/create")) %))))
   ([klass schema map-constructor]
-     `(record* ~klass ~schema ~map-constructor)))
+     `(record* ~klass ~schema #(~map-constructor (into {} %)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
