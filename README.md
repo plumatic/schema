@@ -252,7 +252,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `either`, `both`, `pred`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `conditional`, `both`, `pred`, and more.  Here are a few of our favorites:
 
 ```clojure
 
@@ -282,6 +282,16 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: (not (seq #{}))
 (s/validate SetOfAtLeastOneOddLong #{2})
 ;; RuntimeException: Value does not match schema: #{(not (odd? 2))}
+
+;; conditional & if can be used to express mutually exclusive options 
+;; (these are faster, and provide much better errors than s/either)
+(def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
+(s/validate StringListOrKeywordMap ["A" "B" "C"])
+;; => ["A" "B" "C"]
+(s/validate StringListOrKeywordMap {:foo :bar})
+;; => {:foo :bar}
+(s/validate StringListOrKeywordMap [:foo])
+;; RuntimeException:  Value does not match schema: [(not (instance? java.lang.String :foo))]
 
 ```
 
