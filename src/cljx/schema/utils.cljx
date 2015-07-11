@@ -138,10 +138,7 @@
 ;;; Registry for attaching schemas to classes, used for defn and defrecord
 
 #+clj
-(let [^java.util.Map +class-schemata+ (java.util.concurrent.ConcurrentHashMap.)]
-  ;; TODO(jw): unfortunately (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))
-  ;; is too slow in practice, so for now we leak classes.  Figure out a concurrent, fast,
-  ;; weak alternative.
+(let [^java.util.Map +class-schemata+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))]
   (defn declare-class-schema! [klass schema]
     "Globally set the schema for a class (above and beyond a simple instance? check).
    Use with care, i.e., only on classes that you control.  Also note that this
