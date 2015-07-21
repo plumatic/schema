@@ -1257,3 +1257,8 @@
 
 #+clj
 (set! *warn-on-reflection* false)
+
+(clojure.core/defn set-max-value-length!
+  "Sets the maximum length of value to be output before it is contracted to a prettier name."
+  [max-length]
+  (reset! utils/max-value-length max-length))

@@ -189,6 +189,8 @@ Thus, each time you invoke `stamped-names`, Schema will perform validation.
 
 To reduce generated code size, you can use the `*assert*` flag and `set-compile-fn-validation!` functions to control when validation code is generated ([details](https://github.com/Prismatic/schema/blob/master/src/clj/schema/macros.clj#L181)).
 
+Schema will attempt to reduce the verbosity of its output by restricting the size of values that fail validation to 19 characters.  If a value exceeds this, it will be replaced by the name of its class.  You can adjust this size limitation by calling `set-max-value-length!`.
+
 Finally, we use validation with coercion for API inputs and outputs.  See the coercion section below for details.
 
 ## More examples

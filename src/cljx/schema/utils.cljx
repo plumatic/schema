@@ -30,11 +30,13 @@
 (defn format* [fmt & args]
   (apply #+clj format #+cljs gstring/format fmt args))
 
+(def max-value-length (atom 19))
+
 (defn value-name
   "Provide a descriptive short name for a value."
   [value]
   (let [t (type-of value)]
-    (if (< (count (str value)) 20)
+    (if (<= (count (str value)) @max-value-length)
       value
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
