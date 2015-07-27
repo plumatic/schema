@@ -787,6 +787,43 @@
                 (set good)))))))
   (explain [this] (set [(explain (first this))])))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Queue schemas
+
+;; A queue schema is satisfied by PersistentQueues containing values that all satisfy
+;; a specific sub-schema.
+
+(clojure.core/defn queue? [x]
+  (instance?
+   #+clj clojure.lang.PersistentQueue
+   #+cljs cljs.core/PersistentQueue
+   x))
+
+(clojure.core/defn as-queue [col]
+  (reduce
+   conj
+   #+clj clojure.lang.PersistentQueue/EMPTY
+   #+cljs cljs.core/PersistentQueue.EMPTY
+   col))
+
+(clojure.core/defrecord Queue [schema]
+ Schema
+ (walker [this]
+    (let [sub-walker (subschema-walker schema)]
+      (clojure.core/fn [x]
+        (or (when-not (queue? x)
+              (macros/validation-error this x (list 'queue? (utils/value-name x))))
+            (let [[good bad] ((juxt remove keep) utils/error-val (map sub-walker x))]
+              (if (seq bad)
+                (utils/error (as-queue bad))
+                (as-queue good)))))))
+  (explain [this] (list 'queue (explain schema))))
+
+(clojure.core/defn queue
+  "Defines a schema satisfied by instances of clojure.lang.PersistentQueue
+  (clj.core/PersistentQueue in ClojureScript) whose values satisfy x."
+  [x]
+  (Queue. x))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence Schemas
