@@ -62,8 +62,8 @@
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]
-    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :u #uuid "550e8400-e29b-41d4-a716-446655440000"}
-           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a" :u "550e8400-e29b-41d4-a716-446655440000"})))
+    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :u #uuid "550e8400-e29b-41d4-a716-446655440000" :set #{:a :b}}
+           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a" :u "550e8400-e29b-41d4-a716-446655440000" :set ["a" "a" "b"]})))
     (is (= #{:i} (err-ks (coercer {:i "1.1"})))))
 
   #+clj (testing "jvm specific"

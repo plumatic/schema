@@ -130,4 +130,5 @@
      and long and doubles (JVM only) from strings."
   [schema]
   (or (+string-coercions+ schema)
-      (keyword-enum-matcher schema)))
+      (keyword-enum-matcher schema)
+      (set-matcher schema)))
