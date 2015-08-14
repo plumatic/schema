@@ -126,7 +126,7 @@ If you've done much Clojure, you've probably seen code like this:
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
 
-Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, by allowing arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
+Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, by allowing arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
 
 ```clojure
 (s/defrecord StampedNames
@@ -286,7 +286,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: #{(not (odd? 2))}
 
 ;; conditional & if can be used to express mutually exclusive options 
-;; (these are faster, and provide much better errors than s/either)
+;; (these are faster and provide much better errors than s/either)
 (def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
 (s/validate StringListOrKeywordMap ["A" "B" "C"])
 ;; => ["A" "B" "C"]
@@ -326,7 +326,7 @@ An example application of coercion is converting parsed JSON (e.g., from an HTTP
 
 Here, `json-coercion-matcher` provides some useful defaults for coercing from JSON, such as:
 
- - Numbers should be coerced to the expected type, if this can be done without losing precision.
+ - Numbers should be coerced to the expected type if this can be done without losing precision.
  - When a Keyword is expected, a String can be coerced to the correct type by calling keyword
 
 There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/Prismatic/schema/wiki/Writing-Custom-Transformations) to do even more.
