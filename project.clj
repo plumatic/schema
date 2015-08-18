@@ -70,4 +70,6 @@
 
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
           :src-dir-uri "http://github.com/prismatic/schema/blob/master/"
-          :src-linenum-anchor-prefix "L"})
+          :src-linenum-anchor-prefix "L"}
+
+  :signing {:gpg-key "66E0BF75"})
