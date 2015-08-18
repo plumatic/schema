@@ -1,5 +1,8 @@
 ## 0.4.4
  * Fix ClojureScript warnings about `map->Record` constructors being redefined.
+ * Add queue schemas
+ * Configurable maximum length for values in error messages
+ * Fix potential memory leaks after many redefinitions of `s/defn` or `s/defrecord`.
 
 ## 0.4.3
  * Fix longstanding AOT compilation issue when used with Clojure 1.7.0-RC1 and later.
