@@ -239,21 +239,6 @@
     (is (= '(either {:a Int} Int) (s/explain (s/either {:a s/Int} s/Int))))
     (is (s/explain schema))))
 
-(deftest constrained-test
-  (let [schema (s/constrained
-                {s/Keyword s/Keyword}
-                (fn [m] (every? (fn [[k v]] (= k v)) m))
-                'equal-keys?)]
-    (valid! schema {})
-    (valid! schema {:foo :foo :bar :bar})
-    (invalid! schema {"foo" "foo"})
-    (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
-    (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
-    (is (= '(constrained [Int] vector?)
-           (s/explain (s/constrained [s/Int] vector? 'vector?))))
-    (is (= '(constrained Int odd?)
-           (s/explain (s/constrained s/Int odd?))))))
-
 (deftest both-test
   (let [schema (s/both
                 (s/pred (fn equal-keys? [m] (every? (fn [[k v]] (= k v)) m)) 'equal-keys?)
@@ -275,7 +260,22 @@
     (invalid! schema {:type :bar :baz 10} "{:baz (not (instance? java.lang.String 10))}")
     (invalid! schema {:type :zzz :baz 10}
               "(not (some-matching-condition? a-clojure.lang.PersistentArrayMap))")
-    (is (s/explain schema))))
+    (is (s/explain schema)))
+  (testing "as simple constraint"
+    (let [schema (s/conditional
+                  (fn [m] (every? (fn [[k v]] (= k v)) m))
+                  {s/Keyword s/Keyword}
+                  'equal-keys?)]
+      (valid! schema {})
+      (valid! schema {:foo :foo :bar :bar})
+      (invalid! schema {"foo" "foo"})
+      (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
+      (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
+      (invalid! (s/conditional odd? s/Int) 2 "(not (odd? 2))")
+      (is (= '(conditional odd? Int)
+             (s/explain (s/conditional odd? s/Int))))
+      (is (= '(conditional odd? Int weird?)
+             (s/explain (s/conditional odd? s/Int 'weird?)))))))
 
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
@@ -405,7 +405,7 @@
 
 (deftest keys-and-protocol-test
   (let [field-subset {:x s/Keyword :y s/Num s/Keyword s/Any}
-        schema (s/constrained field-subset #(satisfies? SomeProtocol %))]
+        schema (s/conditional #(satisfies? SomeProtocol %) field-subset)]
     (is (not (s/check schema (->SomeRecord :foo 42 "extra")))) ;; comes out as map
     (invalid! schema {:x :foo :y 42})))
 

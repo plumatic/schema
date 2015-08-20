@@ -443,25 +443,6 @@
   (Either. schemas))
 
 
-;;; constrained (matches precondition and schema)
-
-(clojure.core/defrecord Constrained [schema pred fn-name]
-  Schema
-  (spec [this]
-    (variant/variant-spec
-     (spec/precondition this pred #(list fn-name %))
-     [{:schema schema}]))
-  (explain [this] (list 'constrained (explain schema) fn-name)))
-
-(clojure.core/defn constrained
-  "A value that must satisfy both schema and precondition.
-   Replacement for `both` with cleaner semantics."
-  ([schema pred]
-     (constrained schema pred (symbol (utils/fn-name pred))))
-  ([schema pred pred-name]
-     (Constrained. schema pred pred-name)))
-
-
 ;;; both (satisfies this schema and that one)
 
 (clojure.core/defrecord Both [schemas]
@@ -484,7 +465,8 @@
 (clojure.core/defn ^{:deprecated "1.0.0"} both
   "A value that must satisfy every schema in schemas.
 
-   DEPRECATED: prefer 'constrained' instead.
+   DEPRECATED: prefer 'conditional' with a single condition
+   instead.
 
    When used with coercion, coerces each schema in sequence."
   [& schemas]
@@ -493,18 +475,24 @@
 
 ;;; conditional (choice of schema, based on predicates on the value)
 
-(clojure.core/defrecord ConditionalSchema [preds-and-schemas]
+(clojure.core/defrecord ConditionalSchema [preds-and-schemas error-symbol]
   Schema
   (spec [this]
     (variant/variant-spec
      spec/+no-precondition+
      (for [[p s] preds-and-schemas]
        {:guard p :schema s})
-     #(list 'some-matching-condition? %))) ;; TODO: improve error message
+     #(list (or error-symbol
+                (if (= 1 (count preds-and-schemas))
+                  (symbol (utils/fn-name (ffirst preds-and-schemas))))
+                'some-matching-condition?)
+            %)))
   (explain [this]
-    (->> preds-and-schemas
-         (mapcat (clojure.core/fn [[pred schema]] [pred (explain schema)]))
-         (cons 'conditional))))
+    (cons 'conditional
+          (concat
+           (mapcat (clojure.core/fn [[pred schema]] [(symbol (utils/fn-name pred)) (explain schema)])
+                   preds-and-schemas)
+           (when error-symbol [error-symbol])))))
 
 (clojure.core/defn conditional
   "Define a conditional schema.  Takes args like cond,
@@ -512,12 +500,20 @@
    and checks the first schema where pred is true on the value.
    Unlike cond, throws if the value does not match any condition.
    :else may be used as a final condition in the place of (constantly true).
-   More efficient than either, since only one schema must be checked."
+   More efficient than either, since only one schema must be checked.
+   An optional final argument can be passed, a symbol to appear in
+   error messages when none of the conditions match."
   [& preds-and-schemas]
-  (macros/assert! (and (seq preds-and-schemas) (even? (count preds-and-schemas)))
-                  "Expected even, nonzero number of args; got %s" (count preds-and-schemas))
-  (ConditionalSchema. (for [[pred schema] (partition 2 preds-and-schemas)]
-                        [(if (= pred :else) (constantly true) pred) schema])))
+  (macros/assert!
+   (and (seq preds-and-schemas)
+        (or (even? (count preds-and-schemas))
+            (symbol? (last preds-and-schemas))))
+   "Expected even, nonzero number of args (with optional trailing symbol); got %s"
+   (count preds-and-schemas))
+  (ConditionalSchema.
+   (for [[pred schema] (partition 2 preds-and-schemas)]
+     [(if (= pred :else) (constantly true) pred) schema])
+   (if (odd? (count preds-and-schemas)) (last preds-and-schemas))))
 
 (clojure.core/defn if
   "if the predicate returns truthy, use the if-schema, otherwise use the else-schema"

@@ -3,7 +3,7 @@
  * **BREAKING** Changes to the core Schema protocol will break existing third-party schema tooling and schema types.
  * **BREAKING** Records coerced to an ordinary (non-record) map schema are now converted to maps, rather than retaining their record type.
  * **BREAKING** `s/either` no longer works with coercion.  We recommend switching to `s/conditional` or other options.
- * **Deprecate** `s/both` in favor of new `s/constrained`.
+ * **Deprecate** `s/both` in favor of improved `s/conditional`.
  * `s/pred` can more intelligently guess the predicate name
  * `record` schemas can now coerce values to corresponding record types.
 

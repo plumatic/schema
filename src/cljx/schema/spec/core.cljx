@@ -27,7 +27,7 @@
       - returned-walked? - a boolean specifying whether to return a walked version of the data
         (otherwise, nil is returned which increases performance)
       - cache - a map structure from schema to checker, which speeds up checker creation
-        when the same subschema appears multiple times, and also faciliates handling
+        when the same subschema appears multiple times, and also facilitates handling
         recursive schemas."))
 
 
