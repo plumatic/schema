@@ -1,4 +1,4 @@
-(defproject prismatic/schema "0.4.5-SNAPSHOT"
+(defproject prismatic/schema "1.0.0-SNAPSHOT"
   :description "Clojure(Script) library for declarative data description and validation"
   :url "http://github.com/prismatic/schema"
   :license {:name "Eclipse Public License"
@@ -6,7 +6,8 @@
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.7.0"]
                                   [org.clojure/clojurescript "0.0-2760"]
-                                  [org.clojure/tools.nrepl "0.2.5"]]
+                                  [org.clojure/tools.nrepl "0.2.5"]
+                                  [org.clojure/test.check "0.5.7"]]
                    :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.5"]

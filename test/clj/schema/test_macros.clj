@@ -3,12 +3,13 @@
   (:require
    clojure.test
    [schema.core :as s]
-   [schema.macros :as sm]))
+   [schema.macros :as sm]
+   [schema.spec.core :as spec]))
 
 (defmacro valid!
   "Assert that x satisfies schema s, and the walked value is equal to the original."
   [s x]
-  `(let [x# ~x] (~'is (= x# ((s/start-walker s/walker ~s) x#)))))
+  `(let [x# ~x] (~'is (= x# ((spec/run-checker #(spec/checker (s/spec %1) %2) true ~s) x#)))))
 
 (defmacro invalid!
   "Assert that x does not satisfy schema s, optionally checking the stringified return value"

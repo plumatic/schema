@@ -1,7 +1,12 @@
 (ns schema.utils
   "Private utilities used in schema implementation."
   (:refer-clojure :exclude [record?])
-  #+cljs (:require goog.string.format [goog.string :as gstring]))
+  #+clj (:require [clojure.string :as string])
+  #+cljs (:require
+          goog.string.format
+          [goog.string :as gstring]
+          [clojure.string :as string])
+  #+cljs (:require-macros [schema.utils :refer [char-map]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
@@ -40,18 +45,29 @@
       value
       (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
 
-(defn memoize-id
-  "Identity version of memoize, because many schemas are records, and records
-   don't cache their hash codes (at least in Clojure 1.5.1).
-   Not thread safe, and doesn't cache falsey values."
+(defmacro char-map []
+  clojure.lang.Compiler/CHAR_MAP)
+
+(defn unmunge
+  "TODO: eventually use built in demunge in latest cljs."
+  [s]
+  (->> (char-map)
+       (sort-by #(- (count (second %))))
+       (reduce (fn [^String s [to from]] (string/replace s from (str to))) s)))
+
+(defn fn-name
+  "A meaningful name for a function that looks like its symbol, if applicable."
   [f]
-  #+clj (let [m (java.util.IdentityHashMap.)]
-          (fn [x]
-            (or (.get m x)
-                (let [res (f x)]
-                  (.put m x res)
-                  res))))
-  #+cljs (memoize f))
+  #+cljs (unmunge
+          (or (not-empty (second (re-find #"function ([^\(]*)\(" (str f))))
+              "function"))
+  #+clj (let [s (.getName (class f))
+              slash (.lastIndexOf s "$")
+              raw (unmunge
+                   (if (>= slash 0)
+                     (str (subs s 0 slash) "/" (subs s (inc slash)))
+                     s))]
+          (string/replace raw #"^clojure.core/" "")))
 
 (defn record? [x]
   #+clj (instance? clojure.lang.IRecord x)
@@ -116,24 +132,6 @@
 (defn error-val [x]
   (when (error? x)
     (.-error ^ErrorContainer x)))
-
-(defn wrap-error-name
-  "If maybe-error is an error, wrap the inner value in a NamedError; otherwise, return as-is"
-  [name maybe-error]
-  (if-let [e (error-val maybe-error)]
-    (error (NamedError. name e))
-    maybe-error))
-
-(defn result-builder
-  "Build up a result by conjing values, producing an error if at least one
-   sub-value returns an error."
-  [lift-to-error]
-  (fn conjer [m e]
-    (if-let [err (error-val e)]
-      (error (conj (or (error-val m) (lift-to-error m)) err))
-      (if-let [merr (error-val m)]
-        (error (conj merr nil))
-        (conj m e)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
