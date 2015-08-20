@@ -426,9 +426,9 @@
     (variant/variant-spec
      spec/+no-precondition+
      (for [s schemas]
-       {:guard (complement (checker s))
+       {:guard (complement (checker s)) ;; since the guard determines which option we check against
         :schema s})
-     #(list 'matches-some-either-clause? %)))
+     #(list 'some-matching-either-clause? %)))
   (explain [this] (cons 'either (map explain schemas))))
 
 (clojure.core/defn either
@@ -500,7 +500,7 @@
      spec/+no-precondition+
      (for [[p s] preds-and-schemas]
        {:guard p :schema s})
-     #(list 'matches-some-condition? %))) ;; TODO: improve error message
+     #(list 'some-matching-condition? %))) ;; TODO: improve error message
   (explain [this]
     (->> preds-and-schemas
          (mapcat (clojure.core/fn [[pred schema]] [pred (explain schema)]))

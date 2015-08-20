@@ -1,5 +1,5 @@
 ## 1.0.0-alpha1
- * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.
+ * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.   As a concrete example of an application that's enabled, schema now experimentally supports test-check style generation from schemas.
  * **BREAKING** Changes to the core Schema protocol will break existing third-party schema tooling and schema types.
  * **BREAKING** Records coerced to an ordinary (non-record) map schema are now converted to maps, rather than retaining their record type.
  * **BREAKING** `s/either` no longer works with coercion.  We recommend switching to `s/conditional` or other options.

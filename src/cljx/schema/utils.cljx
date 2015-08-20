@@ -67,7 +67,7 @@
                    (if (>= slash 0)
                      (str (subs s 0 slash) "/" (subs s (inc slash)))
                      s))]
-          (if (.startsWith raw "clojure.core/") (subs raw 13) raw)))
+          (string/replace raw #"^clojure.core/" "")))
 
 (defn record? [x]
   #+clj (instance? clojure.lang.IRecord x)

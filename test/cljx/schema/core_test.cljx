@@ -274,7 +274,7 @@
     (invalid! schema {:type :foo :baz "10"})
     (invalid! schema {:type :bar :baz 10} "{:baz (not (instance? java.lang.String 10))}")
     (invalid! schema {:type :zzz :baz 10}
-              "(not (matches-some-condition? a-clojure.lang.PersistentArrayMap))")
+              "(not (some-matching-condition? a-clojure.lang.PersistentArrayMap))")
     (is (s/explain schema))))
 
 (deftest if-test

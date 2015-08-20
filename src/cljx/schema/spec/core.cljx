@@ -20,7 +20,15 @@
      (by default, usually just data), or a utils/ErrorContainer containing value that looks
      like the 'bad' parts of data with ValidationErrors at the leaves describing the failures.
 
-     params are: subschema-walker, return-walked?, and cache."))
+     params are: subschema-checker, return-walked?, and cache.
+
+     params is a map specifying:
+      - subschema-checker - a function for checking subschemas
+      - returned-walked? - a boolean specifying whether to return a walked version of the data
+        (otherwise, nil is returned which increases performance)
+      - cache - a map structure from schema to checker, which speeds up checker creation
+        when the same subschema appears multiple times, and also faciliates handling
+        recursive schemas."))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,7 +53,7 @@
       (macros/validation-error s x (err-f (utils/value-name x)) reason))))
 
 (defmacro simple-precondition
-  "A simple precondition where f-sym names a predicate (e.g. (simple-precondition s map?)"
+  "A simple precondition where f-sym names a predicate (e.g. (simple-precondition s map?))"
   [s f-sym]
   `(precondition ~s ~f-sym #(list (quote ~f-sym) %)))
 
@@ -54,6 +62,8 @@
 ;;; Helpers
 
 (defn run-checker
+  "A helper to start a checking run, by setting the appropriate params.
+   For examples, see schema.core/checker or schema.coerce/coercer."
   [f return-walked? s]
   (f
    s
@@ -61,19 +71,21 @@
     :return-walked? return-walked?
     :cache #+clj (java.util.IdentityHashMap.) #+cljs (atom {})}))
 
-(defn with-cache [^java.util.Map cache cache-key wrap-recursive-delay result-fn]
-  (if-let [w #+clj (.get cache cache-key) #+cljs (@cache cache-key)]
+(defn with-cache [cache cache-key wrap-recursive-delay result-fn]
+  (if-let [w #+clj (.get ^java.util.Map cache cache-key) #+cljs (@cache cache-key)]
     (if (= ::in-progress w) ;; recursive
-      (wrap-recursive-delay (delay #+clj (.get cache cache-key) #+cljs (@cache cache-key)))
+      (wrap-recursive-delay (delay #+clj (.get ^java.util.Map cache cache-key) #+cljs (@cache cache-key)))
       w)
-    (do #+clj (.put cache cache-key ::in-progress) #+cljs (swap! cache assoc cache-key ::in-progress)
+    (do #+clj (.put ^java.util.Map cache cache-key ::in-progress) #+cljs (swap! cache assoc cache-key ::in-progress)
         (let [res (result-fn)]
-          #+clj (.put cache cache-key res) #+cljs (swap! cache assoc cache-key res)
+          #+clj (.put ^java.util.Map cache cache-key res) #+cljs (swap! cache assoc cache-key res)
           res))))
 
 (defn sub-checker
+  "Should be called recursively on each subschema in the 'checker' method of a spec.
+   Handles caching and error wrapping behavior."
   [{:keys [schema error-wrap]}
-   {:keys [subschema-checker ^java.util.Map cache] :as params}]
+   {:keys [subschema-checker cache] :as params}]
   (with-cache cache schema
     (fn [d] (fn [x] (@d x)))
     (fn []
