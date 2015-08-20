@@ -484,8 +484,8 @@
        {:guard p :schema s})
      #(list (or error-symbol
                 (if (= 1 (count preds-and-schemas))
-                  (symbol (utils/fn-name (ffirst preds-and-schemas))))
-                'some-matching-condition?)
+                  (symbol (utils/fn-name (ffirst preds-and-schemas)))
+                  'some-matching-condition?))
             %)))
   (explain [this]
     (cons 'conditional
