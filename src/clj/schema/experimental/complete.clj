@@ -1,42 +1,94 @@
 (ns schema.experimental.complete
-  "Experimental support for 'completing' partial values to match a target schema,
-   e.g. for tests where only part of an object is important."
+  "(Extremely) experimental support for 'completing' partial datums to match
+   a schema. To use it, you must provide your own test.check dependency."
   (:require
    [clojure.test.check.generators :as check-generators]
-   [schema.core :as s]
    [schema.spec.core :as spec]
-   [schema.experimental.generators :as generators]
    schema.spec.collection
    schema.spec.leaf
-   schema.spec.variant))
-
-(defprotocol Completer
-  (completer [s]))
+   schema.spec.variant
+   [schema.coerce :as coerce]
+   [schema.core :as s]
+   [schema.macros :as macros]
+   [schema.utils :as utils]
+   [schema.experimental.generators :as generators]))
 
 (def +missing+ ::missing)
 
-(extend-protocol Completer
-  schema.spec.leaf.LeafSpec
-  (completer [s]
-    (let [g (generators/leaf-generator s)]
-      (fn [x] (if (= x +missing+) (last (check-generators/sample g 5)) x))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Private helpers
 
+(defprotocol Completer
+  (completer* [spec s sub-checker generator-opts]
+    "A function applied to a datum as part of coercion to complete missing fields."))
+
+(defn sample [g]
+  (last (check-generators/sample g 40)))
+
+(extend-protocol Completer
   schema.spec.variant.VariantSpec
-  (completer [s] (s/checker s))
+  (completer* [spec s sub-checker generator-opts]
+    (let [g (apply generators/generator s generator-opts)]
+      (fn [x]
+        (if (= +missing+ x)
+          (sample g)
+          (sub-checker x)))))
 
   schema.spec.collection.CollectionSpec
-  (completer [s]
-    (let [c (s/checker s)
-          g (generators/generator s {:subschema-generator generators/schema-generator})]
+  (completer* [spec s sub-checker generator-opts]
+    (if (instance? clojure.lang.APersistentMap s) ;; todo: pluggable
+      (let [g (apply generators/generator s generator-opts)]
+        (fn [x]
+          (if (= +missing+ x)
+            (sample g)
+            ;; for now, just do required keys when user provides input.
+            (let [ks (distinct (concat (keys x)
+                                       (->> s
+                                            keys
+                                            (filter s/required-key?)
+                                            (map s/explicit-schema-key))))]
+              (sub-checker
+               (into {} (for [k ks] [k (get x k +missing+)])))))))
+      (fn [x] (assert (not= x +missing+)) (sub-checker x))))
+
+  schema.spec.leaf.LeafSpec
+  (completer* [spec s sub-checker generator-opts]
+    (let [g (apply generators/generator s generator-opts)]
       (fn [x]
-        (if-not (= +missing+ x)
-          (if (instance? clojure.lang.APersistentMap s) ;; todo: pluggable
-            (c (merge (last (check-generators/sample g 5)) x))
-            (c x))
-          (last (check-generators/sample g 5)))))))
+        (if (= +missing+ x)
+          (sample g)
+          x)))))
 
-(defn schema-completer [s]
-  (completer (s/spec s)))
 
-(defn sample-datum [s x]
-  ((spec/run-checker schema-completer true s) x))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public
+
+(s/defn completer
+  "Produce a function that simultaneously coerces, completes, and validates a datum."
+  ([schema] (completer schema {}))
+  ([schema coercion-matcher] (completer schema coercion-matcher {}))
+  ([schema coercion-matcher leaf-generators]
+     (completer schema coercion-matcher leaf-generators {}))
+  ([schema
+    coercion-matcher :- coerce/CoercionMatcher
+    leaf-generators :- generators/LeafGenerators
+    wrappers :- generators/GeneratorWrappers]
+     (spec/run-checker
+      (fn [s params]
+        (let [c (spec/checker (s/spec s) params)
+              coercer (or (coercion-matcher s) identity)
+              completr (completer* (s/spec s) s c [leaf-generators wrappers])]
+          (fn [x]
+            (macros/try-catchall
+             (let [v (coercer x)]
+               (if (utils/error? v)
+                 v
+                 (completr v)))
+             (catch t (macros/validation-error s x t))))))
+      true
+      schema)))
+
+(defn complete
+  "Fill in partial-datum to make it validate schema."
+  [partial-datum & completer-args]
+  ((apply completer completer-args) partial-datum))

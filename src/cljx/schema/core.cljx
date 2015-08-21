@@ -135,17 +135,29 @@
 
 (clojure.core/defn check
   "Return nil if x matches schema; otherwise, returns a value that looks like the
-   'bad' parts of x with ValidationErrors at the leaves describing the failures."
+   'bad' parts of x with ValidationErrors at the leaves describing the failures.
+
+   If you will be checking many datums, it is much more efficient to create
+   a 'checker' once and call it on each of them."
   [schema x]
   ((checker schema) x))
 
+(clojure.core/defn validator
+  "Compile an efficient validator for schema."
+  [schema]
+  (let [c (checker schema)]
+    (clojure.core/fn [value]
+      (when-let [error (c value)]
+        (macros/error! (utils/format* "Value does not match schema: %s" (pr-str error))
+                       {:schema schema :value value :error error}))
+      value)))
+
 (clojure.core/defn validate
-  "Throw an exception if value does not satisfy schema; otherwise, return value."
+  "Throw an exception if value does not satisfy schema; otherwise, return value.
+   If you will be validating many datums, it is much more efficient to create
+   a 'validator' once and call it on each of them."
   [schema value]
-  (when-let [error (check schema value)]
-    (macros/error! (utils/format* "Value does not match schema: %s" (pr-str error))
-                   {:schema schema :value value :error error}))
-  value)
+  ((validator schema) value))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Platform-specific leaf Schemas
