@@ -1,5 +1,5 @@
 (ns schema.coerce
-  "Experimental extension of schema for input coercion (coercing an input to match a schema)"
+  "Extension of schema for input coercion (coercing an input to match a schema)"
   (:require
    #+cljs [cljs.reader :as reader]
    #+clj [clojure.edn :as edn]
