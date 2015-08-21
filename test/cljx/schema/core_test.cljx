@@ -277,6 +277,25 @@
       (is (= '(conditional odd? Int weird?)
              (s/explain (s/conditional odd? s/Int 'weird?)))))))
 
+(deftest cond-pre-test
+  (let [s (s/cond-pre
+           s/Int
+           (s/maybe s/Str)
+           (s/cond-pre s/Keyword {:x s/Int})
+           (s/both [s/Num] (s/pred (fn [xs] (even? (count xs))) 'even-len?))
+           [s/Str])]
+    (valid! s 1)
+    (valid! s "hello")
+    (valid! s nil)
+    (valid! s :hello)
+    (valid! s {:x 3})
+    (valid! s [1 2])
+    (valid! s ["hello"])
+    (invalid! s 3.14)
+    (invalid! s [1 2 3])
+    (invalid! s {:x 3.14})
+    (invalid! s [1 2 3])))
+
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
                  {:type (s/eq :foo) :baz s/Num}
