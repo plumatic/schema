@@ -23,22 +23,25 @@
     "A function applied to a datum as part of coercion to complete missing fields."))
 
 (defn sample [g]
-  (last (check-generators/sample g 40)))
+  (check-generators/generate g 10))
 
 (extend-protocol Completer
   schema.spec.variant.VariantSpec
   (completer* [spec s sub-checker generator-opts]
     (let [g (apply generators/generator s generator-opts)]
-      (fn [x]
-        (if (= +missing+ x)
-          (sample g)
-          (sub-checker x)))))
+      (if (and (class? s) (isa? s clojure.lang.IRecord) (utils/class-schema s))
+        (fn record-completer [x]
+          (sub-checker (into (sample g) x)))
+        (fn variant-completer [x]
+          (if (= +missing+ x)
+            (sample g)
+            (sub-checker x))))))
 
   schema.spec.collection.CollectionSpec
   (completer* [spec s sub-checker generator-opts]
     (if (instance? clojure.lang.APersistentMap s) ;; todo: pluggable
       (let [g (apply generators/generator s generator-opts)]
-        (fn [x]
+        (fn map-completer [x]
           (if (= +missing+ x)
             (sample g)
             ;; for now, just do required keys when user provides input.
@@ -54,7 +57,7 @@
   schema.spec.leaf.LeafSpec
   (completer* [spec s sub-checker generator-opts]
     (let [g (apply generators/generator s generator-opts)]
-      (fn [x]
+      (fn leaf-completer [x]
         (if (= +missing+ x)
           (sample g)
           x)))))
