@@ -22,13 +22,16 @@
   (completer* [spec s sub-checker generator-opts]
     "A function applied to a datum as part of coercion to complete missing fields."))
 
+(defn sample [g]
+  (last (check-generators/sample g 40)))
+
 (extend-protocol Completer
   schema.spec.variant.VariantSpec
   (completer* [spec s sub-checker generator-opts]
     (let [g (apply generators/generator s generator-opts)]
       (fn [x]
         (if (= +missing+ x)
-          (last (check-generators/sample g 40))
+          (sample g)
           (sub-checker x)))))
 
   schema.spec.collection.CollectionSpec
@@ -37,7 +40,7 @@
       (let [g (apply generators/generator s generator-opts)]
         (fn [x]
           (if (= +missing+ x)
-            (last (check-generators/sample g 40))
+            (sample g)
             ;; for now, just do required keys when user provides input.
             (let [ks (distinct (concat (keys x)
                                        (->> s
@@ -53,7 +56,7 @@
     (let [g (apply generators/generator s generator-opts)]
       (fn [x]
         (if (= +missing+ x)
-          (last (check-generators/sample g 40))
+          (sample g)
           x)))))
 
 

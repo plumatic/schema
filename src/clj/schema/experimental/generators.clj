@@ -37,7 +37,7 @@
   schema.spec.variant.VariantSpec
   (composite-generator [s params]
     (generators/such-that
-     #(not ((:pre s) %))
+     (complement (.-pre ^schema.spec.variant.VariantSpec s))
      (generators/one-of
       (for [o (macros/safe-get s :options)]
         (sub-generator o params)))))
@@ -47,7 +47,7 @@
   schema.spec.collection.CollectionSpec
   (composite-generator [s params]
     (generators/such-that
-     #(not ((:pre s) %))
+     (complement (.-pre ^schema.spec.collection.CollectionSpec s))
      (generators/fmap
       (comp (:constructor s) (partial apply concat))
       (apply
@@ -121,10 +121,11 @@
 
 (defn default-leaf-generators
   [leaf-generators]
-  #(or (leaf-generators %)
-       (+simple-leaf-generators+ %)
-       (eq-generators %)
-       (enum-generators %)))
+  (some-fn
+   leaf-generators
+   +simple-leaf-generators+
+   eq-generators
+   enum-generators))
 
 (defn always [x] (generators/return x))
 
@@ -165,13 +166,12 @@
     leaf-generators :- LeafGenerators
     wrappers :- GeneratorWrappers]
      (let [leaf-generators (default-leaf-generators leaf-generators)
-           validator (s/validator schema)
            gen (fn [s params]
                  ((or (wrappers s) identity)
                   (or (leaf-generators s)
                       (composite-generator (s/spec s) params))))]
        (generators/fmap
-        validator
+        (s/validator schema)
         (gen schema {:subschema-generator gen :cache (java.util.IdentityHashMap.)})))))
 
 (s/defn sample :- [s/Any]

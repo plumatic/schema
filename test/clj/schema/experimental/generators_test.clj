@@ -33,7 +33,8 @@
              {[s/Int] (comp (generators/such-that seq)
                             (generators/fmap (partial mapv inc)))
               OGInner2 (generators/merged {:d "mary"})})]
-    (is (s/validate (s/conditional #(= (count %) 20) [FinalSchema]) res))))
+    (is (= (count res) 20))
+    (is (s/validate [FinalSchema] res))))
 
 (deftest simple-leaf-generators-smoke-test
   (doseq [leaf-schema [double float long int short char byte boolean
