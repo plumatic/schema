@@ -524,16 +524,26 @@
   (precondition [this]
     (complement (.-pre ^schema.spec.collection.CollectionSpec this))))
 
+(clojure.core/defrecord CondPre [schemas]
+  Schema
+  (spec [this]
+    (variant/variant-spec
+     spec/+no-precondition+
+     (for [s schemas]
+       {:guard (precondition (spec s))
+        :schema s})
+     #(list 'matches-some-precondition? %)))
+  (explain [this]
+    (cons 'cond-pre
+          (map explain schemas))))
+
 (clojure.core/defn cond-pre
   "A replacement for `either` that constructs a conditional schema
    based on the schema spec preconditions of the component schemas.
 
    EXPERIMENTAL"
   [& schemas]
-  (->> (for [s schemas]
-         [(precondition (spec s)) s])
-       (apply concat)
-       (apply conditional)))
+  (CondPre. schemas))
 
 ;;; both (satisfies this schema and that one)
 
