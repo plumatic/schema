@@ -31,9 +31,8 @@
      friends :- [User]
      pet :- (s/maybe Animal)])
 
-(defn complete-user [spec]
-  (complete/complete
-   spec
+(def complete-user
+  (complete/completer
    User
    {User (fn [x] (if (number? x) {:id x} x))
     Animal (fn [x] (if (keyword? x) {:type x} x))}))
