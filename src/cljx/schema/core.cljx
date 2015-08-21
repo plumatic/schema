@@ -489,34 +489,28 @@
 
 (defprotocol HasPrecondition
   (precondition [this]
-    "Return the Precondition for this schema.
-     A Precondition is a function of a value that returns a
-     ValidationError or nil (see spec.core)"))
+    "Return a predicate representing the Precondition for this schema:
+     the predicate returns true if the precondition is satisfied.
+     (See spec.core for more details)"))
 
 (extend-protocol HasPrecondition
   schema.spec.leaf.LeafSpec
   (precondition [this]
-    (:pre this))
+    (complement (.-pre ^schema.spec.leaf.LeafSpec this)))
 
   schema.spec.variant.VariantSpec
-  (precondition [this]
-    (let [{:keys [pre options]} this]
-      (some-fn
-       pre
-       (spec/precondition
-        Any
-        (complement
-         (apply every-pred
-                (for [{:keys [guard schema]} options]
-                  (if guard
-                    (some-fn (spec/precondition schema guard #(list 'guard %))
-                             (precondition (spec schema)))
-                    (precondition (spec schema))))))
-        #(list 'some-variant-precondition %)))))
+  (precondition [^schema.spec.variant.VariantSpec this]
+    (every-pred
+     (complement (.-pre this))
+     (apply some-fn
+            (for [{:keys [guard schema]} (.-options this)]
+              (if guard
+                (every-pred guard (precondition (spec schema)))
+                (precondition (spec schema)))))))
 
   schema.spec.collection.CollectionSpec
   (precondition [this]
-    (:pre this)))
+    (complement (.-pre ^schema.spec.collection.CollectionSpec this))))
 
 (clojure.core/defn cond-pre
   "A replacement for `either` that constructs a conditional schema
@@ -524,10 +518,10 @@
 
    EXPERIMENTAL"
   [& schemas]
-  (apply conditional
-         (for [s schemas
-               t [(comp not (precondition (spec s))) s]]
-           t)))
+  (->> (for [s schemas]
+         [(precondition (spec s)) s])
+       (apply concat)
+       (apply conditional)))
 
 ;;; both (satisfies this schema and that one)
 
@@ -537,10 +531,7 @@
   (explain [this] (cons 'both (map explain schemas)))
   HasPrecondition
   (precondition [this]
-    (spec/precondition
-     this
-     (complement (apply every-pred (map (comp precondition spec) schemas)))
-     #(list 'every-precondition %)))
+    (apply every-pred (map (comp precondition spec) schemas)))
   spec/CoreSpec
   (subschemas [this] schemas)
   (checker [this params]
