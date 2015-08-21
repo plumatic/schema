@@ -35,7 +35,7 @@
               OGInner2 (generators/merged {:d "mary"})})]
     (is (s/validate (s/conditional #(= (count %) 20) [FinalSchema]) res))))
 
-(defn simple-leaf-generators-smoke-test []
+(deftest simple-leaf-generators-smoke-test
   (doseq [leaf-schema [double float long int short char byte boolean
                        Double Float Long Integer Short Character Byte Boolean
                        ;; TODO

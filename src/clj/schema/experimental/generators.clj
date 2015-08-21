@@ -2,8 +2,7 @@
   "(Very) experimental support for compiling schemas to test.check generators.
    To use it, you must provide your own test.check dependency.
 
-   TODO: add cljs support.
-   TODO: support for completing 'partial datums'"
+   TODO: add cljs support."
   (:require
    [clojure.test.check.generators :as generators]
    [schema.spec.core :as spec]
