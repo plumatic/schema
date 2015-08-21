@@ -1,7 +1,9 @@
 (ns schema.experimental.generators
   "(Very) experimental support for compiling schemas to test.check generators.
-   TODO: support for more types, extensible leaf generators, constraints, etc.
-   Not currently cljx only because was running into issues with test.check."
+   To use it, you must provide your own test.check dependency.
+
+   TODO: add cljs support.
+   TODO: support for completing 'partial datums'"
   (:require
    [clojure.test.check.generators :as generators]
    [schema.spec.core :as spec]
@@ -10,6 +12,9 @@
    schema.spec.variant
    [schema.core :as s]
    [schema.macros :as macros]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Private helpers for composite schemas
 
 (defn g-by [f & args]
   (generators/fmap
@@ -26,56 +31,156 @@
     (fn [d] (generators/make-gen (fn [r s] (generators/call-gen @d r s))))
     (fn [] (subschema-generator schema params))))
 
-(defprotocol LeafGeneratable
-  (leaf-generator [s] "return a generator for s"))
+(defprotocol CompositeGenerator
+  (composite-generator [s params]))
 
-(extend-type nil
-  LeafGeneratable
-  (leaf-generator [x]
-    (cond
-     (= x s/Int) generators/int
-     (= x s/Str) generators/string-ascii
-     (= x s/Keyword) generators/keyword
-     :else (generators/return x))))
-
-(extend-type schema.core.EqSchema
-  LeafGeneratable
-  (leaf-generator [x]
-    (generators/return (:v x))))
-
-(defprotocol Generator
-  (generator [s params]))
-
-;; TODO: do stuff with guards and preconditions?
-(extend-protocol Generator
+(extend-protocol CompositeGenerator
   schema.spec.variant.VariantSpec
-  (generator [s params]
-    (generators/one-of
-     (for [o (macros/safe-get s :options)]
-       (sub-generator o params))))
+  (composite-generator [s params]
+    (generators/such-that
+     #(not ((:pre s) %))
+     (generators/one-of
+      (for [o (macros/safe-get s :options)]
+        (sub-generator o params)))))
 
+  ;; TODO: this does not currently capture proper semantics of maps with
+  ;; both specific keys and key schemas that can override them.
   schema.spec.collection.CollectionSpec
-  (generator [s params]
+  (composite-generator [s params]
+    (generators/such-that
+     #(not ((:pre s) %))
+     (generators/fmap
+      (comp (:constructor s) (partial apply concat))
+      (apply
+       generators/tuple
+       (for [{:keys [cardinality] :as e} (:elements s)]
+         (let [g (sub-generator e params)]
+           (case cardinality
+             :exactly-one (generators/fmap vector g)
+             :at-most-one (generators/one-of [(generators/return nil) (generators/fmap vector g)])
+             :zero-or-more (generators/vector g))))))))
+
+  schema.spec.leaf.LeafSpec
+  (composite-generator [s params]
+    (macros/assert! false "You must provide a leaf generator for %s" s)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public
+
+(def Schema
+  "A Schema for Schemas"
+  (s/protocol s/Schema))
+
+(def Generator
+  "A test.check generator"
+  s/Any)
+
+(def LeafGenerators
+  "A mapping from schemas to generating functions that should be used."
+  (s/=> (s/maybe Generator) Schema))
+
+(def gen-rational
+  "Simple generator of rational numbers."
+  (generators/one-of
+   [generators/int
     (generators/fmap
-     (comp (:constructor s) (partial apply concat))
-     (apply
-      generators/tuple
-      (for [{:keys [cardinality] :as e} (:elements s)]
-        (let [g (sub-generator e params)]
-          (case cardinality
-            :exactly-one (generators/fmap vector g)
-            :at-most-one (generators/one-of [(generators/return nil) (generators/fmap vector g)])
-            :zero-or-more (generators/vector g))))))))
+     (fn [[a b]] (/ (* a a a a) b))
+     (generators/tuple
+      generators/int
+      generators/s-pos-int))]))
 
-(defn schema-generator [s params]
-  (let [sp (s/spec s)]
-    (if (instance? schema.spec.leaf.LeafSpec sp)
-      (leaf-generator s)
-      (generator sp params))))
+(def +simple-leaf-generators+
+  {Double (generators/fmap double gen-rational)
+   Float (generators/fmap float gen-rational)
+   Long generators/int
+   Integer (generators/fmap unchecked-int generators/int)
+   Short (generators/fmap unchecked-short generators/int)
+   Character (generators/fmap unchecked-char generators/int)
+   Byte (generators/fmap unchecked-byte generators/int)
+   s/Str generators/string-ascii
+   s/Bool generators/boolean
+   s/Num (generators/one-of [generators/int (generators/fmap double gen-rational)])
+   s/Int (generators/one-of
+          [generators/int
+           (generators/fmap unchecked-int generators/int)
+           (generators/fmap bigint generators/int)])
+   s/Keyword generators/keyword
+   s/Symbol (generators/fmap (comp symbol name) generators/keyword)
+   Object generators/any
+   s/Any generators/any})
 
-(defn generate [s]
-  (generators/sample
-   (schema-generator
-    s
-    {:subschema-generator schema-generator
-     :cache (java.util.IdentityHashMap.)}) 10))
+(defn eq-generators [s]
+  (when (instance? schema.core.EqSchema s)
+    (generators/return (.-v ^schema.core.EqSchema s))))
+
+(defn enum-generators [s]
+  (when (instance? schema.core.EnumSchema s)
+    (let [vs (vec (.-vs ^schema.core.EqSchema s))]
+      (generators/fmap #(nth vs %) (generators/choose 0 (dec (count vs)))))))
+
+
+(defn default-leaf-generators
+  [leaf-generators]
+  #(or (leaf-generators %)
+       (+simple-leaf-generators+ %)
+       (eq-generators %)
+       (enum-generators %)))
+
+(defn always [x] (generators/return x))
+
+(def GeneratorWrappers
+  "A mapping from schemas to wrappers that should be used around the default
+   generators."
+  (s/=> (s/maybe (s/=> Generator Generator))
+        Schema))
+
+(defn such-that
+  "Helper wrapper that filters to values that match predicate."
+  [f]
+  (partial generators/such-that f))
+
+(defn fmap
+  "Helper wrapper that maps f over all values."
+  [f]
+  (partial generators/fmap f))
+
+(defn merged
+  "Helper wrapper that merges some keys into a schema"
+  [m]
+  (fmap #(merge % m)))
+
+(s/defn generator :- Generator
+  "Produce a test.check generator for schema.
+
+   leaf-generators must return generators for all leaf schemas, and can also return
+   generators for non-leaf schemas to override default generation logic.
+
+   constraints is an optional mapping from schema to wrappers for the default generators,
+   which can impose constraints, fix certain values, etc."
+  ([schema]
+     (generator schema {}))
+  ([schema leaf-generators]
+     (generator schema leaf-generators {}))
+  ([schema :- Schema
+    leaf-generators :- LeafGenerators
+    wrappers :- GeneratorWrappers]
+     (let [leaf-generators (default-leaf-generators leaf-generators)
+           validator (s/validator schema)
+           gen (fn [s params]
+                 ((or (wrappers s) identity)
+                  (or (leaf-generators s)
+                      (composite-generator (s/spec s) params))))]
+       (generators/fmap
+        validator
+        (gen schema {:subschema-generator gen :cache (java.util.IdentityHashMap.)})))))
+
+(s/defn sample :- [s/Any]
+  "Sample k elements from generator."
+  [k & generator-args]
+  (generators/sample (apply generator generator-args) k))
+
+(s/defn generate
+  "Sample a single element of moderate complexity."
+  [& generator-args]
+  (last (apply sample 40 generator-args)))
