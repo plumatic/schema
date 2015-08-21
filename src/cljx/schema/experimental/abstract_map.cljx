@@ -52,6 +52,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public
 
+(s/defn schema-name [schema-extension :- SchemaExtension]
+  (.schema-name schema-extension))
+
+(s/defn base-schema [schema-extension :- SchemaExtension]
+  (.base-schema schema-extension))
+
+(s/defn extended-schema [schema-extension :- SchemaExtension]
+  (.extended-schema schema-extension))
+
 (s/defn abstract-map-schema
   "A schema representing an 'abstract class' map that must match at least one concrete
    subtype (indicated by the value of dispatch-key, a keyword).  Add subtypes by calling
