@@ -27,7 +27,7 @@
   [{:keys [schema]}
    {:keys [subschema-generator ^java.util.Map cache] :as params}]
   (spec/with-cache cache schema
-    (fn [d] (generators/make-gen (fn [r s] (generators/call-gen @d r s))))
+    (fn [d] (#'generators/make-gen (fn [r s] (generators/call-gen @d r (quot s 2)))))
     (fn [] (subschema-generator schema params))))
 
 (defprotocol CompositeGenerator
@@ -105,6 +105,7 @@
            (generators/fmap unchecked-int generators/int)
            (generators/fmap bigint generators/int)])
    s/Keyword generators/keyword
+   clojure.lang.Keyword generators/keyword
    s/Symbol (generators/fmap (comp symbol name) generators/keyword)
    Object generators/any
    s/Any generators/any})
@@ -180,6 +181,6 @@
   (generators/sample (apply generator generator-args) k))
 
 (s/defn generate
-  "Sample a single element of moderate complexity."
+  "Sample a single element of low to moderate size."
   [& generator-args]
-  (last (apply sample 40 generator-args)))
+  (generators/generate (apply generator generator-args) 10))
