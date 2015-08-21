@@ -31,7 +31,7 @@
      spec/+no-precondition+
      (concat
       (for [[k s] @sub-schemas]
-        {:guard #(= (keyword (dispatch-key %)) k)
+        {:guard #(= (keyword (dispatch-key %)) (keyword k))
          :schema s})
       (when open?
         [{:schema (assoc schema dispatch-key s/Keyword s/Any s/Any)}]))
