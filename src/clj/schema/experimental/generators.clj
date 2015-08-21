@@ -84,7 +84,7 @@
   (generators/one-of
    [generators/int
     (generators/fmap
-     (fn [[a b]] (/ (* a a a a) b))
+     (fn [[a b]] (/ (* a a a a a) b))
      (generators/tuple
       generators/int
       generators/s-pos-int))]))
