@@ -431,9 +431,11 @@
      #(list 'some-matching-either-clause? %)))
   (explain [this] (cons 'either (map explain schemas))))
 
-(clojure.core/defn either
+(clojure.core/defn ^{:deprecated "1.0.0"} either
   "A value that must satisfy at least one schema in schemas.
    Note that `either` does not work properly with coercion
+
+   DEPRECATED: prefer `cond-pre`
 
    WARNING: either does not work with coercion.  It is also slow and gives
    bad error messages.  Please consider using `conditional` and friends
@@ -441,36 +443,6 @@
    and work with coercion."
   [& schemas]
   (Either. schemas))
-
-
-;;; both (satisfies this schema and that one)
-
-(clojure.core/defrecord Both [schemas]
-  Schema
-  (spec [this] this)
-  (explain [this] (cons 'both (map explain schemas)))
-
-  spec/CoreSpec
-  (subschemas [this] schemas)
-  (checker [this params]
-    (reduce
-     (clojure.core/fn [f t]
-       (clojure.core/fn [x]
-         (let [tx (t x)]
-           (if (utils/error? tx)
-             tx
-             (f (or tx x))))))
-     (map #(spec/sub-checker {:schema %} params) (reverse schemas)))))
-
-(clojure.core/defn ^{:deprecated "1.0.0"} both
-  "A value that must satisfy every schema in schemas.
-
-   DEPRECATED: prefer 'conditional' with a single condition
-   instead.
-
-   When used with coercion, coerces each schema in sequence."
-  [& schemas]
-  (Both. schemas))
 
 
 ;;; conditional (choice of schema, based on predicates on the value)
@@ -514,6 +486,83 @@
    (for [[pred schema] (partition 2 preds-and-schemas)]
      [(if (= pred :else) (constantly true) pred) schema])
    (if (odd? (count preds-and-schemas)) (last preds-and-schemas))))
+
+(defprotocol HasPrecondition
+  (precondition [this]
+    "Return the Precondition for this schema.
+     A Precondition is a function of a value that returns a
+     ValidationError or nil (see spec.core)"))
+
+(extend-protocol HasPrecondition
+  schema.spec.leaf.LeafSpec
+  (precondition [this]
+    (:pre this))
+
+  schema.spec.variant.VariantSpec
+  (precondition [this]
+    (let [{:keys [pre options]} this]
+      (some-fn
+       pre
+       (spec/precondition
+        Any
+        (complement
+         (apply every-pred
+                (for [{:keys [guard schema]} options]
+                  (if guard
+                    (some-fn (spec/precondition schema guard #(list 'guard %))
+                             (precondition (spec schema)))
+                    (precondition (spec schema))))))
+        #(list 'some-variant-precondition %)))))
+
+  schema.spec.collection.CollectionSpec
+  (precondition [this]
+    (:pre this)))
+
+(clojure.core/defn cond-pre
+  "A replacement for `either` that constructs a conditional schema
+   based on the schema spec preconditions of the component schemas.
+
+   EXPERIMENTAL"
+  [& schemas]
+  (apply conditional
+         (for [s schemas
+               t [(comp not (precondition (spec s))) s]]
+           t)))
+
+;;; both (satisfies this schema and that one)
+
+(clojure.core/defrecord Both [schemas]
+  Schema
+  (spec [this] this)
+  (explain [this] (cons 'both (map explain schemas)))
+  HasPrecondition
+  (precondition [this]
+    (spec/precondition
+     this
+     (complement (apply every-pred (map (comp precondition spec) schemas)))
+     #(list 'every-precondition %)))
+  spec/CoreSpec
+  (subschemas [this] schemas)
+  (checker [this params]
+    (reduce
+     (clojure.core/fn [f t]
+       (clojure.core/fn [x]
+         (let [tx (t x)]
+           (if (utils/error? tx)
+             tx
+             (f (or tx x))))))
+     (map #(spec/sub-checker {:schema %} params) (reverse schemas)))))
+
+(clojure.core/defn ^{:deprecated "1.0.0"} both
+  "A value that must satisfy every schema in schemas.
+
+   DEPRECATED: prefer 'conditional' with a single condition
+   instead.
+
+   When used with coercion, coerces each schema in sequence."
+  [& schemas]
+  (Both. schemas))
+
 
 (clojure.core/defn if
   "if the predicate returns truthy, use the if-schema, otherwise use the else-schema"
@@ -647,38 +696,44 @@
             (explicit-schema-key kspec)))
     (explain kspec)))
 
-(clojure.core/defn- map-spec [this]
+(defn- map-elements [this]
+  (let [extra-keys-schema (find-extra-keys-schema this)]
+    (let [duplicate-keys (->> (dissoc this extra-keys-schema)
+                              keys
+                              (group-by explicit-schema-key)
+                              vals
+                              (filter #(> (count %) 1))
+                              (apply concat)
+                              (mapv explain-kspec))]
+      (macros/assert! (empty? duplicate-keys)
+                      "Schema has multiple variants of the same explicit key: %s" duplicate-keys))
+    (concat
+     (for [[k v] (dissoc this extra-keys-schema)]
+       (let [rk (explicit-schema-key k)
+             required? (required-key? k)]
+         (collection/one-element
+          required? (map-entry (eq rk) v)
+          (clojure.core/fn [item-fn m]
+            (let [e (find m rk)]
+              (cond e (item-fn e)
+                    required? (item-fn (utils/error [rk 'missing-required-key])))
+              (if e
+                (dissoc #+clj (if (instance? clojure.lang.PersistentStructMap m) (into {} m) m) #+cljs m
+                        rk)
+                m))))))
+     (when extra-keys-schema
+       [(collection/all-elements (apply map-entry (find this extra-keys-schema)))]))))
+
+(defn- map-error []
+  (clojure.core/fn [_ elts extra]
+    (into {} (concat (keep utils/error-val elts) (for [[k _] extra] [k 'disallowed-key])))))
+
+(defn- map-spec [this]
   (collection/collection-spec
    (spec/simple-precondition this map?)
    #(into {} %)
-   (let [extra-keys-schema (find-extra-keys-schema this)]
-     (let [duplicate-keys (->> (dissoc this extra-keys-schema)
-                               keys
-                               (group-by explicit-schema-key)
-                               vals
-                               (filter #(> (count %) 1))
-                               (apply concat)
-                               (mapv explain-kspec))]
-       (macros/assert! (empty? duplicate-keys)
-                       "Schema has multiple variants of the same explicit key: %s" duplicate-keys))
-     (concat
-      (for [[k v] (dissoc this extra-keys-schema)]
-        (let [rk (explicit-schema-key k)
-              required? (required-key? k)]
-          (collection/one-element
-           required? (map-entry (eq rk) v)
-           (clojure.core/fn [item-fn m]
-             (let [e (find m rk)]
-               (cond e (item-fn e)
-                     required? (item-fn (utils/error [rk 'missing-required-key])))
-               (if e
-                 (dissoc #+clj (if (instance? clojure.lang.PersistentStructMap m) (into {} m) m) #+cljs m
-                         rk)
-                 m))))))
-      (when extra-keys-schema
-        [(collection/all-elements (apply map-entry (find this extra-keys-schema)))])))
-   (clojure.core/fn [_ elts extra]
-     (into {} (concat (keep utils/error-val elts) (for [[k _] extra] [k 'disallowed-key]))))))
+   (map-elements this)
+   (map-error)))
 
 (clojure.core/defn- map-explain [this]
   (into {} (for [[k v] this] [(explain-kspec k) (explain v)])))
@@ -837,12 +892,14 @@
 (clojure.core/defrecord Record [klass schema]
   Schema
   (spec [this]
-    (assoc (spec schema)
-      :pre (let [p (spec/precondition this #(instance? klass %) #(list 'instance? klass %))]
-             (if-let [evf (:extra-validator-fn this)]
-               (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
-               p))
-      :constructor (:constructor (meta this))))
+    (collection/collection-spec
+     (let [p (spec/precondition this #(instance? klass %) #(list 'instance? klass %))]
+       (if-let [evf (:extra-validator-fn this)]
+         (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
+         p))
+     (:constructor (meta this))
+     (map-elements schema)
+     (map-error)))
   (explain [this]
     (list 'record #+clj (symbol (.getName ^Class klass)) #+cljs (symbol (pr-str klass)) (explain schema))))
 
