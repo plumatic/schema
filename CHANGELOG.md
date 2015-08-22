@@ -1,11 +1,12 @@
 ## 1.0.0-alpha1
- * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.   As a concrete example of an application that's enabled, schema now experimentally supports test-check style generation from schemas.
+ * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.   As a concrete example of an application that's enabled, schema now experimentally supports test-check style generation from schemas, as well as completion of partial inputs.
  * **BREAKING** Changes to the core Schema protocol will break existing third-party schema tooling and schema types.
  * **BREAKING** Records coerced to an ordinary (non-record) map schema are now converted to maps, rather than retaining their record type.
- * **BREAKING** `s/either` no longer works with coercion.  We recommend switching to `s/conditional` or other options.
+ * **Deprecate** `s/either` in favor of `s/cond-pre`, `s/conditional`, or `schema.experimental.abstract-map-schema`.  As of this release, `either` no longer works with coercion.
  * **Deprecate** `s/both` in favor of improved `s/conditional`.
  * `s/pred` can more intelligently guess the predicate name
  * `record` schemas can now coerce values to corresponding record types.
+ * New experimental `abstract-map-schema` that models super/subclasses as maps.
 
 ## 0.4.4
  * Fix ClojureScript warnings about `map->Record` constructors being redefined.
@@ -44,7 +45,7 @@
 ## 0.3.2
  * Fix `s/protocol` in Clojure (didn't work properly with extends created later)
  * Fix ClojureScript (Closure) warning about reference to global RegExp object.
- * Add `set-compile-fn-validation!` function to turn off emission of validation globally, and turn off emission of validation code for non- ^:always-validate functions when *assert* is false. 
+ * Add `set-compile-fn-validation!` function to turn off emission of validation globally, and turn off emission of validation code for non- ^:always-validate functions when *assert* is false.
 
 ## 0.3.1
  * Fix Clojurescript compilation warnings/errors from accidental references to `clojure.data/diff` and `class` inside error messages.
@@ -68,7 +69,7 @@
 ## 0.2.6
  * Memoize walker computation, providing much faster checker compilation for graph-structured schemas
 
-## 0.2.5 
+## 0.2.5
  * Add `normalized-defn-args` helper fn for defining `s/defn`-like macros.
  * Map schemas correctly validate against struct-maps
 
@@ -98,9 +99,9 @@
  * Replaced core Schema protocol method `check` with `walker`, for increased speed and versatility
  * Support for schema-driven transformations/coercion
  * Schemas for primitive arrays (`longs`, etc)
- * Schematized `letfn` 
+ * Schematized `letfn`
 
-## 0.1.10 
+## 0.1.10
  * Remove non-dev dependency on cljx
 
 ## 0.1.9

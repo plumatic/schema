@@ -4,15 +4,20 @@ A Clojure(Script) library for declarative data description and validation.
 
 Leiningen dependency (Clojars): `[prismatic/schema "0.4.4"]`. [Latest codox API docs](http://prismatic.github.io/schema).
 
-**This is an alpha release. The API and organizational structure are
-subject to change. Comments and contributions are much appreciated.**
+**NOTE: this README is updated for the upcoming 1.0.0 release.  Please refer to the git history for previous versions of schema.**
 
 --
 
 One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://blog.getprismatic.com/blog/2013/9/4/schema-for-clojurescript-data-shape-declaration-and-validation) on the Prismatic blog.)
 
-As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  See [this post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/) for a detailed overview, or check out the Coercion section below for an example.
+Schema is a rich language for describing data shapes, with a variety of features:
 
+ - Data validation, with descriptive error messages of failures (targeted at programmers)
+ - Annotation of function arguments and return values, with optional runtime validation
+ - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
+ - As of version 1.0.0, Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.
+ - Schema is also built into our [`plumbing`](https://github.com/Prismatic/plumbing) library, and our [`fnhouse`](https://github.com/Prismatic/fnhouse) library
+illustrates how we build APIs easily and safely with Schema.
 
 ## Meet Schema
 
@@ -20,7 +25,7 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
 
 ```clojure
 (ns schema-examples
-  (:require [schema.core :as s 
+  (:require [schema.core :as s
              :include-macros true ;; cljs only
              ]))
 
@@ -105,12 +110,12 @@ What about when things go bad?  Schema's `s/check` and `s/validate` provide mean
 
 ```
 
-See the "More Examples" section below for more examples and explanation.
+See the "More Examples" section below for more examples and explanation, or the [custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
 
 
 ## Beyond type hints
 
-If you've done much Clojure, you've probably seen code like this:
+If you've done much Clojure, you've probably seen code with documentation like this:
 
 ```clojure
 (defrecord StampedNames
@@ -254,40 +259,25 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `conditional`, `both`, `pred`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, and more.  Here are a few of our favorites:
 
 ```clojure
+;; anything
+(s/validate [s/Any] ["woohoo!" 'go-nuts 42.0])
 
 ;; maybe
 (s/validate (s/maybe s/Keyword) :a)
 (s/validate (s/maybe s/Keyword) nil)
 
-;; enum
+;; eq and enum
+(s/validate (s/eq :a) :a)
 (s/validate (s/enum :a :b :c) :a)
 
-;; both and pred
-(def OddLong (s/both long (s/pred odd? 'odd?)))
-(s/validate OddLong 1)
-;; 1
-(s/validate OddLong 2)
-;; RuntimeException: Value does not match schema: (not (odd? 2))
-(s/validate OddLong (int 3))
-;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
+;; pred
+(s/validate (s/pred odd?) 1)
 
-;; both & pred can be used for schemas of seqs with at least one element:
-(def SetOfAtLeastOneOddLong (s/both #{OddLong} (s/pred seq 'seq)))
-(s/validate SetOfAtLeastOneOddLong #{3})
-;; => #{3}
-(s/validate SetOfAtLeastOneOddLong #{3 5 7})
-;; => #{7 3 5}
-(s/validate SetOfAtLeastOneOddLong #{})
-;; RuntimeException: Value does not match schema: (not (seq #{}))
-(s/validate SetOfAtLeastOneOddLong #{2})
-;; RuntimeException: Value does not match schema: #{(not (odd? 2))}
-
-;; conditional & if can be used to express mutually exclusive options 
-;; (these are faster, and provide much better errors than s/either)
-(def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
+;; conditional (i.e. variant or option)
+(def StringListOrKeywordMap (s/conditional map? {s/Keyword s/Keyword} :else [String]))
 (s/validate StringListOrKeywordMap ["A" "B" "C"])
 ;; => ["A" "B" "C"]
 (s/validate StringListOrKeywordMap {:foo :bar})
@@ -295,9 +285,44 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate StringListOrKeywordMap [:foo])
 ;; RuntimeException:  Value does not match schema: [(not (instance? java.lang.String :foo))]
 
+;; if (shorthand for conditional)
+(def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
+
+;; cond-pre (experimental), also shorthand for conditional, allows you to skip the
+;; predicate when the options are superficially different
+(def StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
+;; but don't do this (use `if` or `abstract-map-schema` here instead):
+(def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
+
+;; conditional can also be used to apply extra validation to a single type
+(def OddLong (s/conditional odd? long))
+(s/validate OddLong 1)
+;; 1
+(s/validate OddLong 2)
+;; RuntimeException: Value does not match schema: (not (odd? 2))
+(s/validate OddLong (int 3))
+;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
+
+;; recursive
+(def Tree {:value s/Int :children [(s/recursive #'Tree)]})
+(s/validate Tree {:value 0, :children [{:value 1, :children []}]})
+
+;; abstract-map (experimental) models "abstract classes" and "subclasses" with maps.
+(require '[schema.experimental.abstract-map :as abstract-map])
+(s/defschema Animal
+  (abstract-map/abstract-map-schema
+   :type
+   {:name s/Str}))
+(abstract-map/extend-schema Cat Animal [:cat] {:claws? s/Bool})
+(abstract-map/extend-schema Dog Animal [:dog] {:barks? s/Bool})
+(s/validate Cat {:type :cat :name "melvin" :claws? true})
+(s/validate Animal {:type :cat :name "melvin" :claws? true})
+(s/validate Animal {:type :dog :name "roofer" :barks? true})
+(s/validate Animal {:type :cat :name "confused kitty" :barks? true})
+;; RuntimeException: Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
 ```
 
-You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types).
+You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0).
 
 ## Transformations and Coercion
 
@@ -333,11 +358,43 @@ There's nothing special about `json-coercion-matcher` though; it's just as easy 
 
 For more details, see [this blog post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/).
 
+## Generation and Completion
+
+As of version 1.0.0, Schema also provides two experimental forms of automatic test data generation from schemas.
+
+```clojure
+(require '[schema.experimental.complete :as c] '[schema.experimental.generators :as g])
+
+(g/sample 3 Animal)
+;; => ({:name "", :barks? false, :type :dog}
+;;     {:name "", :claws? false, :type :cat}
+;;     {:name "\"|", :claws? false, :type :cat})
+
+(g/generate Tree)
+;; => {:value -8N, :children [{:value 5, :children [{:value -2N, :children []}]}
+;;                            {:value -2, :children []}]}
+
+(c/complete {:type :dog} Animal)
+;; => {:name "nL@", :barks? false, :type :dog}
+```
+
+The `schema.experimental.generators` namespace can compile Schemas into `clojure.test.check` generators.  All of the built-in
+schemas are supported out of the box, and it is easy to extend to add new types or customize generation on a per-type basis.
+See [`schema.experimental.generators-test`](https://github.com/Prismatic/schema/blob/master/test/clj/schema/experimental/generators_test.clj)
+for some more complex examples.
+
+Moreover, the `schema.experimental.complete` namespace can build on generation to allow "completion" of partial data.  Whereas generators and
+`clojure.test.check` are very useful tools for abstract property testing, `completers` are useful when we want to test the behavior of a
+function on a *specific* complex data structure, where only some parts of the data structure are relevant for the function under test.
+Completion supports all of the extensibility of generators, plus the ability to provide coercions to create very succinct helpers for
+test data generation.  See [`schema.experimental.complete-test`](https://github.com/Prismatic/schema/blob/master/test/clj/schema/experimental/complete_test.clj)
+for examples.
+
+
 ## For the Future
 
-Longer-term, we have lots more in store for Schema. Just a few of the crazy ideas we have brewing are:
+Longer-term, we have lots more in store for Schema. Just a couple of the crazy ideas we have brewing are:
  - Automatically generate API client libraries based on API schemas
- - Automatically generate test data from schemas
  - Compile to `core.typed` annotations for more typey goodness, if that's your thing
 
 ## Community
