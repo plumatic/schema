@@ -16,8 +16,7 @@ Schema is a rich language for describing data shapes, with a variety of features
  - Annotation of function arguments and return values, with optional runtime validation
  - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
  - As of version 1.0.0, Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.
- - Schema is also built into our [`plumbing`](https://github.com/Prismatic/plumbing) library, and our [`fnhouse`](https://github.com/Prismatic/fnhouse) library
-illustrates how we build APIs easily and safely with Schema.
+ - Schema is also built into our [`plumbing`](https://github.com/Prismatic/plumbing) and [`fnhouse`](https://github.com/Prismatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema.
 
 ## Meet Schema
 
@@ -110,7 +109,7 @@ What about when things go bad?  Schema's `s/check` and `s/validate` provide mean
 
 ```
 
-See the "More Examples" section below for more examples and explanation, or the [custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
+See the "More Examples" section below for more examples and explanation, or the [custom Schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
 
 
 ## Beyond type hints
@@ -289,9 +288,11 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
 
 ;; cond-pre (experimental), also shorthand for conditional, allows you to skip the
-;; predicate when the options are superficially different
+;; predicate when the options are superficially different by doing a greedy match
+;; on the preconditions of the options.
 (def StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
-;; but don't do this (use `if` or `abstract-map-schema` here instead):
+;; but don't do this -- this will never validate `{:b :x}` because the first schema 
+;; will be chosen based on the `map?` precondition (use `if` or `abstract-map-schema` instead):
 (def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
 
 ;; conditional can also be used to apply extra validation to a single type
@@ -326,7 +327,7 @@ You can also define schemas for [recursive data types](https://github.com/Prisma
 
 ## Transformations and Coercion
 
-As of version 0.2.0, Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
+As of version 0.2.0, Schema supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
 
 An example application of coercion is converting parsed JSON (e.g., from an HTTP post request) to a domain object with a richer set of types (e.g., Keywords).
 
@@ -360,7 +361,7 @@ For more details, see [this blog post](http://blog.getprismatic.com/schema-0-2-0
 
 ## Generation and Completion
 
-As of version 1.0.0, Schema also provides two experimental forms of automatic test data generation from schemas.
+As of version 1.0.0, Schema provides two experimental forms of automatic test data generation from schemas.
 
 ```clojure
 (require '[schema.experimental.complete :as c] '[schema.experimental.generators :as g])
