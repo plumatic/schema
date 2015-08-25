@@ -40,7 +40,9 @@
      (complement (.-pre ^schema.spec.variant.VariantSpec s))
      (generators/one-of
       (for [o (macros/safe-get s :options)]
-        (sub-generator o params)))))
+        (if-let [g (:guard o)]
+          (generators/such-that g (sub-generator o params))
+          (sub-generator o params))))))
 
   ;; TODO: this does not currently capture proper semantics of maps with
   ;; both specific keys and key schemas that can override them.
