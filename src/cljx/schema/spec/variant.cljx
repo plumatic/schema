@@ -41,9 +41,10 @@
    subschemas, e.g., a tagged union. It has an overall precondition,
    set of options, and error function.
 
-   The semantics of `options` is that the options are processed in order;
-   the datum must match the schema for the first option for which `guard`
-   passes.
+   The semantics of `options` is that the options are processed in
+   order. During checking, the datum must match the schema for the
+   first option for which `guard` passes. During generation, any datum
+   generated from an option will pass the corresponding `guard`.
 
    err-f is a function to produce an error message if none
    of the guards match (and must be passed unless the last option has no
