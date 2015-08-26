@@ -291,7 +291,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; predicate when the options are superficially different by doing a greedy match
 ;; on the preconditions of the options.
 (def StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
-;; but don't do this -- this will never validate `{:b :x}` because the first schema 
+;; but don't do this -- this will never validate `{:b :x}` because the first schema
 ;; will be chosen based on the `map?` precondition (use `if` or `abstract-map-schema` instead):
 (def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
 
