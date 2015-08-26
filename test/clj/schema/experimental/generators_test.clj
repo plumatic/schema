@@ -41,7 +41,7 @@
                        Double Float Long Integer Short Character Byte Boolean
                        ;; TODO
                        ;; doubles floats longs ints shorts chars bytes booleans
-                       s/Str String s/Bool s/Num s/Int s/Keyword s/Symbol
+                       s/Str String s/Bool s/Num s/Int s/Keyword s/Symbol s/Inst
                        Object s/Any (s/eq "foo") (s/enum :a :b :c)]]
     (testing (str leaf-schema)
       (is (= 10 (count (generators/sample 10 leaf-schema)))))))

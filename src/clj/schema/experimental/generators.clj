@@ -110,7 +110,8 @@
    clojure.lang.Keyword generators/keyword
    s/Symbol (generators/fmap (comp symbol name) generators/keyword)
    Object generators/any
-   s/Any generators/any})
+   s/Any generators/any
+   s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)})
 
 (defn eq-generators [s]
   (when (instance? schema.core.EqSchema s)
