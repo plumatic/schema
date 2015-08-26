@@ -91,7 +91,7 @@
       generators/int
       generators/s-pos-int))]))
 
-(def +simple-leaf-generators+
+(def +primative-generators+
   {Double (generators/fmap double gen-rational)
    Float (generators/fmap float gen-rational)
    Long generators/int
@@ -99,19 +99,34 @@
    Short (generators/fmap unchecked-short generators/int)
    Character (generators/fmap unchecked-char generators/int)
    Byte (generators/fmap unchecked-byte generators/int)
-   s/Str generators/string-ascii
-   s/Bool generators/boolean
-   s/Num (generators/one-of [generators/int (generators/fmap double gen-rational)])
-   s/Int (generators/one-of
-          [generators/int
-           (generators/fmap unchecked-int generators/int)
-           (generators/fmap bigint generators/int)])
-   s/Keyword generators/keyword
-   clojure.lang.Keyword generators/keyword
-   s/Symbol (generators/fmap (comp symbol name) generators/keyword)
-   Object generators/any
-   s/Any generators/any
-   s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)})
+   Boolean generators/boolean})
+
+(def +simple-leaf-generators+
+  (merge
+   +primative-generators+
+   {s/Str generators/string-ascii
+    s/Bool generators/boolean
+    s/Num (generators/one-of [generators/int (generators/fmap double gen-rational)])
+    s/Int (generators/one-of
+           [generators/int
+            (generators/fmap unchecked-int generators/int)
+            (generators/fmap bigint generators/int)])
+    s/Keyword generators/keyword
+    clojure.lang.Keyword generators/keyword
+    s/Symbol (generators/fmap (comp symbol name) generators/keyword)
+    Object generators/any
+    s/Any generators/any
+    s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)}
+   (into {}
+         (for [[f ctor c] [[doubles double-array Double]
+                           [floats float-array Float]
+                           [longs long-array Long]
+                           [ints int-array Integer]
+                           [shorts short-array Short]
+                           [chars char-array Character]
+                           [bytes byte-array Byte]
+                           [booleans boolean-array Boolean]]]
+           [f (generators/fmap ctor (generators/vector (macros/safe-get +primative-generators+ c)))]))))
 
 (defn eq-generators [s]
   (when (instance? schema.core.EqSchema s)
