@@ -39,9 +39,8 @@
 (deftest simple-leaf-generators-smoke-test
   (doseq [leaf-schema [double float long int short char byte boolean
                        Double Float Long Integer Short Character Byte Boolean
-                       ;; TODO
-                       ;; doubles floats longs ints shorts chars bytes booleans
-                       s/Str String s/Bool s/Num s/Int s/Keyword s/Symbol
+                       doubles floats longs ints shorts chars bytes booleans
+                       s/Str String s/Bool s/Num s/Int s/Keyword s/Symbol s/Inst
                        Object s/Any (s/eq "foo") (s/enum :a :b :c)]]
     (testing (str leaf-schema)
       (is (= 10 (count (generators/sample 10 leaf-schema)))))))
