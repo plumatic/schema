@@ -1069,7 +1069,8 @@
 
 #+clj
 (defmacro defrecord+
-  "Like defrecord, but emits a record using potemkin/defrecord+.  You must provide
+  "DEPRECATED -- canonical version moved to schema.potemkin
+   Like defrecord, but emits a record using potemkin/defrecord+.  You must provide
    your own dependency on potemkin to use this."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
