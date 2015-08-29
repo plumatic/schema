@@ -185,7 +185,13 @@
   (explain [this]
     (if-let [more-schema (utils/class-schema this)]
       (explain more-schema)
-      #+clj (symbol (.getName ^Class this)) #+cljs this)))
+      #+clj (symbol (.getName ^Class this))
+      #+cljs (condp = this
+               js/Boolean 'Bool
+               js/Number 'Num
+               js/Date 'Inst
+               cljs.core/UUID 'Uuid
+               this))))
 
 
 ;; On the JVM, the primitive coercion functions (double, long, etc)
