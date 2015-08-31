@@ -1,12 +1,14 @@
-## 1.0.0-alpha1
+## 1.0.0
  * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.   As a concrete example of an application that's enabled, schema now experimentally supports test-check style generation from schemas, as well as completion of partial inputs.
  * **BREAKING** Changes to the core Schema protocol will break existing third-party schema tooling and schema types.
  * **BREAKING** Records coerced to an ordinary (non-record) map schema are now converted to maps, rather than retaining their record type.
  * **Deprecate** `s/either` in favor of `s/cond-pre`, `s/conditional`, or `schema.experimental.abstract-map-schema`.  As of this release, `either` no longer works with coercion.
  * **Deprecate** `s/both` in favor of improved `s/conditional`.
+ * **Deprecate** `schema.core/defrecord+`; moved to new `schema.potemkin` namespace.
  * `s/pred` can more intelligently guess the predicate name
  * `record` schemas can now coerce values to corresponding record types.
  * New experimental `abstract-map-schema` that models super/subclasses as maps.
+ * Improved explains explains for leaf schemas, especially in Clojurescript.
 
 ## 0.4.4
  * Fix ClojureScript warnings about `map->Record` constructors being redefined.
