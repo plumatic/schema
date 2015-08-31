@@ -56,8 +56,7 @@
   (deftest class-test
     (valid! String "a")
     (invalid! String nil "(not (instance? java.lang.String nil))")
-    (invalid! String :a "(not (instance? java.lang.String :a))")
-    (is (= 'java.lang.String (s/explain String))))
+    (invalid! String :a "(not (instance? java.lang.String :a))"))
 
   (deftest primitive-test
     (valid! double 1.0)
@@ -161,13 +160,13 @@
 (deftest leaf-bool-test
   (valid! s/Bool true)
   (invalid! s/Bool nil "(not (instance? java.lang.Boolean nil))")
-  #+clj (is (= 'java.lang.Boolean (s/explain s/Bool))))
+  (is (= 'Bool (s/explain s/Bool))))
 
 (deftest leaf-string-test
   (valid! s/Str "asdf")
   (invalid! s/Str nil "(not (instance? java.lang.String nil))")
   (invalid! s/Str :a "(not (instance? java.lang.String :a))")
-  #+clj (is (= 'java.lang.String (s/explain s/Str))))
+  (is (= 'Str (s/explain s/Str))))
 
 (deftest leaf-number-test
   (valid! s/Num 1)
@@ -175,7 +174,7 @@
   (valid! s/Num (/ 1 2))
   (invalid! s/Num nil "(not (instance? java.lang.Number nil))")
   (invalid! s/Num "1" "(not (instance? java.lang.Number \"1\"))")
-  #+clj (is (= 'java.lang.Number (s/explain s/Num))))
+  (is (= 'Num (s/explain s/Num))))
 
 (deftest leaf-int-test
   (valid! s/Int 1)
@@ -199,15 +198,18 @@
 
 (deftest leaf-regex-test
   (valid! s/Regex #".*")
-  (invalid! s/Regex ".*"))
+  (invalid! s/Regex ".*")
+  (is (= 'Regex (s/explain s/Regex))))
 
 (deftest leaf-inst-test
   (valid! s/Inst #inst "2013-01-01T01:15:01.840-00:00")
-  (invalid! s/Inst "2013-01-01T01:15:01.840-00:00"))
+  (invalid! s/Inst "2013-01-01T01:15:01.840-00:00")
+  (is (= 'Inst (s/explain s/Inst))))
 
 (deftest leaf-uuid-test
   (valid! s/Uuid #uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf")
-  (invalid! s/Uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf"))
+  (invalid! s/Uuid "0e98ce5b-9aca-4bf7-b5fd-d90576c80fdf")
+  (is (= 'Uuid (s/explain s/Uuid))))
 
 
 
