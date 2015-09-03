@@ -274,6 +274,7 @@
       (invalid! schema {:foo :bar} "(not (equal-keys? {:foo :bar}))")
       (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
       (invalid! (s/conditional odd? s/Int) 2 "(not (odd? 2))")
+      (invalid! (s/conditional odd? s/Int) "1" "(throws? (odd? \"1\"))")
       (is (= '(conditional odd? Int)
              (s/explain (s/conditional odd? s/Int))))
       (is (= '(conditional odd? Int weird?)

@@ -13,7 +13,22 @@
   (let [g (:guard o)
         c (spec/sub-checker o params)
         step (if g
-               (fn [x] (if (g x) (c x) (else x)))
+               (fn [x]
+                 (let [guard-result (macros/try-catchall
+                                     (g x)
+                                     (catch e# ::exception))]
+                   (cond (= ::exception guard-result)
+                         (macros/validation-error
+                          (:schema o)
+                          x
+                          (list (symbol (utils/fn-name g)) (utils/value-name x))
+                          'throws?)
+
+                         guard-result
+                         (c x)
+
+                         :else
+                         (else x))))
                c)]
     (if-let [wrap-error (:wrap-error o)]
       (fn [x]

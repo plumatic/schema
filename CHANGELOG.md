@@ -1,3 +1,6 @@
+## 1.0.1
+ * Catch and report exceptions in guards the same as preconditions, rather than allowing them to propagate out.
+
 ## 1.0.0
  * New schema backend, which is faster, simpler, and more declarative, enabling more applications and simplifying tooling.  Users of built-in schema types should experience very little or no breakage, but tooling or custom schema types will need to be updated.   As a concrete example of an application that's enabled, schema now experimentally supports test-check style generation from schemas, as well as completion of partial inputs.
  * **BREAKING** Changes to the core Schema protocol will break existing third-party schema tooling and schema types.
