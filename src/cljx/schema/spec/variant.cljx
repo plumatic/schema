@@ -13,7 +13,17 @@
   (let [g (:guard o)
         c (spec/sub-checker o params)
         step (if g
-               (fn [x] (if (g x) (c x) (else x)))
+               (fn [x]
+                 (macros/try-catchall
+                  (if (g x)
+                    (c x)
+                    (else x))
+                  (catch e#
+                      (macros/validation-error
+                       (:schema o)
+                       x
+                       (list (symbol (utils/fn-name g)) (utils/value-name x))
+                       'throws?))))
                c)]
     (if-let [wrap-error (:wrap-error o)]
       (fn [x]
