@@ -69,8 +69,11 @@
     [(first s) (next s)]
     [nil s]))
 
-(def primitive-sym? '#{float double boolean byte char short int long
-                       floats doubles booleans bytes chars shorts ints longs objects})
+(if-cljs
+ (def primitive-sym? '#{float double boolean byte char short int long
+                        floats doubles booleans bytes chars shorts ints longs objects})
+ (def primitive-sym? '#{float double byte char short int long
+                        floats doubles bytes chars shorts ints longs objects}))
 
 (defn valid-tag? [env tag]
   (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
