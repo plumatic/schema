@@ -116,6 +116,7 @@
     s/Symbol (generators/fmap (comp symbol name) generators/keyword)
     Object generators/any
     s/Any generators/any
+    s/Uuid (generators/fmap (fn [bytes] (java.util.UUID/nameUUIDFromBytes bytes)) generators/bytes)
     s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)}
    (into {}
          (for [[f ctor c] [[doubles double-array Double]
