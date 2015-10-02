@@ -1215,20 +1215,21 @@
         {:keys [doc tag] :as standard-meta} (meta name)
         {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (macros/process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
-       (clojure.core/defn ~(with-meta name {})
-         ~(assoc (apply dissoc standard-meta (when (macros/primitive-sym? tag) [:tag]))
-            :doc (str
-                  (str "Inputs: " (if (= 1 (count raw-arglists))
-                                    (first raw-arglists)
-                                    (apply list raw-arglists)))
-                  (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
-                    (str "\n  Returns: " ret))
-                  (when doc (str  "\n\n  " doc)))
-            :raw-arglists (list 'quote raw-arglists)
-            :arglists (list 'quote arglists)
-            :schema schema-form)
-         ~@fn-body)
-       (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form))))
+       (let [ret# (clojure.core/defn ~(with-meta name {})
+                    ~(assoc (apply dissoc standard-meta (when (macros/primitive-sym? tag) [:tag]))
+                       :doc (str
+                             (str "Inputs: " (if (= 1 (count raw-arglists))
+                                               (first raw-arglists)
+                                               (apply list raw-arglists)))
+                             (when-let [ret (when (= (second defn-args) :-) (nth defn-args 2))]
+                               (str "\n  Returns: " ret))
+                             (when doc (str  "\n\n  " doc)))
+                       :raw-arglists (list 'quote raw-arglists)
+                       :arglists (list 'quote arglists)
+                       :schema schema-form)
+                    ~@fn-body)]
+         (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form)
+         ret#))))
 
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
