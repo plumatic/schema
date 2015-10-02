@@ -1026,6 +1026,13 @@
 
 (def ^String +bad-input-str+ "Input to simple-validated-defn does not match schema")
 
+;; Test that s/defn returns var
+#+clj
+(with-test
+  (s/defn with-test-fn [a b] (+ a b))
+  (is (= 3 (with-test-fn 1 2)))
+  (is (= 0 (with-test-fn 10 -10))))
+
 #+cljs
 (deftest simple-validated-defn-test
   (s/with-fn-validation
