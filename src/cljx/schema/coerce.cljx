@@ -24,7 +24,8 @@
   (s/=> (s/maybe (s/=> s/Any s/Any)) Schema))
 
 (s/defn coercer
-  "Produce a function that simultaneously coerces and validates a datum."
+  "Produce a function that simultaneously coerces and validates a datum.  Returns
+   a coerced value, or a schema.utils.ErrorContainer describing the error."
   [schema coercion-matcher :- CoercionMatcher]
   (spec/run-checker
    (fn [s params]
@@ -40,6 +41,17 @@
          c)))
    true
    schema))
+
+(s/defn coercer!
+  "Like `coercer`, but is guaranteed to return a value that satisfies schema (or throw)."
+  [schema coercion-matcher :- CoercionMatcher]
+  (let [c (coercer schema coercion-matcher)]
+    (fn [value]
+      (let [coerced (c value)]
+        (when-let [error (utils/error-val coerced)]
+          (macros/error! (utils/format* "Value cannot be coerced to match schema: %s" (pr-str error))
+                         {:schema schema :value value :error error}))
+        coerced))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Coercion helpers

@@ -73,6 +73,11 @@
             (is (= res (coercer {:jb "false" :l "2.0" :d "1" :jk "asdf"})))
             (is (= #{:l} (err-ks (coercer {:l "1.2"})))))))
 
+(deftest coercer!-test
+  (let [coercer (coerce/coercer! {:k s/Keyword :i s/Int} coerce/string-coercion-matcher)]
+    (is (= {:k :key :i 12} (coercer {:k "key" :i "12"})))
+    (is (thrown-with-msg? #+clj Exception #+cljs js/Error  #"keyword\? 12" (coercer {:k 12 :i 12})))))
+
 #+clj
 (do
   (def NestedVecs
