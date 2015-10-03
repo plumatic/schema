@@ -1,3 +1,7 @@
+## 1.0.2
+ * Add leaf generators for UUIDs
+ * Make `s/defn` compatible with `with-test` 
+
 ## 1.0.1
  * Catch and report exceptions in guards the same as preconditions, rather than allowing them to propagate out.
 
