@@ -75,7 +75,7 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol defrecord defn letfn defmethod fn])
+  (:refer-clojure :exclude [Keyword Symbol atom defrecord defn letfn defmethod fn])
   (:require
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
@@ -622,6 +622,29 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Atom schema
+
+(defn- atom? [x]
+  #+clj (instance? clojure.lang.IAtom x)
+  #+cljs (satisfies? IAtom x))
+
+(clojure.core/defrecord Atomic [schema]
+  Schema
+  (spec [this]
+    (collection/collection-spec
+     (spec/simple-precondition this atom?)
+     clojure.core/atom
+     [(collection/one-element true schema (clojure.core/fn [item-fn coll] (item-fn @coll) nil))]
+     (clojure.core/fn [_ xs _] (clojure.core/atom (first xs)))))
+  (explain [this] (list 'atom (explain schema))))
+
+(clojure.core/defn atom
+  "An atom containing a value matching 'schema'."
+  [schema]
+  (->Atomic schema))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
 ;; A map schema is itself a Clojure map, which can provide value schemas for specific required
@@ -900,7 +923,6 @@
   [first-schema first-name second-schema second-name]
   [(one first-schema first-name)
    (one second-schema second-name)])
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Record Schemas
