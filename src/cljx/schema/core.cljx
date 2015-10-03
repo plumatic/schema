@@ -1197,6 +1197,11 @@
       means that all arities must share the same output schema. Schema will
       automatically propagate primitive hints to the arg vector and class hints
       to the fn name, so that you get the behavior you expect from Clojure.
+    - All primitive schemas will be passed through as type hints to Clojure,
+      despite their legality in a particular position.  E.g.,
+        (s/defn foo [x :- int])
+      will fail because Clojure does not allow primitive ints as fn arguments;
+      in such cases, use the boxed Classes instead (e.g., Integer).
     - Schema metadata is only processed on top-level arguments.  I.e., you can
       use destructuring, but you must put schema metadata on the top-level
       arguments, not the destructured variables.
