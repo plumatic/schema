@@ -625,7 +625,7 @@
 ;;; Atom schema
 
 (defn- atom? [x]
-  #+clj (instance? clojure.lang.IAtom x)
+  #+clj (instance? clojure.lang.Atom x)
   #+cljs (satisfies? IAtom x))
 
 (clojure.core/defrecord Atomic [schema]
