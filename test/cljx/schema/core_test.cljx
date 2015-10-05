@@ -365,6 +365,15 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Atom schemas
+
+(deftest atom-test
+  (let [s (s/atom s/Str)]
+    (is (not (s/check s (atom "asdf")))) ;; don't expect identity after walking
+    (invalid! s (delay "asdf") "(not (atom? a-clojure.lang.Delay))")
+    (invalid! s (atom 1))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
 (deftest uniform-map-test
