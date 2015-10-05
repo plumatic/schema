@@ -1,4 +1,5 @@
 ## 1.0.2
+ * Extend keyword `enum` coercion to keyword `eq` coercion
  * Add leaf generators for UUIDs
  * Make `s/defn` compatible with `with-test` 
 

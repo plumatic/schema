@@ -59,8 +59,10 @@
   (if (string? s) (= "true" (str/lower-case s)) s))
 
 (defn keyword-enum-matcher [schema]
-  (when (and (instance? #+clj schema.core.EnumSchema #+cljs s/EnumSchema schema)
-             (every? keyword? (.-vs ^schema.core.EnumSchema schema)))
+  (when (or (and (instance? #+clj schema.core.EnumSchema #+cljs s/EnumSchema schema)
+                 (every? keyword? (.-vs ^schema.core.EnumSchema schema)))
+            (and (instance? #+clj schema.core.EqSchema #+cljs s/EqSchema schema)
+                 (keyword? (.-v ^schema.core.EqSchema schema))))
     string->keyword))
 
 (defn set-matcher [schema]
@@ -106,7 +108,7 @@
           Boolean string->boolean}))
 
 (defn json-coercion-matcher
-  "A matcher that coerces keywords and keyword enums from strings, and longs and doubles
+  "A matcher that coerces keywords and keyword eq/enums from strings, and longs and doubles
      from numbers on the JVM (without losing precision)"
   [schema]
   (or (+json-coercions+ schema)
@@ -127,7 +129,7 @@
           Double (safe #(Double/parseDouble %))}))
 
 (defn string-coercion-matcher
-  "A matcher that coerces keywords, keyword enums, s/Num and s/Int,
+  "A matcher that coerces keywords, keyword eq/enums, s/Num and s/Int,
      and long and doubles (JVM only) from strings."
   [schema]
   (or (+string-coercions+ schema)

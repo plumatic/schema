@@ -18,6 +18,7 @@
    (s/optional-key :k1) {s/Int s/Keyword}
    (s/optional-key :k2) s/Keyword
    (s/optional-key :e) (s/enum :a :b :c)
+   (s/optional-key :eq) (s/eq :k)
    (s/optional-key :set) #{s/Keyword}
    (s/optional-key :u) s/Uuid})
 
@@ -38,9 +39,9 @@
   (let [coercer (coerce/coercer
                  (merge Generic JSON)
                  coerce/json-coercion-matcher)
-        res {:i 1 :is [1 2] :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :set #{:a :b}}]
+        res {:i 1 :is [1 2] :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :eq :k :set #{:a :b}}]
     (is (= res
-           (coercer {:i 1.0 :is [1.0 2.0] :n 3.0 :s "asdf" :k1 {1.0 "hi"} :k2 "bye" :e "a" :set ["a" "a" "b"]})))
+           (coercer {:i 1.0 :is [1.0 2.0] :n 3.0 :s "asdf" :k1 {1.0 "hi"} :k2 "bye" :e "a" :eq "k" :set ["a" "a" "b"]})))
     (is (= res (coercer res)))
     (is (= {:i 1 :b true} (coercer {:i 1.0 :b "TRUE"})))
     (is (= {:i 1 :b false} (coercer {:i 1.0 :b "Yes"})))
@@ -62,8 +63,8 @@
 
 (deftest string-coercer-test
   (let [coercer (coerce/coercer Generic coerce/string-coercion-matcher)]
-    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :u #uuid "550e8400-e29b-41d4-a716-446655440000" :set #{:a :b}}
-           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a" :u "550e8400-e29b-41d4-a716-446655440000" :set ["a" "a" "b"]})))
+    (is (= {:b true :i 1 :n 3.0 :s "asdf" :k1 {1 :hi} :k2 :bye :e :a :eq :k :u #uuid "550e8400-e29b-41d4-a716-446655440000" :set #{:a :b}}
+           (coercer {:b "true" :i "1" :n "3.0" :s "asdf" :k1 {"1" "hi"} :k2 "bye" :e "a" :eq "k" :u "550e8400-e29b-41d4-a716-446655440000" :set ["a" "a" "b"]})))
     (is (= #{:i} (err-ks (coercer {:i "1.1"})))))
 
   #+clj (testing "jvm specific"
