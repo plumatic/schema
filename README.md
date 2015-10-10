@@ -274,6 +274,11 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate (s/eq :a) :a)
 (s/validate (s/enum :a :b :c) :a)
 
+;; either
+(def A {:a s/Any})
+(def B {:b s/Any})
+(s/validate (s/either A B) {:a "val"})
+
 ;; pred
 (s/validate (s/pred odd?) 1)
 
