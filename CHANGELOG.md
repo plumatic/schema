@@ -4,6 +4,7 @@
  * Add `coercer!` which throws on error
  * Add leaf generators for UUIDs
  * Make `s/defn` compatible with `with-test` 
+ * Add `constrained` schema for postconditions (replaces `(both x (s/pred ...))`)
 
 ## 1.0.1
  * Catch and report exceptions in guards the same as preconditions, rather than allowing them to propagate out.

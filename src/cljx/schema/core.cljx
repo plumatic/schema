@@ -506,6 +506,9 @@
      [(if (= pred :else) (constantly true) pred) schema])
    (if (odd? (count preds-and-schemas)) (last preds-and-schemas))))
 
+
+;; cond-pre (conditional based on surface type)
+
 (defprotocol HasPrecondition
   (precondition [this]
     "Return a predicate representing the Precondition for this schema:
@@ -552,6 +555,30 @@
   [& schemas]
   (CondPre. schemas))
 
+;; constrained (post-condition on schema)
+
+(clojure.core/defrecord Constrained [schema postcondition post-name]
+  Schema
+  (spec [this]
+    (variant/variant-spec
+     spec/+no-precondition+
+     [{:schema schema}]
+     nil
+     (spec/precondition this postcondition #(list post-name %))))
+  (explain [this]
+    (list 'constrained (explain schema) post-name)))
+
+(clojure.core/defn constrained
+  "A schema with an additional post-condition.  Differs from `conditional`
+   with a single schema, in that the predicate checked *after* the main
+   schema.  This can lead to better error messages, and is often better
+   suited for coercion."
+  ([s p?] (constrained s p? (symbol (utils/fn-name p?))))
+  ([s p? pred-name]
+     (when-not (ifn? p?)
+       (macros/error! (utils/format* "Not a function: %s" p?)))
+     (Constrained. s p? pred-name)))
+
 ;;; both (satisfies this schema and that one)
 
 (clojure.core/defrecord Both [schemas]
@@ -577,7 +604,7 @@
   "A value that must satisfy every schema in schemas.
 
    DEPRECATED: prefer 'conditional' with a single condition
-   instead.
+   instead, or `constrained`.
 
    When used with coercion, coerces each schema in sequence."
   [& schemas]
