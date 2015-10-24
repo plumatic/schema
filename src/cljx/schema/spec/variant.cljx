@@ -38,7 +38,7 @@
             res)))
       step)))
 
-(defrecord VariantSpec [pre options err-f]
+(defrecord VariantSpec [pre options err-f post]
   spec/CoreSpec
   (subschemas [this] (map :schema options))
   (checker [this params]
@@ -47,9 +47,16 @@
                (option-step o params f))
              (fn [x] (macros/validation-error this x (err-f (utils/value-name x))))
              (reverse options))]
-      (fn [x]
-        (or (pre x)
-            (t x))))))
+      (if post
+        (fn [x]
+          (or (pre x)
+              (let [v (t x)]
+                (if (utils/error? v)
+                  v
+                  (or (post v) v)))))
+        (fn [x]
+          (or (pre x)
+              (t x)))))))
 
 (defn variant-spec
   "A variant spec represents a choice between a set of alternative
@@ -66,12 +73,15 @@
    guard)."
   ([pre options]
      (variant-spec pre options nil))
+  ([pre options err-f]
+     (variant-spec pre options err-f nil))
   ([pre ;- spec/Precondition
     options ;- [{:schema (s/protocol Schema)
     ;;           (s/optional-key :guard) (s/pred fn?)
     ;;           (s/optional-key :error-wrap) (s/pred fn?)}]
     err-f ;- (s/pred fn?)
+    post ;- (s/maybe spec/Precondition)
     ]
      (macros/assert! (or err-f (nil? (:guard (last options))))
                      "when last option has a guard, err-f must be provided")
-     (->VariantSpec pre options err-f)))
+     (->VariantSpec pre options err-f post)))

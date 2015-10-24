@@ -88,3 +88,7 @@
     (is (= [1 [2 [3] [4]]]
            ((coerce/coercer NestedVecs coerce/string-coercion-matcher)
             ["1" ["2" ["3"] ["4"]]])))))
+
+(deftest constrained-test
+  (let [coercer (coerce/coercer! (s/constrained s/Int odd?) coerce/string-coercion-matcher)]
+    (is (= 1 (coercer "1")))))

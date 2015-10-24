@@ -37,7 +37,12 @@
   schema.spec.variant.VariantSpec
   (composite-generator [s params]
     (generators/such-that
-     (complement (.-pre ^schema.spec.variant.VariantSpec s))
+     (fn [x]
+       (let [pre (.-pre ^schema.spec.variant.VariantSpec s)
+             post (.-post ^schema.spec.variant.VariantSpec s)]
+         (not
+          (or (pre x)
+              (and post (post x))))))
      (generators/one-of
       (for [o (macros/safe-get s :options)]
         (if-let [g (:guard o)]

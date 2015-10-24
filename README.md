@@ -260,7 +260,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
 
 ```clojure
 ;; anything
@@ -297,8 +297,11 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; will be chosen based on the `map?` precondition (use `if` or `abstract-map-schema` instead):
 (def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
 
-;; conditional can also be used to apply extra validation to a single type
-(def OddLong (s/conditional odd? long))
+;; conditional can also be used to apply extra validation to a single type,
+;; but constrained is often more desirable since it applies the validation
+;; as a *postcondition*, which typically provides better error messages
+;; and works better with coercion
+(def OddLong (s/constrained long odd?))
 (s/validate OddLong 1)
 ;; 1
 (s/validate OddLong 2)

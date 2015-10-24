@@ -299,6 +299,15 @@
     (invalid! s {:x 3.14})
     (invalid! s [1 2 3])))
 
+(deftest constrained-test
+  (let [s (s/constrained s/Int odd?)]
+    (is (= '(constrained Int odd?) (s/explain s)))
+    (valid! s 1)
+    (valid! s 5)
+    (invalid! s 2 "(not (odd? 2))")
+    (invalid! s "2" "(not (integer? \"2\"))")
+    (invalid! (s/constrained s/Str odd?) "2" "(throws? (odd? \"2\"))" )))
+
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
                  {:type (s/eq :foo) :baz s/Num}
