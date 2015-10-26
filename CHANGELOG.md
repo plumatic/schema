@@ -1,3 +1,6 @@
+## 1.0.3
+ * Fix warning about overriding `atom` under Clojure 1.7
+
 ## 1.0.2
  * Extend keyword `enum` coercion to keyword `eq` coercion
  * Add `s/atom` schema for atoms

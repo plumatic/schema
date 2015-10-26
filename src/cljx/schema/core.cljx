@@ -99,7 +99,7 @@
 
 #+clj (when-not clj-1195-fixed?
         ;; don't exclude fn because of bug in extend-protocol
-        (refer-clojure :exclude '[Keyword Symbol defrecord defn letfn defmethod]))
+        (refer-clojure :exclude '[Keyword Symbol atom defrecord defn letfn defmethod]))
 
 #+clj (set! *warn-on-reflection* true)
 
