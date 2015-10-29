@@ -1,5 +1,6 @@
 ## 1.0.3
  * Fix warning about overriding `atom` under Clojure 1.7
+ * Fix behavior of `constrained` with some schemas (e.g. maps).
 
 ## 1.0.2
  * Extend keyword `enum` coercion to keyword `eq` coercion

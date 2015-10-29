@@ -90,5 +90,5 @@
             ["1" ["2" ["3"] ["4"]]])))))
 
 (deftest constrained-test
-  (let [coercer (coerce/coercer! (s/constrained s/Int odd?) coerce/string-coercion-matcher)]
-    (is (= 1 (coercer "1")))))
+  (is (= 1 ((coerce/coercer! (s/constrained s/Int odd?) coerce/string-coercion-matcher) "1")))
+  (is (= {1 1} ((coerce/coercer! (s/constrained {s/Int s/Int} #(odd? (count %))) coerce/string-coercion-matcher) {"1" "1"}))))

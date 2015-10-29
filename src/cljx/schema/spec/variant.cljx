@@ -53,7 +53,7 @@
               (let [v (t x)]
                 (if (utils/error? v)
                   v
-                  (or (post v) v)))))
+                  (or (post (if (:return-walked? params) v x)) v)))))
         (fn [x]
           (or (pre x)
               (t x)))))))

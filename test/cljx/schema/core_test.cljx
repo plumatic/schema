@@ -306,7 +306,11 @@
     (valid! s 5)
     (invalid! s 2 "(not (odd? 2))")
     (invalid! s "2" "(not (integer? \"2\"))")
-    (invalid! (s/constrained s/Str odd?) "2" "(throws? (odd? \"2\"))" )))
+    (invalid! (s/constrained s/Str odd?) "2" "(throws? (odd? \"2\"))" ))
+  (let [s (s/constrained {:a s/Int} #(odd? (:a %)))]
+    (valid! s {:a 1})
+    (invalid! s {:b 1})
+    (invalid! s {:a 2})))
 
 (deftest if-test
   (let [schema (s/if #(= (:type %) :foo)
