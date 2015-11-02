@@ -413,7 +413,7 @@ We welcome contributions in the form of bug reports and pull requests; please se
 
 ## Supported Clojure versions
 
-Schema is currently supported on 1.5.1 and 1.6.x and the latest version of ClojureScript.
+Schema is currently supported on 1.6 and 1.7 and the latest version of ClojureScript.
 
 ## License
 
