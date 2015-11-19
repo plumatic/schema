@@ -1153,10 +1153,12 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(if (fn-validation?)
-     (do ~@body)
-     (do (set-fn-validation! true)
-         (try ~@body (finally (set-fn-validation! false))))))
+  `(let [body# (fn [] ~@body)]
+     (if (fn-validation?)
+       (body#)
+       (do
+         (set-fn-validation! true)
+         (try (body#) (finally (set-fn-validation! false)))))))
 
 (defmacro without-fn-validation
   "Execute body with input and output schema validation turned off for
@@ -1164,10 +1166,12 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(if (fn-validation?)
-     (do (set-fn-validation! false)
-         (try ~@body (finally (set-fn-validation! true))))
-     (do ~@body)))
+  `(let [body# (fn [] ~@body)]
+     (if (fn-validation?)
+       (do
+         (set-fn-validation! false)
+         (try (body#) (finally (set-fn-validation! true))))
+       (body#))))
 
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
