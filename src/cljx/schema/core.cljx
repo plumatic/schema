@@ -244,6 +244,10 @@
   "Any value, including nil."
   (AnythingSchema. nil))
 
+(def Dunno
+  "I.e., “I don’t *know* that *any* value is acceptable; I just don’t want to
+  deal with refining the schema any more right now.”"
+  Any)
 
 ;;; eq (to a single allowed value)
 
