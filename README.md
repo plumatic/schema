@@ -330,6 +330,26 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0).
 
+### Working backwards
+
+When adding schemas to already-existing code, you may find it useful work in
+stages: initially describing the shapes of expected data with broad strokes,
+gradually refining the schemas as your understanding of the domain improves. To
+remind yourself and others that certain schemas are not yet precise, you can use
+`Dunno` (an alias for `Any`) and `Approx` (a no-op macro).
+
+Some example usages:
+
+```clojure
+(def Username (Approx Str))  ; there may be length requirements or character restrictions
+(def ApiResponse
+  {:started-by Username
+   :affected #{Username}
+   :completed? (Approx Bool)  ; not sure if it's ever nil
+   :initiated-at (Approx Str)  ; an RFC-3339 timestamp
+   :result {Dunno Dunno}})
+```
+
 ## Transformations and Coercion
 
 As of version 0.2.0, Schema supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
