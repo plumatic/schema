@@ -96,7 +96,7 @@
       generators/int
       generators/s-pos-int))]))
 
-(def +primative-generators+
+(def +primitive-generators+
   {Double (generators/fmap double gen-rational)
    Float (generators/fmap float gen-rational)
    Long generators/int
@@ -108,7 +108,7 @@
 
 (def +simple-leaf-generators+
   (merge
-   +primative-generators+
+   +primitive-generators+
    {s/Str generators/string-ascii
     s/Bool generators/boolean
     s/Num (generators/one-of [generators/int (generators/fmap double gen-rational)])
@@ -132,7 +132,7 @@
                            [chars char-array Character]
                            [bytes byte-array Byte]
                            [booleans boolean-array Boolean]]]
-           [f (generators/fmap ctor (generators/vector (macros/safe-get +primative-generators+ c)))]))))
+           [f (generators/fmap ctor (generators/vector (macros/safe-get +primitive-generators+ c)))]))))
 
 (defn eq-generators [s]
   (when (instance? schema.core.EqSchema s)
