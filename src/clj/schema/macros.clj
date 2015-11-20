@@ -362,3 +362,8 @@
    See (doc compile-fn-validation?) for all conditions which control fn validation compilation"
   [on?]
   (reset! *compile-fn-validation* on?))
+
+(defmacro Approx
+  "A no-op “tag” to mark a schema as only *approximately* constraining the type."
+  [x]
+  x)
