@@ -86,24 +86,16 @@
   "A mapping from schemas to generating functions that should be used."
   (s/=> (s/maybe Generator) Schema))
 
-(def gen-rational
-  "Simple generator of rational numbers."
-  (generators/one-of
-   [generators/int
-    (generators/fmap
-     (fn [[a b]] (/ (* a a a a a) b))
-     (generators/tuple
-      generators/int
-      generators/s-pos-int))]))
-
 (def +primitive-generators+
-  {Double (generators/fmap double gen-rational)
-   Float (generators/fmap float gen-rational)
-   Long generators/int
-   Integer (generators/fmap unchecked-int generators/int)
-   Short (generators/fmap unchecked-short generators/int)
-   Character (generators/fmap unchecked-char generators/int)
-   Byte (generators/fmap unchecked-byte generators/int)
+  {Double generators/double
+   ;; using unchecked-float here will unfortunately generate a lot of
+   ;; infinities, since lots of doubles are out of the float range
+   Float (generators/fmap unchecked-float generators/double)
+   Long generators/large-integer
+   Integer (generators/fmap unchecked-int generators/large-integer)
+   Short (generators/fmap unchecked-short generators/large-integer)
+   Character (generators/fmap unchecked-char generators/large-integer)
+   Byte (generators/fmap unchecked-byte generators/large-integer)
    Boolean generators/boolean})
 
 (def +simple-leaf-generators+
@@ -111,17 +103,17 @@
    +primitive-generators+
    {s/Str generators/string-ascii
     s/Bool generators/boolean
-    s/Num (generators/one-of [generators/int (generators/fmap double gen-rational)])
+    s/Num (generators/one-of [generators/large-integer generators/double])
     s/Int (generators/one-of
-           [generators/int
-            (generators/fmap unchecked-int generators/int)
-            (generators/fmap bigint generators/int)])
+           [generators/large-integer
+            (generators/fmap unchecked-int generators/large-integer)
+            (generators/fmap bigint generators/large-integer)])
     s/Keyword generators/keyword
     clojure.lang.Keyword generators/keyword
     s/Symbol (generators/fmap (comp symbol name) generators/keyword)
     Object generators/any
     s/Any generators/any
-    s/Uuid (generators/fmap (fn [bytes] (java.util.UUID/nameUUIDFromBytes bytes)) generators/bytes)
+    s/Uuid generators/uuid
     s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)}
    (into {}
          (for [[f ctor c] [[doubles double-array Double]
