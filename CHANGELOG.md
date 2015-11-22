@@ -1,5 +1,6 @@
 ## 1.0.4
  * Update generators, bump minimum version of test.check to 0.9.0.  Generators will only work under Clojure 1.7.0+.
+ * Better performance for anonymous schematized functions, via lazy checker creation
 
 ## 1.0.3
  * Fix warning about overriding `atom` under Clojure 1.7
