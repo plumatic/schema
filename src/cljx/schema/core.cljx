@@ -454,7 +454,7 @@
   "A value that must satisfy at least one schema in schemas.
    Note that `either` does not work properly with coercion
 
-   DEPRECATED: prefer `cond-pre`
+   DEPRECATED: prefer `conditional` or `cond-pre`
 
    WARNING: either does not work with coercion.  It is also slow and gives
    bad error messages.  Please consider using `conditional` and friends
@@ -900,7 +900,10 @@
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert!
      (and (<= (count more) 1) (every? #(not (instance? One %)) more))
-     "Sequence schema %s does not match [one* optional* rest-schema?]" s)
+     "%s is not a valid sequence schema; %s%s%s" s
+     "a valid sequence schema consists of zero or more `one` elements, "
+     "followed by zero or more `optional` elements, followed by an optional "
+     "schema that will match the remaining elements.")
     [(concat required optional) (first more)]))
 
 (extend-protocol Schema
