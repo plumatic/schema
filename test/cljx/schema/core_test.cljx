@@ -8,13 +8,15 @@
     - (invalid-call! s x) asserts that calling the function throws an error."
   #+clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:use-macros
-          [cemerick.cljs.test :only [is deftest testing]]
+          [cemerick.cljs.test :only [is deftest testing are]]
           [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:require-macros [schema.macros :as macros])
   (:require
    clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
+   [schema.spec.core :as spec]
+   [schema.spec.collection :as collection]
    #+clj [schema.macros :as macros]
    #+cljs cemerick.cljs.test))
 
@@ -1313,6 +1315,54 @@
                         {:foo ~'Int
                          :bar ~'Keyword
                          (~'optional-key :baz) ~'Keyword}))]})))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;  Regression tests
+
+(defrecord ItemTest [first second])
+
+(defrecord CacheTest [schema]
+  s/Schema
+  (spec [this]
+    (collection/collection-spec
+      (let [p (spec/precondition this #(instance? ItemTest %) #(list 'instance? ItemTest %))]
+        (if-let [evf (:extra-validator-fn this)]
+          (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
+          p))
+      (fn [x] x)
+      [{:schema     s/Int
+        :cardinality :exactly-one
+        :parser     (fn [item-col m]
+                      (item-col (:first m))
+                      m)
+        :error-wrap (fn [err] [:first (utils/error-val err)])
+        }
+       {:schema      schema
+        :cardinality :exactly-one
+        :parser      (fn [item-col m]
+                       (item-col (:second m))
+                       m)
+        :error-wrap  (fn [err] [:second (utils/error-val err)])
+        }
+       {:schema s/Any
+        :cardinality :exactly-one
+        :parser (fn [_ _] nil)}]
+      (fn [_ elts _] (map utils/error-val elts))))
+  (explain [_]
+    (list 'cache-test)))
+
+(deftest issue-310-error-wrap-cache
+  (are [schema value expected]
+    (= expected (pr-str (s/check schema value)))
+    (->CacheTest s/Int) (->ItemTest :a nil)
+    "([:first (not (integer? :a))] [:second (not (integer? nil))])"
+
+    (->CacheTest [s/Int]) (->ItemTest :a nil)
+    "([:first (not (integer? :a))] nil)"
+
+    (->CacheTest [s/Int]) (->ItemTest :a [nil])
+    "([:first (not (integer? :a))] [:second [(not (integer? nil))]])"))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

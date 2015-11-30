@@ -87,14 +87,13 @@
    Handles caching and error wrapping behavior."
   [{:keys [schema error-wrap]}
    {:keys [subschema-checker cache] :as params}]
-  (with-cache cache schema
-    (fn [d] (fn [x] (@d x)))
-    (fn []
-      (let [sub (subschema-checker schema params)]
-        (if error-wrap
-          (fn [x]
-            (let [res (sub x)]
-              (if-let [e (utils/error-val res)]
-                (utils/error (error-wrap res))
-                res)))
-          sub)))))
+  (let [sub (with-cache cache schema
+              (fn [d] (fn [x] (@d x)))
+              (fn [] (subschema-checker schema params)))]
+    (if error-wrap
+      (fn [x]
+        (let [res (sub x)]
+          (if-let [e (utils/error-val res)]
+            (utils/error (error-wrap res))
+            res)))
+      sub)))
