@@ -211,8 +211,8 @@
         compile-validation (compile-fn-validation? env fn-name)]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
      :more-bindings (when compile-validation
-                      [input-checker-sym `(schema.core/checker ~input-schema-sym)
-                       output-checker-sym `(schema.core/checker ~output-schema-sym)])
+                      [input-checker-sym `(delay (schema.core/checker ~input-schema-sym))
+                       output-checker-sym `(delay (schema.core/checker ~output-schema-sym))])
      :arglist bind
      :raw-arglist original-arglist
      :arity-form (if compile-validation
@@ -230,7 +230,7 @@
                            (let [args# ~(if rest-arg
                                           `(list* ~@bind-syms ~rest-sym)
                                           bind-syms)]
-                             (when-let [error# (~input-checker-sym args#)]
+                             (when-let [error# (@~input-checker-sym args#)]
                                (error! (utils/format* "Input to %s does not match schema: %s"
                                                       '~fn-name (pr-str error#))
                                        {:schema ~input-schema-sym :value args# :error error#}))))
@@ -238,7 +238,7 @@
                                                (when rest-arg [rest-arg rest-sym]))
                                     ~@(apply-prepost-conditions body))]
                            (when validate#
-                             (when-let [error# (~output-checker-sym o#)]
+                             (when-let [error# (@~output-checker-sym o#)]
                                (error! (utils/format* "Output of %s does not match schema: %s"
                                                       '~fn-name (pr-str error#))
                                        {:schema ~output-schema-sym :value o# :error error#})))
@@ -270,7 +270,9 @@
                            (mapcat :more-bindings processed-arities)))
      :arglists (map :arglist processed-arities)
      :raw-arglists (map :raw-arglist processed-arities)
-     :schema-form `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))
+     :schema-form (if (= 1 (count processed-arities))
+                    `(schema.core/->FnSchema ~output-schema-sym ~[(ffirst schema-bindings)])
+                    `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings)))
      :fn-body fn-forms}))
 
 (defn parse-arity-spec
