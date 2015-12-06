@@ -264,7 +264,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
                            (when compile-validation
-                             `[^schema.utils.PSimpleCell ~'ufv__ schema.utils/use-fn-validation])
+                             `[~(with-meta 'ufv__ {:tag 'schema.utils.PSimpleCell}) schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))
