@@ -407,9 +407,14 @@ Longer-term, we have lots more in store for Schema. Just a couple of the crazy i
 
 Please feel free to join the Plumbing [mailing list](https://groups.google.com/forum/#!forum/prismatic-plumbing) to ask questions or discuss how you're using Schema.
 
-For announcements of new releases, you can also follow on [@PrismaticEng](http://twitter.com/prismaticeng) on Twitter.
+We welcome contributions in the form of bug reports and pull requests; please see `CONTRIBUTING.md` in the repo root for guidelines.  Libraries that extend `schema` with new functionality are great too; here are a few that we know of:
 
-We welcome contributions in the form of bug reports and pull requests; please see `CONTRIBUTING.md` in the repo root for guidelines.
+ - https://github.com/metosin/schema-tools has lots of useful utilities for working with schemas
+ - https://github.com/cddr/integrity includes a variety of extensions, including helpers for producing error messages suitable for end-users.
+ - https://github.com/gfredericks/schema-bijections has support for bijections, which are like a precise, two-way version of coercion, created for use with JSON APIs.
+ - https://github.com/outpace/schema-transit couples Schema to Cognitect's Transit library
+
+If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
