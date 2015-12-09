@@ -181,7 +181,7 @@
   (get_cell [this] q)
   (set_cell [this x] (set! q x)))
 
-(def ^schema.utils.PSimpleCell use-fn-validation
+(def use-fn-validation
   "Turn on run-time function validation for functions compiled when
    s/compile-fn-validation was true -- has no effect for functions compiled
    when it is false."

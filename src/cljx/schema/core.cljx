@@ -1143,12 +1143,12 @@
 (clojure.core/defn fn-validation?
   "Get the current global schema validation setting."
   []
-  (.get_cell utils/use-fn-validation))
+  (.get_cell ^schema.utils.PSimpleCell utils/use-fn-validation))
 
 (clojure.core/defn set-fn-validation!
   "Globally turn on (or off) schema validation for all s/fn and s/defn instances."
   [on?]
-  (.set_cell utils/use-fn-validation on?))
+  (.set_cell ^schema.utils.PSimpleCell utils/use-fn-validation on?))
 
 (defmacro with-fn-validation
   "Execute body with input and output schema validation turned on for
