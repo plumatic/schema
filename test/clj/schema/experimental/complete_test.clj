@@ -7,11 +7,12 @@
    [schema.experimental.complete :as complete]))
 
 (deftest complete-test
-  (let [s [{:a s/Int :b s/Str}]
-        [r1 r2 :as rs] (complete/complete [{:a 1} {:b "bob"}] s)]
+  (let [s [{:a s/Int :b s/Str :c [s/Str]}]
+        [r1 r2 r3 :as rs] (complete/complete [{:a 1} {:b "bob"} {:c ["foo" "bar"]}] s)]
     (is (not (s/check s rs)))
     (is (= (:a r1) 1))
-    (is (= (:b r2) "bob")))
+    (is (= (:b r2) "bob"))
+    (is (= (:c r3) ["foo" "bar"])))
   (testing "complete through variant"
     (let [s (s/cond-pre s/Str {:foo s/Int})]
       (is (= "test" (complete/complete "test" s)))

@@ -52,7 +52,11 @@
                                             (map s/explicit-schema-key))))]
               (sub-checker
                (into {} (for [k ks] [k (get x k +missing+)])))))))
-      (fn [x] (assert (not= x +missing+)) (sub-checker x))))
+      (let [g (apply generators/generator s generator-opts)]
+        (fn coll-completer [x]
+          (if (= +missing+ x)
+            (sample g)
+            (sub-checker x))))))
 
   schema.spec.leaf.LeafSpec
   (completer* [spec s sub-checker generator-opts]
