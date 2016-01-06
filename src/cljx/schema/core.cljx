@@ -551,6 +551,18 @@
   "A replacement for `either` that constructs a conditional schema
    based on the schema spec preconditions of the component schemas.
 
+   Given a datum, the preconditions for each schema (which typically
+   check just the outermost class) are tested against the datum in turn.
+   The first schema whose precondition matches is greedily selected,
+   and the datum is validated against that schema.  Unlike `either`,
+   a validation failure is final (and there is no backtracking to try
+   other schemas that might match).
+
+   Thus, `cond-pre` is only suitable for schemas with mutually exclusive
+   preconditions (e.g., s/Int and s/Str).  If this doesn't hold
+   (e.g. {:a s/Int} and {:b s/Str}), you must use `conditional` instead
+   and provide an explicit condition for distinguishing the cases.
+
    EXPERIMENTAL"
   [& schemas]
   (CondPre. schemas))
