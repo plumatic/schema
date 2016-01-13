@@ -1,16 +1,16 @@
-<img src="https://raw.github.com/wiki/prismatic/schema/images/logo.png" width="270" />
+<img src="https://raw.github.com/wiki/plumatic/schema/images/logo.png" width="270" />
 
 A Clojure(Script) library for declarative data description and validation.
 
 [![Clojars Project](http://clojars.org/prismatic/schema/latest-version.svg)](http://clojars.org/prismatic/schema)
 
-[Latest codox API docs](http://prismatic.github.io/schema).
+[Latest codox API docs](http://plumatic.github.io/schema).
 
 **NOTE: this README is updated for the recent 1.0.0 release.  Please refer to the git history for previous versions of schema.**
 
 --
 
-One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://prismatic.github.io/schema-for-clojurescript-data-shape-declaration-and-validation) on the Prismatic blog.)
+One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://plumatic.github.io/schema-for-clojurescript-data-shape-declaration-and-validation).)
 
 Schema is a rich language for describing data shapes, with a variety of features:
 
@@ -18,7 +18,7 @@ Schema is a rich language for describing data shapes, with a variety of features
  - Annotation of function arguments and return values, with optional runtime validation
  - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
  - As of version 1.0.0, Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.
- - Schema is also built into our [`plumbing`](https://github.com/Prismatic/plumbing) and [`fnhouse`](https://github.com/Prismatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema.
+ - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema.
 
 ## Meet Schema
 
@@ -111,7 +111,7 @@ What about when things go bad?  Schema's `s/check` and `s/validate` provide mean
 
 ```
 
-See the "More Examples" section below for more examples and explanation, or the [custom Schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
+See the "More Examples" section below for more examples and explanation, or the [custom Schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
 
 
 ## Beyond type hints
@@ -193,7 +193,7 @@ Alternatively, you can force validation for key functions (without the need for 
 
 Thus, each time you invoke `stamped-names`, Schema will perform validation.
 
-To reduce generated code size, you can use the `*assert*` flag and `set-compile-fn-validation!` functions to control when validation code is generated ([details](https://github.com/Prismatic/schema/blob/master/src/clj/schema/macros.clj#L181)).
+To reduce generated code size, you can use the `*assert*` flag and `set-compile-fn-validation!` functions to control when validation code is generated ([details](https://github.com/plumatic/schema/blob/master/src/clj/schema/macros.clj#L181)).
 
 Schema will attempt to reduce the verbosity of its output by restricting the size of values that fail validation to 19 characters.  If a value exceeds this, it will be replaced by the name of its class.  You can adjust this size limitation by calling `set-max-value-length!`.
 
@@ -201,7 +201,7 @@ Finally, we use validation with coercion for API inputs and outputs.  See the co
 
 ## More examples
 
-The source code in [schema/core.cljx](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides a wealth of extra tools for defining schemas, which are described in docstrings. The file [schema/core_test.cljx](https://github.com/Prismatic/schema/blob/master/test/cljx/schema/core_test.cljx) demonstrates a variety of sample schemas and many examples of passing & failing clojure data.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
+The source code in [schema/core.cljx](https://github.com/plumatic/schema/blob/master/src/cljx/schema/core.cljx) provides a wealth of extra tools for defining schemas, which are described in docstrings. The file [schema/core_test.cljx](https://github.com/plumatic/schema/blob/master/test/cljx/schema/core_test.cljx) demonstrates a variety of sample schemas and many examples of passing & failing clojure data.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
 
 ### Map schema details
 
@@ -260,7 +260,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-[`schema.core`](https://github.com/Prismatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
 
 ```clojure
 ;; anything
@@ -328,7 +328,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
 ```
 
-You can also define schemas for [recursive data types](https://github.com/Prismatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/Prismatic/schema/wiki/Defining-New-Schema-Types-1.0).
+You can also define schemas for [recursive data types](https://github.com/plumatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0).
 
 ## Transformations and Coercion
 
@@ -360,9 +360,9 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
  - Numbers should be coerced to the expected type, if this can be done without losing precision.
  - When a Keyword is expected, a String can be coerced to the correct type by calling keyword
 
-There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/Prismatic/schema/wiki/Writing-Custom-Transformations) to do even more.
+There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/plumatic/schema/wiki/Writing-Custom-Transformations) to do even more.
 
-For more details, see [this blog post](http://blog.getprismatic.com/schema-0-2-0-back-with-clojurescript-data-coercion/).
+For more details, see [this blog post](http://plumatic.github.io//schema-0-2-0-back-with-clojurescript-data-coercion).
 
 ## Generation and Completion
 
@@ -386,14 +386,14 @@ As of version 1.0.0, Schema provides two experimental forms of automatic test da
 
 The `schema.experimental.generators` namespace can compile Schemas into `clojure.test.check` generators.  All of the built-in
 schemas are supported out of the box, and it is easy to extend to add new types or customize generation on a per-type basis.
-See [`schema.experimental.generators-test`](https://github.com/Prismatic/schema/blob/master/test/clj/schema/experimental/generators_test.clj)
+See [`schema.experimental.generators-test`](https://github.com/plumatic/schema/blob/master/test/clj/schema/experimental/generators_test.clj)
 for some more complex examples.
 
 Moreover, the `schema.experimental.complete` namespace can build on generation to allow "completion" of partial data.  Whereas generators and
 `clojure.test.check` are very useful tools for abstract property testing, `completers` are useful when we want to test the behavior of a
 function on a *specific* complex data structure, where only some parts of the data structure are relevant for the function under test.
 Completion supports all of the extensibility of generators, plus the ability to provide coercions to create very succinct helpers for
-test data generation.  See [`schema.experimental.complete-test`](https://github.com/Prismatic/schema/blob/master/test/clj/schema/experimental/complete_test.clj)
+test data generation.  See [`schema.experimental.complete-test`](https://github.com/plumatic/schema/blob/master/test/clj/schema/experimental/complete_test.clj)
 for examples.
 
 
@@ -422,4 +422,4 @@ Schema is currently supported on 1.6 and 1.7 and the latest version of ClojureSc
 
 ## License
 
-Copyright (C) 2013 Prismatic and Contributors.  Distributed under the Eclipse Public License, the same as Clojure.
+Distributed under the Eclipse Public License, the same as Clojure.

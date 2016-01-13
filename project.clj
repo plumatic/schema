@@ -1,6 +1,6 @@
 (defproject prismatic/schema "1.0.5-SNAPSHOT"
   :description "Clojure(Script) library for declarative data description and validation"
-  :url "http://github.com/prismatic/schema"
+  :url "http://github.com/plumatic/schema"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
@@ -70,7 +70,7 @@
                                            :pretty-print true}}}}
 
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
-          :src-dir-uri "http://github.com/prismatic/schema/blob/master/"
+          :src-dir-uri "http://github.com/plumatic/schema/blob/master/"
           :src-linenum-anchor-prefix "L"}
 
   :signing {:gpg-key "66E0BF75"})
