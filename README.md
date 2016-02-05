@@ -175,7 +175,7 @@ First, we ensure that all data types that will be shared across namespaces (or h
 
 This documentation is probably the most important benefit of Schema, which is why we've optimized Schemas for easy readability and reuse -- and sometimes, this is all you need. Schemas are purely descriptive, not prescriptive, so unlike a type system they should never get in your way, or constrain the types of functions you can write.
 
-After documentation, the next-most important benefit is validation.  Thus far, we've found three key use cases for validation.  First, you can globally turn on function validation within a given test namespace by adding this line:
+After documentation, the next-most important benefit is validation.  Thus far, we've found four key use cases for validation.  First, you can globally turn on function validation within a given test namespace by adding this line:
 
 ```clojure
 (use-fixtures :once schema.test/validate-schemas)
@@ -183,11 +183,19 @@ After documentation, the next-most important benefit is validation.  Thus far, w
 
 As long as your tests cover all call boundaries, this means you should catch any 'type-like' bugs in your code at test time.
 
-Second, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).
+Second, it may be handy to enable schema validation during development. To enable it, you can either type this into the repl or put it in your `user.clj`:
+
+```clojure
+(s/set-fn-validation! true)
+```
+
+To disable it again, call the same function, but with `false` as parameter instead.
+
+Third, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).
 
 Alternatively, you can force validation for key functions (without the need for `with-fn-validation`):
 
-```
+```clojure
 (s/defn ^:always-validate stamped-names ...)
 ```
 
