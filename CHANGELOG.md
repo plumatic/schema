@@ -1,3 +1,6 @@
+## 1.0.5
+ * Fix completion through non-map collections
+
 ## 1.0.4
  * Attempt to resolve issues with AOT compilation by moving typehint on `use-fn-validation` var to callsites.
  * Update generators, bump minimum version of test.check to 0.9.0.  Generators will only work under Clojure 1.7.0+.
