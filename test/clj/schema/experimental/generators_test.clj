@@ -45,6 +45,17 @@
     (testing (str leaf-schema)
       (is (= 10 (count (generators/sample 10 leaf-schema)))))))
 
+(def FancySeq
+  "A sequence that starts with a String, followed by an optional Keyword,
+   followed by any number of Numbers."
+  [(s/one s/Str "s")
+   (s/optional s/Keyword "k")
+   s/Num])
+
+(deftest fancy-seq-smoke-test
+  "Catch issues wit a fancier schema with optional keys and such."
+  (is (= 100 (count (generators/sample 100 FancySeq)))))
+
 (check-clojure-test/defspec spec-test
   100
   (properties/for-all [x (generators/generator OGSchema)]
