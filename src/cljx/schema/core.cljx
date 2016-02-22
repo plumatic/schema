@@ -488,7 +488,8 @@
 (clojure.core/defn conditional
   "Define a conditional schema.  Takes args like cond,
    (conditional pred1 schema1 pred2 schema2 ...),
-   and checks the first schema where pred is true on the value.
+   and checks the first schemaX where predX (an ordinary Clojure function
+   that returns true or false) returns true on the value.
    Unlike cond, throws if the value does not match any condition.
    :else may be used as a final condition in the place of (constantly true).
    More efficient than either, since only one schema must be checked.
@@ -502,8 +503,10 @@
    "Expected even, nonzero number of args (with optional trailing symbol); got %s"
    (count preds-and-schemas))
   (ConditionalSchema.
-   (for [[pred schema] (partition 2 preds-and-schemas)]
-     [(if (= pred :else) (constantly true) pred) schema])
+   (vec
+    (for [[pred schema] (partition 2 preds-and-schemas)]
+      (do (macros/assert! (ifn? pred) (str "Conditional predicate " pred " must be a function"))
+          [(if (= pred :else) (constantly true) pred) schema])))
    (if (odd? (count preds-and-schemas)) (last preds-and-schemas))))
 
 
