@@ -2,20 +2,47 @@
   "A collection spec represents a collection of elements,
    each of which is itself schematized."
   (:require
+   #+clj [schema.macros :as macros]
    [schema.utils :as utils]
-   [schema.spec.core :as spec]))
+   [schema.spec.core :as spec])
+  #+cljs (:require-macros [schema.macros :as macros]))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Collection Specs
 
+(declare sequence-transformer)
+
 (defn- element-transformer [e params then]
-  (let [parser (:parser e)
-        c (spec/sub-checker e params)]
-    #+clj (fn [^java.util.List res x]
-            (then res (parser (fn [t] (.add res (if (utils/error? t) t (c t)))) x)))
-    #+cljs (fn [res x]
-             (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x)))))
+  (if (vector? e)
+    (case (first e)
+      ::optional
+      (sequence-transformer (next e) params then)
+
+      ::remaining
+      (let [_ (macros/assert! (= 2 (count e)) "remaining can have only one schema.")
+            c (spec/sub-checker (second e) params)]
+        #+clj (fn [^java.util.List res x]
+                (doseq [i x]
+                  (.add res (c i)))
+                (then res nil))
+        #+cljs (fn [res x]
+                 (swap! res into (map c x))
+                 (then res nil))))
+
+    (let [parser (:parser e)
+          c (spec/sub-checker e params)]
+      #+clj (fn [^java.util.List res x]
+              (then res (parser (fn [t] (.add res (if (utils/error? t) t (c t)))) x)))
+      #+cljs (fn [res x]
+               (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x))))))
+
+(defn- sequence-transformer [elts params then]
+  (reduce
+   (fn [f e]
+     (element-transformer e params f))
+   then
+   (reverse elts)))
 
 #+clj ;; for performance
 (defn- has-error? [^java.util.List l]
@@ -31,16 +58,19 @@
 (defn- has-error? [l]
   (some utils/error? l))
 
+(defn subschemas [elt]
+  (if (map? elt)
+    [(:schema elt)]
+    (do (assert (vector? elt))
+        (assert (#{::remaining ::optional} (first elt)))
+        (mapcat subschemas (next elt)))))
+
 (defrecord CollectionSpec [pre constructor elements on-error]
   spec/CoreSpec
-  (subschemas [this] (map :schema elements))
+  (subschemas [this] (mapcat subschemas elements))
   (checker [this params]
     (let [constructor (if (:return-walked? params) constructor (fn [_] nil))
-          t (reduce
-             (fn [f e]
-               (element-transformer e params f))
-             (fn [_ x] x)
-             (reverse elements))]
+          t (sequence-transformer elements params (fn [_ x] x))]
       (fn [x]
         (or (pre x)
             (let [res #+clj (java.util.ArrayList.) #+cljs (atom [])
@@ -50,6 +80,7 @@
                 (utils/error (on-error x res remaining))
                 (constructor res))))))))
 
+
 (defn collection-spec
   "A collection represents a collection of elements, each of which is itself
    schematized.  At the top level, the collection has a precondition
@@ -57,13 +88,14 @@
    sequence of items, an element spec, and a function that constructs a
    descriptive error on failure.
 
-   The element spec is a sequence of maps, each of which provides an element
-   schema, cardinality, parser (allowing for efficient processing of
-   structured collections), and optional error wrapper."
+   The element spec is a nested list structure, in which the leaf elements each
+   provide an element schema, parser (allowing for efficient processing of structured
+   collections), and optional error wrapper.  Each item in the list is a leaf
+   element, except that the final element can be an \"optional\" or \"required\"
+   structure (see below) with its own elements inside."
   [pre ;- spec/Precondition
    constructor ;- (s/=> s/Any [(s/named s/Any 'checked-value)])
-   elements ;- [{:schema (s/protocol Schema)
-   ;;            :cardinality (s/enum :exactly-one :at-most-one :zero-or-more)
+   elements ;- nested list of [{:schema (s/protocol Schema)
    ;;            :parser (s/=> s/Any (s/=> s/Any s/Any) s/Any) ; takes [item-fn coll], calls item-fn on matching items, returns remaining.
    ;;            (s/optional-key :error-wrap) (s/pred fn?)}]
    on-error ;- (=> s/Any (s/named s/Any 'value) [(s/named s/Any 'checked-element)] [(s/named s/Any 'unmatched-element)])
@@ -74,12 +106,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for creating 'elements'
 
+(defn remaining
+  "All remaining elements must match schema s"
+  [s]
+  [::remaining s])
+
+(defn optional
+  "If any more elements are present, they must match the elements in 'ss'"
+  [& ss]
+  (vec (cons ::optional ss)))
+
 (defn all-elements [schema]
-  {:schema schema
-   :cardinality :zero-or-more
-   :parser (fn [item-fn coll] (doseq [x coll] (item-fn x)) nil)})
+  (remaining
+   {:schema schema
+    :parser (fn [coll] (macros/error! (str "should never be not called")))}))
 
 (defn one-element [required? schema parser]
-  {:schema schema
-   :cardinality (if required? :exactly-one :at-most-one)
-   :parser parser})
+  (let [base {:schema schema :parser parser}]
+    (if required?
+      base
+      (optional base))))
+
+(defn optional-tail [schema parser more]
+  (into (optional {:schema schema :parser parser}) more))
