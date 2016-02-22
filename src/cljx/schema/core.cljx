@@ -77,6 +77,7 @@
   ;; don't exclude def because it's not a var.
   (:refer-clojure :exclude [Keyword Symbol atom defrecord defn letfn defmethod fn])
   (:require
+   #+clj [clojure.pprint :as pprint]
    [clojure.string :as str]
    #+clj [schema.macros :as macros]
    [schema.utils :as utils]
@@ -121,9 +122,12 @@
 #+clj
 (do (clojure.core/defmethod print-method schema.core.Schema [s writer]
       (print-method (explain s) writer))
-    (prefer-method print-method schema.core.Schema clojure.lang.IRecord)
-    (prefer-method print-method schema.core.Schema java.util.Map)
-    (prefer-method print-method schema.core.Schema clojure.lang.IPersistentMap))
+    (clojure.core/defmethod pprint/simple-dispatch schema.core.Schema [s]
+      (pprint/write-out (explain s)))
+    (doseq [m [print-method pprint/simple-dispatch]]
+      (prefer-method m schema.core.Schema clojure.lang.IRecord)
+      (prefer-method m schema.core.Schema java.util.Map)
+      (prefer-method m schema.core.Schema clojure.lang.IPersistentMap)))
 
 (clojure.core/defn checker
   "Compile an efficient checker for schema, which returns nil for valid values and

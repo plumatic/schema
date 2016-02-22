@@ -12,6 +12,8 @@
           [schema.test-macros :only [valid! invalid! invalid-call!]])
   #+cljs (:require-macros [schema.macros :as macros])
   (:require
+   [clojure.string :as str]
+   #+clj [clojure.pprint :as pprint]
    clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
@@ -1319,6 +1321,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Regression tests
+
+#+clj
+(deftest pprint-test
+  (is (= "(maybe Int)" (str/trim (with-out-str (pprint/pprint (s/maybe s/Int)))))))
 
 (defrecord ItemTest [first second])
 
