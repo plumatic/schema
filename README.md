@@ -33,14 +33,16 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
 (def Data
   "A schema for a nested data type"
   {:a {:b s/Str
-       :c s/Int}
+       :c s/Int
+       :d (s/maybe s/Str)}
    :d [{:e s/Keyword
         :f [s/Num]}]})
 
 (s/validate
   Data
   {:a {:b "abc"
-       :c 123}
+       :c 123
+       :d nil}
    :d [{:e :bc
         :f [12.2 13 100]}
        {:e :bc
