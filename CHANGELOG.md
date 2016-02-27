@@ -1,3 +1,6 @@
+## 1.0.6
+ * Install a pprint method that uses the explain, in addition to an ordinary print-method.  Should fix large prints and stack overflows while pprinting schemas, or with plugins such as `pretty`.
+
 ## 1.0.5
  * Fix completion through non-map collections
 
