@@ -38,6 +38,8 @@
                (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x))))))
 
 (defn- sequence-transformer [elts params then]
+  (macros/assert! (not-any? #(and (vector? %) (= (first %) ::remaining)) (butlast elts))
+                  "Remaining schemas must be in tail position.")
   (reduce
    (fn [f e]
      (element-transformer e params f))
@@ -90,14 +92,21 @@
 
    The element spec is a nested list structure, in which the leaf elements each
    provide an element schema, parser (allowing for efficient processing of structured
-   collections), and optional error wrapper.  Each item in the list is a leaf
-   element, except that the final element can be an \"optional\" or \"required\"
-   structure (see below) with its own elements inside."
+   collections), and optional error wrapper.  Each item in the list can be a leaf
+   element or an `optional` nested element spec (see below).  In addition, the final
+   element can be a `remaining` schema (see below).
+
+   Note that the `optional` carries no semantics with respect to validation;
+   the user must ensure that the parser enforces the desired semantics, which
+   should match the structure of the spec for proper generation."
   [pre ;- spec/Precondition
    constructor ;- (s/=> s/Any [(s/named s/Any 'checked-value)])
-   elements ;- nested list of [{:schema (s/protocol Schema)
-   ;;            :parser (s/=> s/Any (s/=> s/Any s/Any) s/Any) ; takes [item-fn coll], calls item-fn on matching items, returns remaining.
-   ;;            (s/optional-key :error-wrap) (s/pred fn?)}]
+   elements ;- [(s/cond-pre
+   ;;            {:schema (s/protocol Schema)
+   ;;             :parser (s/=> s/Any (s/=> s/Any s/Any) s/Any) ; takes [item-fn coll], calls item-fn on matching items, returns remaining.
+   ;;             (s/optional-key :error-wrap) (s/pred fn?)}
+   ;;            [(s/one ::optional) (s/recursive Elements)]]
+   ;;          where the last element can optionally be a [::remaining schema]
    on-error ;- (=> s/Any (s/named s/Any 'value) [(s/named s/Any 'checked-element)] [(s/named s/Any 'unmatched-element)])
    ]
   (->CollectionSpec pre constructor elements on-error))
