@@ -30,6 +30,30 @@
     (fn [d] (#'generators/make-gen (fn [r s] (generators/call-gen @d r (quot s 2)))))
     (fn [] (subschema-generator schema params))))
 
+
+;; Helpers for collections
+
+(declare elements-generator)
+
+(defn element-generator [e params]
+  (if (vector? e)
+    (case (first e)
+      ::schema.spec.collection/optional
+      (generators/one-of
+       [(generators/return nil)
+        (elements-generator (next e) params)])
+
+      ::schema.spec.collection/remaining
+      (do (macros/assert! (= 2 (count e)) "remaining can have only one schema.")
+          (generators/vector (sub-generator (second e) params))))
+    (generators/fmap vector (sub-generator e params))))
+
+(defn elements-generator [elts params]
+  (->> elts
+       (map #(element-generator % params))
+       (apply generators/tuple)
+       (generators/fmap (partial apply concat))))
+
 (defprotocol CompositeGenerator
   (composite-generator [s params]))
 
@@ -55,16 +79,7 @@
   (composite-generator [s params]
     (generators/such-that
      (complement (.-pre ^schema.spec.collection.CollectionSpec s))
-     (generators/fmap
-      (comp (:constructor s) (partial apply concat))
-      (apply
-       generators/tuple
-       (for [{:keys [cardinality] :as e} (:elements s)]
-         (let [g (sub-generator e params)]
-           (case cardinality
-             :exactly-one (generators/fmap vector g)
-             :at-most-one (generators/one-of [(generators/return nil) (generators/fmap vector g)])
-             :zero-or-more (generators/vector g))))))))
+     (generators/fmap (:constructor s) (elements-generator (:elements s) params))))
 
   schema.spec.leaf.LeafSpec
   (composite-generator [s params]

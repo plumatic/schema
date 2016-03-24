@@ -936,23 +936,32 @@
       #(list 'sequential? %))
      vec
      (let [[singles multi] (parse-sequence-schema this)]
-       (concat
-        (for [^One s singles]
-          (let [required? (not (.-optional? s))]
-            (collection/one-element
-             required? (named (.-schema s) (.-name s))
-             (clojure.core/fn [item-fn x]
-               (if-let [x (seq x)]
-                 (do (item-fn (first x))
-                     (rest x))
-                 (do (when required?
-                       (item-fn
-                        (macros/validation-error
-                         (.-schema s) ::missing
-                         (list 'present? (.-name s)))))
-                     nil))))))
+       (reduce
+        (clojure.core/fn [more ^One s]
+          (if-not (.-optional? s)
+            (cons
+             (collection/one-element
+              true (named (.-schema s) (.-name s))
+              (clojure.core/fn [item-fn x]
+                (if-let [x (seq x)]
+                  (do (item-fn (first x))
+                      (rest x))
+                  (do (item-fn
+                       (macros/validation-error
+                        (.-schema s) ::missing
+                        (list 'present? (.-name s))))
+                      nil))))
+             more)
+            [(collection/optional-tail
+              (named (.-schema s) (.-name s))
+              (clojure.core/fn [item-fn x]
+                (when-let [x (seq x)]
+                  (item-fn (first x))
+                  (rest x)))
+              more)]))
         (when multi
-          [(collection/all-elements multi)])))
+          [(collection/all-elements multi)])
+        (reverse singles)))
      (clojure.core/fn [_ elts extra]
        (let [head (mapv utils/error-val elts)]
          (if (seq extra)

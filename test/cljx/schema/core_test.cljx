@@ -1332,29 +1332,24 @@
   s/Schema
   (spec [this]
     (collection/collection-spec
-      (let [p (spec/precondition this #(instance? ItemTest %) #(list 'instance? ItemTest %))]
-        (if-let [evf (:extra-validator-fn this)]
-          (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
-          p))
-      (fn [x] x)
-      [{:schema     s/Int
-        :cardinality :exactly-one
-        :parser     (fn [item-col m]
-                      (item-col (:first m))
+     (let [p (spec/precondition this #(instance? ItemTest %) #(list 'instance? ItemTest %))]
+       (if-let [evf (:extra-validator-fn this)]
+         (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
+         p))
+     (fn [x] x)
+     [{:schema     s/Int
+       :parser     (fn [item-col m]
+                     (item-col (:first m))
+                     m)
+       :error-wrap (fn [err] [:first (utils/error-val err)])}
+      {:schema      schema
+       :parser      (fn [item-col m]
+                      (item-col (:second m))
                       m)
-        :error-wrap (fn [err] [:first (utils/error-val err)])
-        }
-       {:schema      schema
-        :cardinality :exactly-one
-        :parser      (fn [item-col m]
-                       (item-col (:second m))
-                       m)
-        :error-wrap  (fn [err] [:second (utils/error-val err)])
-        }
-       {:schema s/Any
-        :cardinality :exactly-one
-        :parser (fn [_ _] nil)}]
-      (fn [_ elts _] (map utils/error-val elts))))
+       :error-wrap  (fn [err] [:second (utils/error-val err)])}
+      {:schema s/Any
+       :parser (fn [_ _] nil)}]
+     (fn [_ elts _] (map utils/error-val elts))))
   (explain [_]
     (list 'cache-test)))
 
