@@ -1,4 +1,5 @@
 ## 1.1.0
+ * **Deprecate* schema.experimental.generators and schema.experimental.complete.  Find them in their new home in the separate schema-generators project.
  * **BREAKING** change the internal details of collection specs (should only be an issue for custom collection schemas that don't rely on helpers `one-element` or `all-elements`).
  * Fix generation for sequence schemas containing a non-trailing `s/optional` element.
 

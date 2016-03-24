@@ -3,6 +3,7 @@
    To use it, you must provide your own test.check dependency.
 
    TODO: add cljs support."
+  {:deprecated "1.1.0"}
   (:require
    [clojure.test.check.generators :as generators]
    [schema.spec.core :as spec]

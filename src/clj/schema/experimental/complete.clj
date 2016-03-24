@@ -1,6 +1,7 @@
 (ns schema.experimental.complete
   "(Extremely) experimental support for 'completing' partial datums to match
    a schema. To use it, you must provide your own test.check dependency."
+  {:deprecated "1.1.0"}
   (:require
    [clojure.test.check.generators :as check-generators]
    [schema.spec.core :as spec]
