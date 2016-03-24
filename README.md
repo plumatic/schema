@@ -340,7 +340,7 @@ You can also define schemas for [recursive data types](https://github.com/plumat
 
 ## Transformations and Coercion
 
-As of version 0.2.0, Schema supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
+Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
 
 An example application of coercion is converting parsed JSON (e.g., from an HTTP post request) to a domain object with a richer set of types (e.g., Keywords).
 
@@ -426,7 +426,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on 1.6 and 1.7 and the latest version of ClojureScript.
+Schema is currently supported on 1.6 through 1.8 and the latest version of ClojureScript.
 
 ## License
 
