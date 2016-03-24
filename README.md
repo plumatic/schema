@@ -17,7 +17,7 @@ Schema is a rich language for describing data shapes, with a variety of features
  - Data validation, with descriptive error messages of failures (targeted at programmers)
  - Annotation of function arguments and return values, with optional runtime validation
  - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
- - As of version 1.0.0, Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.
+ - Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.  ** As of 1.1.0, this functionality can be found in the separate [`schema-generators`](https://github.com/plumatic/schema-generators) library. **
  - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema.
 
 ## Meet Schema
@@ -374,35 +374,7 @@ For more details, see [this blog post](http://plumatic.github.io//schema-0-2-0-b
 
 ## Generation and Completion
 
-As of version 1.0.0, Schema provides two experimental forms of automatic test data generation from schemas.
-
-```clojure
-(require '[schema.experimental.complete :as c] '[schema.experimental.generators :as g])
-
-(g/sample 3 Animal)
-;; => ({:name "", :barks? false, :type :dog}
-;;     {:name "", :claws? false, :type :cat}
-;;     {:name "\"|", :claws? false, :type :cat})
-
-(g/generate Tree)
-;; => {:value -8N, :children [{:value 5, :children [{:value -2N, :children []}]}
-;;                            {:value -2, :children []}]}
-
-(c/complete {:type :dog} Animal)
-;; => {:name "nL@", :barks? false, :type :dog}
-```
-
-The `schema.experimental.generators` namespace can compile Schemas into `clojure.test.check` generators.  All of the built-in
-schemas are supported out of the box, and it is easy to extend to add new types or customize generation on a per-type basis.
-See [`schema.experimental.generators-test`](https://github.com/plumatic/schema/blob/master/test/clj/schema/experimental/generators_test.clj)
-for some more complex examples.
-
-Moreover, the `schema.experimental.complete` namespace can build on generation to allow "completion" of partial data.  Whereas generators and
-`clojure.test.check` are very useful tools for abstract property testing, `completers` are useful when we want to test the behavior of a
-function on a *specific* complex data structure, where only some parts of the data structure are relevant for the function under test.
-Completion supports all of the extensibility of generators, plus the ability to provide coercions to create very succinct helpers for
-test data generation.  See [`schema.experimental.complete-test`](https://github.com/plumatic/schema/blob/master/test/clj/schema/experimental/complete_test.clj)
-for examples.
+** As of 1.1.0, this functionality can be found in the separate [`schema-generators`](https://github.com/plumatic/schema-generators) library. **
 
 
 ## For the Future
@@ -421,6 +393,7 @@ We welcome contributions in the form of bug reports and pull requests; please se
  - https://github.com/cddr/integrity includes a variety of extensions, including helpers for producing error messages suitable for end-users.
  - https://github.com/gfredericks/schema-bijections has support for bijections, which are like a precise, two-way version of coercion, created for use with JSON APIs.
  - https://github.com/outpace/schema-transit couples Schema to Cognitect's Transit library
+ - https://github.com/plumatic/schema-generators provides out-of-the box generation and partial datum completion from Schemas.
 
 If you make something new, please feel free to PR to add it here!
 
