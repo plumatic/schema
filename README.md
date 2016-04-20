@@ -191,7 +191,7 @@ Second, it may be handy to enable schema validation during development. To enabl
 
 To disable it again, call the same function, but with `false` as parameter instead.
 
-Third, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).
+Third, we manually call `s/validate` to check any data we read and write over the wire or to persistent storage, ensuring that we catch and debug bad data before it strays too far from its source.  If you need maximal performance, you can avoid the schema processing overhead on each call by create a validator once with `s/validator` and calling the resulting function on each datum you want to validate (`s/defn` does this under the hood).  Analogously, `s/check` and `s/checker` are similar, but *return* the error (or nil for success) rather than throwing exceptions on bad data.
 
 Alternatively, you can force validation for key functions (without the need for `with-fn-validation`):
 
