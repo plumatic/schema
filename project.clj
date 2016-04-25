@@ -38,6 +38,7 @@
 
   :auto-clean false
 
+  :java-source-paths ["src/jvm"]
   :source-paths ["target/generated/src/clj" "src/clj"]
 
   :resource-paths ["target/generated/src/cljs"]

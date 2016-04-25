@@ -164,30 +164,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Utilities for fast-as-possible reference to use to turn fn schema validation on/off
 
-#+clj
-(definterface PSimpleCell
-  (get_cell ^boolean [])
-  (set_cell [^boolean x]))
-
-#+cljs
-(defprotocol PSimpleCell
-  (get_cell [this])
-  (set_cell [this x]))
-
-
-;; adds ~5% overhead compared to no check
-(deftype SimpleVCell [^:volatile-mutable ^boolean q]
-  PSimpleCell
-  (get_cell [this] q)
-  (set_cell [this x] (set! q x)))
+#+cljs ;; clojure version defined in schema.utils.SimpleVCell.java
+(deftype SimpleVCell [^:volatile-mutable ^boolean value])
 
 (def use-fn-validation
   "Turn on run-time function validation for functions compiled when
    s/compile-fn-validation was true -- has no effect for functions compiled
    when it is false."
-  (SimpleVCell. false))
-
-#+cljs
-(do
-  (set! (.-get_cell use-fn-validation) (partial get_cell use-fn-validation))
-  (set! (.-set_cell use-fn-validation) (partial set_cell use-fn-validation)))
+  (schema.utils.SimpleVCell. false))

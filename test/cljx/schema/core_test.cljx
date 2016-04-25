@@ -1221,7 +1221,7 @@
 (deftest with-fn-validation-error-test
   (is (thrown? #+clj RuntimeException #+cljs js/Error
                (s/with-fn-validation (throw #+clj (RuntimeException.) #+cljs (js/Error. "error")))))
-  (is (false? (.get_cell utils/use-fn-validation))))
+  (is (false? (s/fn-validation?))))
 
 
 ;; def
