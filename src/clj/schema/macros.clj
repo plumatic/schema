@@ -225,7 +225,7 @@
                         metad-bind-syms)
                       `(let [validate# ~(if (:always-validate (meta fn-name))
                                           `true
-                                          `(.get_cell ~'ufv__))]
+                                          `(if-cljs (deref ~'ufv__) (.get ~'ufv__)))]
                          (when validate#
                            (let [args# ~(if rest-arg
                                           `(list* ~@bind-syms ~rest-sym)
@@ -264,7 +264,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
                            (when compile-validation
-                             `[~(with-meta 'ufv__ {:tag 'schema.utils.PSimpleCell}) schema.utils/use-fn-validation])
+                             `[~(with-meta 'ufv__ {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))
