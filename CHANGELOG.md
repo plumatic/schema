@@ -1,3 +1,6 @@
+## 1.1.2 
+ * Exclude `clojure.core/Inst` to avoid warnings in Clojure 1.9 alphas
+
 ## 1.1.1
  * Fix (at least some) AOT issues around PSimpleCell/SimpleVCell, by replacing with atom/AtomicReference.
 

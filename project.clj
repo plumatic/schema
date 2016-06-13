@@ -25,9 +25,10 @@
                                    {:source-paths ["test/cljx"]
                                     :output-path "target/generated/test/cljs"
                                     :rules :cljs}]}}
-             :1.8 {:dependencies [[org.clojure/clojure "1.8.0"] [org.clojure/clojurescript "0.0-3308"]]}}
+             :1.8 {:dependencies [[org.clojure/clojure "1.8.0"] [org.clojure/clojurescript "0.0-3308"]]}
+             :1.9 {:dependencies [[org.clojure/clojure "1.9.0-alpha5"] [org.clojure/clojurescript "0.0-3308"]]}}
 
-  :aliases {"all" ["with-profile" "dev:dev,1.8"]
+  :aliases {"all" ["with-profile" "dev:dev,1.8:dev,1.9"]
             "deploy" ["do" "clean," "cljx" "once," "deploy" "clojars"]
             "test" ["do" "clean," "cljx" "once," "test," "with-profile" "dev" "cljsbuild" "test"]}
 
