@@ -1,3 +1,6 @@
+## 1.1.3 
+ * Make fn validation customizable by addition of `fn-validator` function
+
 ## 1.1.2 
  * Exclude `clojure.core/Inst` to avoid warnings in Clojure 1.9 alphas
 
