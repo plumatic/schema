@@ -1206,6 +1206,22 @@
          (try (body#) (finally (set-fn-validation! true))))
        (body#))))
 
+(def fn-validator
+  "A var that can be rebound to a function to customize the behavior
+  of fn validation. When fn validation is on and `fn-validator` is
+  bound to a function, normal argument and return value checks will
+  be substituted with a call to this function with five arguments:
+
+    direction   - :input or :output
+    fn-name     - a symbol, the function's name
+    schema      - the schema for the arglist or the return value
+    checker     - a precompiled checker to check a value against
+                  the schema
+    value       - the actual arglist or return value
+
+  The function's return value will be ignored."
+  nil)
+
 (clojure.core/defn schematize-fn
   "Attach the schema to fn f at runtime, extractable by fn-schema."
   [f schema]

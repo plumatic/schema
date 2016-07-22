@@ -230,18 +230,30 @@
                            (let [args# ~(if rest-arg
                                           `(list* ~@bind-syms ~rest-sym)
                                           bind-syms)]
-                             (when-let [error# (@~input-checker-sym args#)]
-                               (error! (utils/format* "Input to %s does not match schema: %s"
-                                                      '~fn-name (pr-str error#))
-                                       {:schema ~input-schema-sym :value args# :error error#}))))
+                             (if schema.core/fn-validator
+                               (schema.core/fn-validator :input
+                                                         '~fn-name
+                                                         ~input-schema-sym
+                                                         @~input-checker-sym
+                                                         args#)
+                               (when-let [error# (@~input-checker-sym args#)]
+                                 (error! (utils/format* "Input to %s does not match schema: %s"
+                                                        '~fn-name (pr-str error#))
+                                         {:schema ~input-schema-sym :value args# :error error#})))))
                          (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
                                                (when rest-arg [rest-arg rest-sym]))
                                     ~@(apply-prepost-conditions body))]
                            (when validate#
-                             (when-let [error# (@~output-checker-sym o#)]
-                               (error! (utils/format* "Output of %s does not match schema: %s"
-                                                      '~fn-name (pr-str error#))
-                                       {:schema ~output-schema-sym :value o# :error error#})))
+                             (if schema.core/fn-validator
+                               (schema.core/fn-validator :output
+                                                         '~fn-name
+                                                         ~output-schema-sym
+                                                         @~output-checker-sym
+                                                         o#)
+                               (when-let [error# (@~output-checker-sym o#)]
+                                 (error! (utils/format* "Output of %s does not match schema: %s"
+                                                        '~fn-name (pr-str error#))
+                                         {:schema ~output-schema-sym :value o# :error error#}))))
                            o#))))
                    (cons (into regular-args (when rest-arg ['& rest-arg]))
                          body))}))

@@ -1387,3 +1387,21 @@
 
 (deftest schema-ns-test
   (is (= 'schema.core-test (s/schema-ns TestFoo))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;  Testing the ability to redefine schema.macros/fn-validator
+
+(deftest soft-validation-test
+  (let [the-log (atom [])
+        log #(swap! the-log conj %&)]
+    (with-redefs [s/fn-validator
+                  (fn [dir fn-name schema checker value]
+                    (when-let [err (checker value)]
+                      (log dir fn-name value)))]
+      (s/with-fn-validation
+        (simple-validated-defn 12)
+        (simple-validated-defn 13)))
+    (is (= [[:input 'simple-validated-defn [12]]
+            [:output 'simple-validated-defn "12"]]
+           @the-log))))
