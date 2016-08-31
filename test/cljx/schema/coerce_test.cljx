@@ -92,3 +92,10 @@
 (deftest constrained-test
   (is (= 1 ((coerce/coercer! (s/constrained s/Int odd?) coerce/string-coercion-matcher) "1")))
   (is (= {1 1} ((coerce/coercer! (s/constrained {s/Int s/Int} #(odd? (count %))) coerce/string-coercion-matcher) {"1" "1"}))))
+
+(deftest map-entry-test
+  (let [entry (first {:foo :bar})
+        coercer (coerce/coercer! (s/map-entry s/Any s/Any) (constantly nil))
+        coerced-value (coercer entry)]
+    (is (= entry coerced-value))
+    (is (= (type entry) (type coerced-value)))))
