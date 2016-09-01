@@ -747,13 +747,17 @@
   (or (required-key? ks)
       (optional-key? ks)))
 
+(clojure.core/defn map-entry-ctor [[k v :as coll]]
+  #+clj (clojure.lang.MapEntry. k v)
+  #+cljs (vec coll))
+
 ;; A schema for a single map entry.
 (clojure.core/defrecord MapEntry [key-schema val-schema]
   Schema
   (spec [this]
     (collection/collection-spec
      spec/+no-precondition+
-     vec
+     map-entry-ctor
      [(collection/one-element true key-schema (clojure.core/fn [item-fn e] (item-fn (key e)) e))
       (collection/one-element true val-schema (clojure.core/fn [item-fn e] (item-fn (val e)) nil))]
      (clojure.core/fn [[k] [xk xv] _]
