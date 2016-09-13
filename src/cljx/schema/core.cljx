@@ -266,7 +266,11 @@
 
 (clojure.core/defrecord Isa [h parent]
   Schema
-  (spec [this] (leaf/leaf-spec (spec/precondition this #(isa? h % parent) #(list 'isa? % parent))))
+  (spec [this] (leaf/leaf-spec (spec/precondition this
+                                                  #(if h
+                                                     (isa? h % parent)
+                                                     (isa? % parent))
+                                                  #(list 'isa? % parent))))
   (explain [this] (list 'isa? parent)))
 
 (clojure.core/defn isa

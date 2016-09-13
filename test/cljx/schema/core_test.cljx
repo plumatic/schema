@@ -106,14 +106,19 @@
 (deftest isa-test
   (let [h (make-hierarchy)
         h (derive h ::square ::shape)
-        schema (s/isa h ::shape)]
-    (valid! schema ::square)
-    (invalid! schema ::form)
+        schema-with-h (s/isa h ::shape)
+        schema-no-h (s/isa ::number)]
+    (derive ::integer ::number)
+    (valid! schema-with-h ::square)
+    (valid! schema-no-h ::integer)
+    (invalid! schema-with-h ::form)
+    (invalid! schema-no-h ::form)
     #+clj
     (valid! (s/isa java.lang.Number) java.lang.Long)
     #+cljs
     (valid! (s/isa js/Number) js/Number)
-    (is (= '(isa? ::shape) (s/explain schema)))))
+    (is (= '(isa? ::shape) (s/explain schema-with-h)))
+    (is (= '(isa? ::number) (s/explain schema-no-h)))))
 
 (deftest enum-test
   (let [schema (s/enum :a :b 1)]
