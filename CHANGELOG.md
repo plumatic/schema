@@ -1,3 +1,6 @@
+## [Unreleased] 1.1.4
+ * Highlights schema validation errors
+
 ## 1.1.3 
  * Make fn validation customizable by addition of `fn-validator` function
 

@@ -237,7 +237,7 @@
                                                          @~input-checker-sym
                                                          args#)
                                (when-let [error# (@~input-checker-sym args#)]
-                                 (error! (utils/format* "Input to %s does not match schema: %s"
+                                 (error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
                                                         '~fn-name (pr-str error#))
                                          {:schema ~input-schema-sym :value args# :error error#})))))
                          (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
@@ -251,7 +251,7 @@
                                                          @~output-checker-sym
                                                          o#)
                                (when-let [error# (@~output-checker-sym o#)]
-                                 (error! (utils/format* "Output of %s does not match schema: %s"
+                                 (error! (utils/format* "Output of %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
                                                         '~fn-name (pr-str error#))
                                          {:schema ~output-schema-sym :value o# :error error#}))))
                            o#))))
