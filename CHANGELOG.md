@@ -1,5 +1,7 @@
-## [Unreleased] 1.1.4
+## 1.1.4
  * Highlights schema validation errors
+ * Fix an issue with `isa?` and the global hierarchy
+ * Fix an issue with coercion and map entries
 
 ## 1.1.3 
  * Make fn validation customizable by addition of `fn-validator` function
