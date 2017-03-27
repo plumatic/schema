@@ -1,3 +1,6 @@
+## 1.1.5
+ * Pretty print schema validation errors
+
 ## 1.1.4
  * Highlights schema validation errors
  * Fix an issue with `isa?` and the global hierarchy
