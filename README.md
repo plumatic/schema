@@ -338,6 +338,34 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 You can also define schemas for [recursive data types](https://github.com/plumatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0).
 
+
+### Conditional Schema
+
+This is an example of a conditional Schema for a map, a key may be required based on the value of another key.
+We use merge because Schemas are simple data structures.
+
+```clojure
+(require '[schema.core :as s])
+
+(def ConditionalData
+   (let [Base {:a s/Str
+               :b (s/enum :move-along :requires-extra-key)}]
+     (s/conditional
+       #(= (:b %) :requires-extra-key) (merge Base {:extra-key s/Str})
+       :else Base)))
+
+(s/validate ConditionalData {:a "a" :b :move-along})
+;; ==> {:a "a" :b :move-along}
+
+;; :extra-key is required when :b is :requires-extra-key
+(s/validate ConditionalData {:a "a" :b :requires-extra-key})
+;; ==> clojure.lang.ExceptionInfo: Value does not match schema: {:extra-key missing-required-key}
+
+(s/validate ConditionalData {:a "a" :b :requires-extra-key :extra-key "extra! extra!"})
+;; ==> {:a "a" :b :requires-extra-key :extra-key "extra! extra!"}
+
+```
+
 ## Transformations and Coercion
 
 Schema also supports schema-driven data transformations, with *coercion* being the main application fleshed out thus far.  Coercion is like validation, except a schema-dependent transformation can be applied to the input data before validation.
