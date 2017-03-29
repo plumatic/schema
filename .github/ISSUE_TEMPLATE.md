@@ -1,0 +1,2 @@
+- [ ] This is a bug report (with instructions to reproduce) or other issue with the code
+(if this is a question or feature request, please **do not** open an issue and post on the [mailing list](https://groups.google.com/forum/#!forum/prismatic-plumbing) instead).  
