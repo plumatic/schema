@@ -117,6 +117,7 @@
           s/Int safe-long-cast
           Long safe-long-cast
           Double (safe double)
+          Float (safe float)
           Boolean string->boolean}))
 
 (defn json-coercion-matcher
