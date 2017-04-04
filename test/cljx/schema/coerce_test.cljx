@@ -30,6 +30,7 @@
   {(s/optional-key :jb) Boolean
    (s/optional-key :l) long
    (s/optional-key :d) Double
+   (s/optional-key :f) Float
    (s/optional-key :jk) clojure.lang.Keyword})
 
 (defn err-ks [res]
@@ -49,12 +50,13 @@
 
   #+clj (testing "jvm specific"
           (let [coercer (coerce/coercer JVM coerce/json-coercion-matcher)
-                res {:l 1 :d 1.0 :jk :asdf}]
-            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf"})))
+                res {:l 1 :d 1.0  :jk :asdf :f (float 0.1)}]
+            (is (= res (coercer {:l 1.0 :d 1 :jk "asdf" :f 0.1}) ))
             (is (= res (coercer res)))
             (is (= {:jb true} (coercer {:jb "TRUE"})))
             (is (= {:jb false} (coercer {:jb "Yes"})))
-            (is (= #{:l :jk} (err-ks (coercer {:l 1.2 :jk 1.0}))))
+            (is (= #{:l :jk :f} (err-ks (coercer {:l 1.2 :jk 1.0 :f "0"}))))
+            (is (= #{:f} (err-ks (coercer {:f nil}))))
             (is (= #{:d} (err-ks (coercer {:d nil}))))
             (is (= #{:d} (err-ks (coercer {:d "1.0"}))))))
   #+clj (testing "malformed uuid"
