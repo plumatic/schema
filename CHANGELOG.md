@@ -1,9 +1,5 @@
-## 1.1.6
- * Revert pretty printing of validation errors to remove reflection and fix stack traces.
- * Add float type to JVM coercers.
-
 ## 1.1.5
- * Pretty print schema validation errors
+ * Add float type to JVM coercers.
 
 ## 1.1.4
  * Highlights schema validation errors
