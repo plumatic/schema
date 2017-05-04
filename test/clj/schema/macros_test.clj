@@ -19,6 +19,13 @@
         (is (= (concat ['abc (merge explicit-meta schema-attrs doc-attrs attr-map) simple-body])
                (concat [name (meta name) more])))))))
 
+(deftest clj-primitives
+  (doseq [symbol '#{float double byte char short int long
+                        floats doubles bytes chars shorts ints longs objects}]
+    (is (macros/primitive-sym? symbol)))
+  (is (nil? (macros/primitive-sym? 'boolean)))
+  (is (nil? (macros/primitive-sym? 'booleans))))
+
 (deftest compile-fn-validation?-test
   (is (macros/compile-fn-validation? {} 'foo))
   (is (not (macros/compile-fn-validation? {} (with-meta 'foo {:never-validate true}))))
