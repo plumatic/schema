@@ -75,7 +75,7 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol Inst atom defrecord defn letfn defmethod fn])
+  (:refer-clojure :exclude [Keyword Symbol Inst atom defrecord defn letfn defmethod fn MapEntry ->MapEntry])
   (:require
    #+clj [clojure.pprint :as pprint]
    [clojure.string :as str]
