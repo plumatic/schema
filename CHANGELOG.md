@@ -1,3 +1,6 @@
+## 1.1.6 
+ * Add exclusions to workaround `->MapEntry` warnings with latest cljs.
+
 ## 1.1.5
  * Add float type to JVM coercers.
 
