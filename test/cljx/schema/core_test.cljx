@@ -97,6 +97,10 @@
   (valid! s/Any :whatever)
   (is (= 'Any (s/explain s/Any))))
 
+(deftest var-test
+  (valid! #'s/Any 10)
+  (is (= 'Any (s/explain #'s/Any))))
+
 (deftest eq-test
   (let [schema (s/eq 10)]
     (valid! schema 10)

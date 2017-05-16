@@ -248,6 +248,14 @@
   "Any value, including nil."
   (AnythingSchema. nil))
 
+;; Vars can contain schema
+
+(extend-protocol Schema
+  #+clj clojure.lang.Var #+cljs cljs.core.Var
+  (spec [this]
+    (spec (deref this)))
+  (explain [this]
+    (explain (deref this))))
 
 ;;; eq (to a single allowed value)
 
