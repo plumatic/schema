@@ -1124,8 +1124,8 @@
   (is (= "4" (simple-validated-defn 4)))
   (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
     (is (.contains (.getMessage e) +bad-input-str+))
-    (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
-    (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj"))))
+    (is (.contains (.getClassName ^StackTraceElement (second (.getStackTrace e))) "simple_validated_defn"))
+    (is (.startsWith (.getFileName ^StackTraceElement (second (.getStackTrace e))) "core_test.clj"))))
 
 (s/defn ^:always-validate always-validated-defn :- (s/pred even?)
   [x :- (s/pred pos?)]
