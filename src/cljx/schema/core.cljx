@@ -836,7 +836,7 @@
   (into {} (for [[k v] this] [(explain-kspec k) (explain v)])))
 
 (extend-protocol Schema
-  #+clj clojure.lang.APersistentMap
+  #+clj clojure.lang.IPersistentMap
   #+cljs cljs.core.PersistentArrayMap
   (spec [this] (map-spec this))
   (explain [this] (map-explain this))
