@@ -87,6 +87,10 @@ From these simple building blocks, we can build up more complex schemas that loo
 
 ;; nested map from long to String to double
 (s/validate {long {String double}} {1 {"2" 3.0 "4" 5.0}})
+
+;; list of anything
+(s/validate [s/Any] '(:a "hello" 99))
+
 ```
 
 Since schemas are just data, you can also `def` them and reuse and compose them as you would expect:
