@@ -254,9 +254,9 @@ Similarly, you can also write sequence schemas that expect particular values in 
    (s/optional s/Keyword "k")
    s/Num])
 
-(s/validate FancySeq ["test"])
-(s/validate FancySeq ["test" :k])
-(s/validate FancySeq ["test" :k 1 2 3])
+(s/validate FancySeq ["s"])
+(s/validate FancySeq ["s" :k])
+(s/validate FancySeq ["s" :k 1 2 3])
 ;; all ok
 
 (s/validate FancySeq [1 :k 2 3 "4"])
