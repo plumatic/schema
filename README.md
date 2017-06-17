@@ -30,7 +30,7 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
              :include-macros true ;; cljs only
              ]))
 
-(def Data
+(s/def Data
   "A schema for a nested data type"
   {:a {:b s/Str
        :c s/Int}
@@ -93,7 +93,7 @@ Since schemas are just data, you can also `def` them and reuse and compose them 
 
 ```clojure
 (def StringList [s/Str])
-(def StringScores {String double})
+(def StringScores {StringList double})
 (def StringScoreMap {long StringScores})
 ```
 
