@@ -6,7 +6,7 @@
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.7.0"]
                                   [org.clojure/clojurescript "0.0-2760"]
-                                  [org.clojure/tools.nrepl "0.2.5"]
+                                  ;;[org.clojure/tools.nrepl "0.2.5"]
                                   [org.clojure/test.check "0.9.0"]
                                   [potemkin "0.4.1"]]
                    :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
