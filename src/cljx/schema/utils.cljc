@@ -1,12 +1,12 @@
 (ns schema.utils
   "Private utilities used in schema implementation."
   (:refer-clojure :exclude [record?])
-  #+clj (:require [clojure.string :as string])
-  #+cljs (:require
-          goog.string.format
-          [goog.string :as gstring]
-          [clojure.string :as string])
-  #+cljs (:require-macros [schema.utils :refer [char-map]]))
+  #?(:clj (:require [clojure.string :as string])
+     :cljs (:require
+            goog.string.format
+            [goog.string :as gstring]
+            [clojure.string :as string]))
+  #?(:cljs (:require-macros [schema.utils :refer [char-map]])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
@@ -22,18 +22,18 @@
           [k v])))
 
 (defn type-of [x]
-  #+clj (class x)
-  #+cljs (js* "typeof ~{}" x))
+  #?(:clj (class x))
+  #?(:cljs (js* "typeof ~{}" x)))
 
 (defn fn-schema-bearer
   "What class can we associate the fn schema with? In Clojure use the class of the fn; in
    cljs just use the fn itself."
   [f]
-  #+clj (class f)
-  #+cljs f)
+  #?(:clj (class f))
+  #?(:cljs f))
 
 (defn format* [fmt & args]
-  (apply #+clj format #+cljs gstring/format fmt args))
+  (apply #?(:clj format) #?(:cljs gstring/format) fmt args))
 
 (def max-value-length (atom 19))
 
@@ -43,7 +43,7 @@
   (let [t (type-of value)]
     (if (<= (count (str value)) @max-value-length)
       value
-      (symbol (str "a-" #+clj (.getName ^Class t) #+cljs t)))))
+      (symbol (str "a-" #?(:clj (.getName ^Class t)) #?(:cljs t))))))
 
 (defmacro char-map []
   clojure.lang.Compiler/CHAR_MAP)
@@ -58,20 +58,20 @@
 (defn fn-name
   "A meaningful name for a function that looks like its symbol, if applicable."
   [f]
-  #+cljs (unmunge
-          (or (not-empty (second (re-find #"function ([^\(]*)\(" (str f))))
-              "function"))
-  #+clj (let [s (.getName (class f))
-              slash (.lastIndexOf s "$")
-              raw (unmunge
-                   (if (>= slash 0)
-                     (str (subs s 0 slash) "/" (subs s (inc slash)))
-                     s))]
-          (string/replace raw #"^clojure.core/" "")))
+  #?(:cljs (unmunge
+            (or (not-empty (second (re-find #"function ([^\(]*)\(" (str f))))
+                "function"))
+     :clj (let [s (.getName (class f))
+                slash (.lastIndexOf s "$")
+                raw (unmunge
+                     (if (>= slash 0)
+                       (str (subs s 0 slash) "/" (subs s (inc slash)))
+                       s))]
+            (string/replace raw #"^clojure.core/" ""))))
 
 (defn record? [x]
-  #+clj (instance? clojure.lang.IRecord x)
-  #+cljs (satisfies? IRecord x))
+  #?(:clj (instance? clojure.lang.IRecord x)
+     :cljs (satisfies? IRecord x)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -84,16 +84,17 @@
 (declare validation-error-explain)
 
 (deftype ValidationError [schema value expectation-delay fail-explanation]
-  #+cljs IPrintWithWriter
-  #+cljs (-pr-writer [this writer opts]
-           (-pr-writer (validation-error-explain this) writer opts)))
+  #?@(:cljs
+      [IPrintWithWriter
+       (-pr-writer [this writer opts]
+                   (-pr-writer (validation-error-explain this) writer opts))]))
 
 (defn validation-error-explain [^ValidationError err]
   (list (or (.-fail-explanation err) 'not) @(.-expectation-delay err)))
 
-#+clj ;; Validation errors print like forms that would return false
-(defmethod print-method ValidationError [err writer]
-  (print-method (validation-error-explain err) writer))
+#?(:clj ;; Validation errors print like forms that would return false
+   (defmethod print-method ValidationError [err writer]
+     (print-method (validation-error-explain err) writer)))
 
 (defn make-ValidationError
   "for cljs sake (easier than normalizing imports in macros.clj)"
@@ -105,16 +106,17 @@
 (declare named-error-explain)
 
 (deftype NamedError [name error]
-  #+cljs IPrintWithWriter
-  #+cljs (-pr-writer [this writer opts]
-           (-pr-writer (named-error-explain this) writer opts)))
+  #?@(:cljs
+      [IPrintWithWriter
+       (-pr-writer [this writer opts]
+                   (-pr-writer (named-error-explain this) writer opts))]))
 
 (defn named-error-explain [^NamedError err]
   (list 'named (.-error err) (.-name err)))
 
-#+clj ;; Validation errors print like forms that would return false
-(defmethod print-method NamedError [err writer]
-  (print-method (named-error-explain err) writer))
+#?(:clj ;; Validation errors print like forms that would return false
+   (defmethod print-method NamedError [err writer]
+     (print-method (named-error-explain err) writer)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -137,28 +139,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Registry for attaching schemas to classes, used for defn and defrecord
 
-#+clj
-(let [^java.util.Map +class-schemata+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))]
-  (defn declare-class-schema! [klass schema]
-    "Globally set the schema for a class (above and beyond a simple instance? check).
+#?(:clj
+   (let [^java.util.Map +class-schemata+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))]
+     (defn declare-class-schema! [klass schema]
+       "Globally set the schema for a class (above and beyond a simple instance? check).
    Use with care, i.e., only on classes that you control.  Also note that this
    schema only applies to instances of the concrete type passed, i.e.,
    (= (class x) klass), not (instance? klass x)."
-    (assert (class? klass)
-            (format* "Cannot declare class schema for non-class %s" (class klass)))
-    (.put +class-schemata+ klass schema))
+       (assert (class? klass)
+               (format* "Cannot declare class schema for non-class %s" (class klass)))
+       (.put +class-schemata+ klass schema))
 
-  (defn class-schema [klass]
-    "The last schema for a class set by declare-class-schema!, or nil."
-    (.get +class-schemata+ klass)))
+     (defn class-schema [klass]
+       "The last schema for a class set by declare-class-schema!, or nil."
+       (.get +class-schemata+ klass))))
 
-#+cljs
-(do
-  (defn declare-class-schema! [klass schema]
-    (aset klass "schema$utils$schema" schema))
+#?(:cljs
+   (do
+     (defn declare-class-schema! [klass schema]
+       (aset klass "schema$utils$schema" schema))
 
-  (defn class-schema [klass]
-    (aget klass "schema$utils$schema")))
+     (defn class-schema [klass]
+       (aget klass "schema$utils$schema"))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -169,5 +171,5 @@
    s/compile-fn-validation was true -- has no effect for functions compiled
    when it is false."
   ;; specialize in Clojure for performance
-  #+clj (java.util.concurrent.atomic.AtomicReference. false)
-  #+cljs (atom false))
+  #?(:clj (java.util.concurrent.atomic.AtomicReference. false)
+     :cljs (atom false)))
