@@ -8,29 +8,30 @@
                                   [org.clojure/clojurescript "0.0-2760"]
                                   ;;[org.clojure/tools.nrepl "0.2.5"]
                                   [org.clojure/test.check "0.9.0"]
-                                  [potemkin "0.4.1"]]
-                   :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
+                                  [potemkin "0.4.1"]
+                                  [com.cemerick/piggieback "0.2.2"]]
+                   :plugins [[cljsee "0.1.0"]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.5"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
-                   :cljx {:builds [{:source-paths ["src/cljx"]
-                                    :output-path "target/generated/src/clj"
-                                    :rules :clj}
-                                   {:source-paths ["src/cljx"]
-                                    :output-path "target/generated/src/cljs"
-                                    :rules :cljs}
-                                   {:source-paths ["test/cljx"]
-                                    :output-path "target/generated/test/clj"
-                                    :rules :clj}
-                                   {:source-paths ["test/cljx"]
-                                    :output-path "target/generated/test/cljs"
-                                    :rules :cljs}]}}
+                   :cljsee {:builds [{:source-paths ["src/cljx"]
+                                      :output-path "target/generated/src/clj"
+                                      :rules :clj}
+                                     {:source-paths ["src/cljx"]
+                                      :output-path "target/generated/src/cljs"
+                                      :rules :cljs}
+                                     {:source-paths ["test/cljx"]
+                                      :output-path "target/generated/test/clj"
+                                      :rules :clj}
+                                     {:source-paths ["test/cljx"]
+                                      :output-path "target/generated/test/cljs"
+                                      :rules :cljs}]}}
              :1.8 {:dependencies [[org.clojure/clojure "1.8.0"] [org.clojure/clojurescript "0.0-3308"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0-alpha5"] [org.clojure/clojurescript "0.0-3308"]]}}
 
   :aliases {"all" ["with-profile" "dev:dev,1.8:dev,1.9"]
-            "deploy" ["do" "clean," "cljx" "once," "deploy" "clojars"]
-            "test" ["do" "clean," "cljx" "once," "test," "with-profile" "dev" "cljsbuild" "test"]}
+            "deploy" ["do" "clean," "cljsee" "once," "deploy" "clojars"]
+            "test" ["do" "clean," "cljsee" "once," "test," "with-profile" "dev" "cljsbuild" "test"]}
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
