@@ -6,7 +6,7 @@
             goog.string.format
             [goog.string :as gstring]
             [clojure.string :as string]))
-  #?(:cljs (:require-macros [schema.utils :refer [char-map]])))
+  #_(:cljs (:require-macros [schema.utils :refer [char-map]])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Miscellaneous helpers
@@ -45,20 +45,22 @@
       value
       (symbol (str "a-" #?(:clj (.getName ^Class t)) #?(:cljs t))))))
 
-(defmacro char-map []
-  clojure.lang.Compiler/CHAR_MAP)
+#?(:clj
+   (defmacro char-map []
+     clojure.lang.Compiler/CHAR_MAP))
 
-(defn unmunge
-  "TODO: eventually use built in demunge in latest cljs."
-  [s]
-  (->> (char-map)
-       (sort-by #(- (count (second %))))
-       (reduce (fn [^String s [to from]] (string/replace s from (str to))) s)))
+#?(:clj
+   (defn unmunge
+     "TODO: eventually use built in demunge in latest cljs."
+     [s]
+     (->> (char-map)
+          (sort-by #(- (count (second %))))
+          (reduce (fn [^String s [to from]] (string/replace s from (str to))) s))))
 
 (defn fn-name
   "A meaningful name for a function that looks like its symbol, if applicable."
   [f]
-  #?(:cljs (unmunge
+  #?(:cljs (demunge
             (or (not-empty (second (re-find #"function ([^\(]*)\(" (str f))))
                 "function"))
      :clj (let [s (.getName (class f))
