@@ -405,7 +405,7 @@
 
 (def Uuid
   "The local representation of #uuid ..."
-  #?(:clj java.util.UUID #+cljs cljs.core/UUID))
+  #?(:clj java.util.UUID :cljs cljs.core/UUID))
 
 
 

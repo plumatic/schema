@@ -74,7 +74,7 @@
               :cljs (atom {}))}))
 
 (defn with-cache [cache cache-key wrap-recursive-delay result-fn]
-  (if-let [w #?(:clj (.get ^java.util.Map cache cache-key) cljs (@cache cache-key))]
+  (if-let [w #?(:clj (.get ^java.util.Map cache cache-key) :cljs (@cache cache-key))]
     (if (= ::in-progress w) ;; recursive
       (wrap-recursive-delay (delay #?(:clj (.get ^java.util.Map cache cache-key)
                                       :cljs (@cache cache-key))))

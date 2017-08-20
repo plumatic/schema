@@ -45,11 +45,11 @@
 (defn foo-bar [])
 
 (deftest fn-name-test
-  (is (= "odd?" (utils/fn-name odd?)))
-  (is (= #?(:clj "schema.core-test/foo-bar" :cljs "foo-bar")
+  (is (= #?(:clj "odd?" :cljs "cljs$core$odd?") (utils/fn-name odd?)))
+  (is (= #?(:clj "schema.core-test/foo-bar" :cljs "schema$core-test$foo-bar")
          (utils/fn-name foo-bar)))
   #?(:clj (is (= "schema.core-test$fn" (subs (utils/fn-name (fn foo [x] (+ x x))) 0 19))))
-  #?(:cljs (is (= "foo" (utils/fn-name (fn foo [x] (+ x x))))))
+  #?(:cljs (is (= "schema$core-test$fn-name-test-test-$-foo" (utils/fn-name (fn foo [x] (+ x x))))))
   #?(:cljs (is (= "function" (utils/fn-name (fn [x] (+ x x)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -284,9 +284,9 @@
       (invalid! schema {:foo 1} "(not (equal-keys? {:foo 1}))")
       (invalid! (s/conditional odd? s/Int) 2 "(not (odd? 2))")
       (invalid! (s/conditional odd? s/Int) "1" "(throws? (odd? \"1\"))")
-      (is (= '(conditional odd? Int)
+      (is (= '(conditional #?(:clj odd? :cljs cljs$core$odd?) Int)
              (s/explain (s/conditional odd? s/Int))))
-      (is (= '(conditional odd? Int weird?)
+      (is (= '(conditional #?(:clj odd? :cljs cljs$core$odd?) Int weird?)
              (s/explain (s/conditional odd? s/Int 'weird?)))))))
 
 (deftest cond-pre-test
@@ -310,7 +310,8 @@
 
 (deftest constrained-test
   (let [s (s/constrained s/Int odd?)]
-    (is (= '(constrained Int odd?) (s/explain s)))
+    (is (= '(constrained Int #?(:clj odd? :cljs cljs$core$odd?))
+           (s/explain s)))
     (valid! s 1)
     (valid! s 5)
     (invalid! s 2 "(not (odd? 2))")
@@ -1360,15 +1361,18 @@
 
 (deftest issue-310-error-wrap-cache
   (are [schema value expected]
-    (= expected (pr-str (s/check schema value)))
+      (= expected (pr-str (s/check schema value)))
     (->CacheTest s/Int) (->ItemTest :a nil)
-    "([:first (not (integer? :a))] [:second (not (integer? nil))])"
+    #?(:clj "([:first (not (integer? :a))] [:second (not (integer? nil))])"
+       :cljs "([:first (not (cljs$core$integer? :a))] [:second (not (cljs$core$integer? nil))])")
 
     (->CacheTest [s/Int]) (->ItemTest :a nil)
-    "([:first (not (integer? :a))] nil)"
+    #?(:clj "([:first (not (integer? :a))] nil)"
+       :cljs "([:first (not (cljs$core$integer? :a))] nil)")
 
     (->CacheTest [s/Int]) (->ItemTest :a [nil])
-    "([:first (not (integer? :a))] [:second [(not (integer? nil))]])"))
+    #?(:clj "([:first (not (integer? :a))] [:second [(not (integer? nil))]])"
+       :cljs "([:first (not (cljs$core$integer? :a))] [:second [(not (cljs$core$integer? nil))]])")))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
