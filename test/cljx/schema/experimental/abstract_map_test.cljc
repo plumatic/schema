@@ -1,13 +1,13 @@
 (ns schema.experimental.abstract-map-test
-  #+clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
-  #+cljs (:use-macros
-          [cemerick.cljs.test :only [is deftest testing]]
-          [schema.test-macros :only [valid! invalid! invalid-call!]])
+  #?(:clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]])
+     :cljs (:use-macros
+            [cemerick.cljs.test :only [is deftest testing]]
+            [schema.test-macros :only [valid! invalid! invalid-call!]]))
   (:require
    [schema.core :as s]
    [schema.coerce :as coerce]
    [schema.experimental.abstract-map :as abstract-map :include-macros true]
-   #+cljs cemerick.cljs.test))
+   #?(:cljs cemerick.cljs.test)))
 
 (s/defschema Animal
   (abstract-map/abstract-map-schema
