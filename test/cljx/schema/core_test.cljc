@@ -19,7 +19,7 @@
    [schema.core :as s]
    [schema.spec.core :as spec]
    [schema.spec.collection :as collection]
-   #?(:clj [schema.macros :as macros])
+   [schema.macros :as macros]
    #?(:cljs cemerick.cljs.test)))
 
 #?(:cljs
@@ -310,7 +310,7 @@
 
 (deftest constrained-test
   (let [s (s/constrained s/Int odd?)]
-    (is (= '(constrained Int #?(:clj odd? :cljs cljs$core$odd?))
+    (is (= '(constrained Int odd?)
            (s/explain s)))
     (valid! s 1)
     (valid! s 5)
