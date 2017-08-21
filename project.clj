@@ -11,7 +11,7 @@
                                   [org.clojure/test.check "0.9.0"]
                                   [potemkin "0.4.1"]
                                   [com.cemerick/piggieback "0.2.2"]]
-                   :plugins [[cljsee "0.1.0"]
+                   :plugins [;;[cljsee "0.1.0"]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.1.7"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
@@ -32,7 +32,9 @@
 
   :aliases {"all" ["with-profile" "dev:dev,1.8:dev,1.9"]
             "deploy" ["do" "clean," "cljsee" "once," "deploy" "clojars"]
-            "test" ["do" "clean," "cljsee" "once," "test," "with-profile" "dev" "cljsbuild" "test"]}
+            "test" ["do" "clean,"
+                    ;;"cljsee" "once,"
+                    "test," "with-profile" "dev" "cljsbuild" "test"]}
 
   :jar-exclusions [#"\.cljx|\.swp|\.swo|\.DS_Store"]
 
@@ -41,11 +43,13 @@
 
   :auto-clean false
 
-  :source-paths ["target/generated/src/clj" "src/clj"]
+  ;;:source-paths ["target/generated/src/clj" "src/clj"]
+  :source-paths ["src/clj" "src/cljx"]
 
-  :resource-paths ["target/generated/src/cljs"]
+  ;;:resource-paths ["target/generated/src/cljs"]
 
-  :test-paths ["target/generated/test/clj" "test/clj"]
+  ;;:test-paths ["target/generated/test/clj" "test/clj"]
+  :test-paths ["test/cljx" "test/clj"]
 
   :cljsbuild {:test-commands {"unit" ["phantomjs" :runner
                                       "this.literal_js_was_evaluated=true"
@@ -54,23 +58,26 @@
                                                 "this.literal_js_was_evaluated=true"
                                                 "target/unit-test-no-assert.js"]}
               :builds
-              {:dev {:source-paths ["src/clj" "target/generated/src/cljs"]
+              {:dev {:source-paths ["src/clj" "src/cljx"]
                      :compiler {:output-to "target/main.js"
                                 :optimizations :whitespace
                                 :pretty-print true}}
                :test {:source-paths ["src/clj" "test/clj"
-                                     "target/generated/src/cljs"
-                                     "target/generated/test/cljs"]
+                                     "src/cljx" "test/cljx"
+                                     ;;"target/generated/src/cljs"
+                                     ;;"target/generated/test/cljs"
+                                     ]
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
                                  :pretty-print true}}
-               :test-no-assert {:source-paths ["src/clj" "test/clj"
-                                               "target/generated/src/cljs"
-                                               "target/generated/test/cljs"]
-                                :assert false
-                                :compiler {:output-to "target/unit-test-no-assert.js"
-                                           :optimizations :whitespace
-                                           :pretty-print true}}}}
+               ;;:test-no-assert
+               #_{:source-paths ["src/clj" "test/clj"
+                                 "target/generated/src/cljs"
+                                 "target/generated/test/cljs"]
+                  :assert false
+                  :compiler {:output-to "target/unit-test-no-assert.js"
+                             :optimizations :whitespace
+                             :pretty-print true}}}}
 
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
           :src-dir-uri "http://github.com/plumatic/schema/blob/master/"

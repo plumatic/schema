@@ -79,7 +79,8 @@
   (:require
    #?(:clj [clojure.pprint :as pprint])
    [clojure.string :as str]
-   #?(:clj [schema.macros :as macros])
+   [schema.macros :as macros]
+   #_(:clj [schema.macros :as macros])
    [schema.utils :as utils]
    [schema.spec.core :as spec :include-macros true]
    [schema.spec.leaf :as leaf]
