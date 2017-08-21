@@ -310,7 +310,7 @@
 
 (deftest constrained-test
   (let [s (s/constrained s/Int odd?)]
-    (is (= '(constrained Int odd?)
+    (is (= '(constrained Int cljs$core$odd?)
            (s/explain s)))
     (valid! s 1)
     (valid! s 5)

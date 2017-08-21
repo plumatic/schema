@@ -70,14 +70,16 @@
                       :compiler {:output-to "target/unit-test.js"
                                  :optimizations :whitespace
                                  :pretty-print true}}
-               ;;:test-no-assert
-               #_{:source-paths ["src/clj" "test/clj"
-                                 "target/generated/src/cljs"
-                                 "target/generated/test/cljs"]
-                  :assert false
-                  :compiler {:output-to "target/unit-test-no-assert.js"
-                             :optimizations :whitespace
-                             :pretty-print true}}}}
+               :test-no-assert
+               {:source-paths ["src/clj" "test/clj"
+                               "src/cljx" "test/cljx"
+                               ;;"target/generated/src/cljs"
+                               ;;"target/generated/test/cljs"
+                               ]
+                :assert false
+                :compiler {:output-to "target/unit-test-no-assert.js"
+                           :optimizations :whitespace
+                           :pretty-print true}}}}
 
   :codox {:src-uri-mapping {#"target/generated/src/clj" #(str "src/cljx/" % "x")}
           :src-dir-uri "http://github.com/plumatic/schema/blob/master/"
