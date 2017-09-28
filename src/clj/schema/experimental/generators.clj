@@ -39,12 +39,12 @@
 (defn element-generator [e params]
   (if (vector? e)
     (case (first e)
-      ::schema.spec.collection/optional
+      :schema.spec.collection/optional
       (generators/one-of
        [(generators/return nil)
         (elements-generator (next e) params)])
 
-      ::schema.spec.collection/remaining
+      :schema.spec.collection/remaining
       (do (macros/assert! (= 2 (count e)) "remaining can have only one schema.")
           (generators/vector (sub-generator (second e) params))))
     (generators/fmap vector (sub-generator e params))))
