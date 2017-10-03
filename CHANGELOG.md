@@ -1,3 +1,6 @@
+## 1.1.7
+ * Remove unnecessarily relative marker in `::schema.spec.collection/` keywords to fix compatibility with latest Clojure 1.9 alpha.
+
 ## 1.1.6 
  * Add exclusions to workaround `->MapEntry` warnings with latest cljs.
 
