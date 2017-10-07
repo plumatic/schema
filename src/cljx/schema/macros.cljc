@@ -1,6 +1,7 @@
 (ns schema.macros
   "Macros and macro helpers used in schema.core."
   (:require
+   [cljs.analyzer.api]
    [clojure.string :as str]
    [schema.utils :as utils]))
 
@@ -73,7 +74,10 @@
                        floats doubles booleans bytes chars shorts ints longs objects})
 
 (defn valid-tag? [env tag]
-  (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
+  (and (symbol? tag) (or (primitive-sym? tag)
+                         #?(:clj (class? (resolve env tag))
+                            ;;:cljs (instance? (cljs.analyzer.api/resolve env tag))
+                            ))))
 
 (defn normalized-metadata
   "Take an object with optional metadata, which may include a :tag,
@@ -201,7 +205,8 @@
   [env fn-name output-schema-sym bind-meta [bind & body]]
   (assert! (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
+    (throw #?(:clj (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))
+              :cljs (js/Error. (str "Meta not supported on bindings, put on fn name" (vec bad-meta))))))
   (let [original-arglist bind
         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
         [regular-args rest-arg] (split-rest-arg env bind)
