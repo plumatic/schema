@@ -1365,11 +1365,11 @@
     (cljs.core/-add-method
      ~(with-meta multifn {:tag 'cljs.core/MultiFn})
      ~dispatch-val
-     (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))
+     (fn ~(with-meta (gensym (str multifn "__")) (meta multifn)) ~@fn-tail))
     (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
        addMethod
        ~dispatch-val
-       (fn ~(with-meta (gensym) (meta multifn)) ~@fn-tail))))
+       (fn ~(with-meta (gensym (str multifn "__")) (meta multifn)) ~@fn-tail))))
 
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
