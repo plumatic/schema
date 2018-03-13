@@ -1410,3 +1410,18 @@
     (is (= [[:input 'simple-validated-defn [12]]
             [:output 'simple-validated-defn "12"]]
            @the-log))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;  Testing that error messages on multimethods include the name
+
+(defmulti ffbe878f identity)
+(s/defmethod ^:always-validate ffbe878f 42
+  [x :- s/Str]
+  :unreachable)
+
+(deftest multimethod-error-messages
+  (try
+    (ffbe878f 42)
+    (is false "unreachable")
+    (catch Exception e
+      (is (re-find #"ffbe878f" (str e))))))
