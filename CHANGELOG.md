@@ -1,3 +1,6 @@
+## 1.1.8
+ * Improved errors for multimethods.
+
 ## 1.1.7
  * Remove unnecessarily relative marker in `::schema.spec.collection/` keywords to fix compatibility with latest Clojure 1.9 alpha.
 
