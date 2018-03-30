@@ -1424,4 +1424,5 @@
     (ffbe878f 42)
     (is false "unreachable")
     (catch Exception e
-      (is (re-find #"ffbe878f" (str e))))))
+      (is (re-find #"ffbe878f"
+                   (#+cljs .-message #+clj .getMessage e))))))
