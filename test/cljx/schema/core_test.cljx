@@ -17,6 +17,7 @@
    clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
+   [schema.other-namespace :as other-namespace]
    [schema.spec.core :as spec]
    [schema.spec.collection :as collection]
    #+clj [schema.macros :as macros]
@@ -1419,10 +1420,22 @@
   [x :- s/Str]
   :unreachable)
 
+(s/defmethod ^:always-validate other-namespace/ef408750 42
+  [x :- s/Str]
+  :also-unreachable)
+
 (deftest multimethod-error-messages
-  (try
-    (ffbe878f 42)
-    (is false "unreachable")
-    (catch Exception e
-      (is (re-find #"ffbe878f"
-                   (#+cljs .-message #+clj .getMessage e))))))
+  (testing "multimethods in the same namespace"
+    (try
+      (ffbe878f 42)
+      (is false "unreachable")
+      (catch Exception e
+        (is (re-find #"ffbe878f"
+                     (#+cljs .-message #+clj .getMessage e))))))
+  (testing "multimethods in a different namespace"
+    (try
+      (other-namespace/ef408750 42)
+      (is false "unreachable")
+      (catch Exception e
+        (is (re-find #"ef408750"
+                     (#+cljs .-message #+clj .getMessage e)))))))
