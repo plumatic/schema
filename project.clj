@@ -12,6 +12,7 @@
                    :plugins [[com.keminglabs/cljx "0.6.0" :exclusions [org.clojure/clojure]]
                              [codox "0.8.8"]
                              [lein-cljsbuild "1.0.5"]
+                             [lein-release/lein-release "1.0.4"]
                              [com.cemerick/clojurescript.test "0.3.1"]]
                    :cljx {:builds [{:source-paths ["src/cljx"]
                                     :output-path "target/generated/src/clj"
