@@ -1,3 +1,6 @@
+## 1.1.9
+ * Fix bug introduced in 1.1.8 ([#402](https://github.com/plumatic/schema/pull/402)).
+
 ## 1.1.8
  * Improved errors for multimethods.
 
