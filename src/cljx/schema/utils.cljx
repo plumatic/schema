@@ -155,10 +155,10 @@
 #+cljs
 (do
   (defn declare-class-schema! [klass schema]
-    (aset klass "schema$utils$schema" schema))
+    (goog.object/set klass "schema$utils$schema" schema))
 
   (defn class-schema [klass]
-    (aget klass "schema$utils$schema")))
+    (goog.object/get klass "schema$utils$schema")))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
