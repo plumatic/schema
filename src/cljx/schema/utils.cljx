@@ -4,6 +4,7 @@
   #+clj (:require [clojure.string :as string])
   #+cljs (:require
           goog.string.format
+          [goog.object :as gobject]
           [goog.string :as gstring]
           [clojure.string :as string])
   #+cljs (:require-macros [schema.utils :refer [char-map]]))
@@ -155,10 +156,10 @@
 #+cljs
 (do
   (defn declare-class-schema! [klass schema]
-    (aset klass "schema$utils$schema" schema))
+    (gobject/set klass "schema$utils$schema" schema))
 
   (defn class-schema [klass]
-    (aget klass "schema$utils$schema")))
+    (gobject/get klass "schema$utils$schema")))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
