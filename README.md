@@ -394,6 +394,7 @@ We welcome contributions in the form of bug reports and pull requests; please se
  - https://github.com/gfredericks/schema-bijections has support for bijections, which are like a precise, two-way version of coercion, created for use with JSON APIs.
  - https://github.com/outpace/schema-transit couples Schema to Cognitect's Transit library
  - https://github.com/plumatic/schema-generators provides out-of-the box generation and partial datum completion from Schemas.
+ - https://github.com/KitApps/schema-refined provides `constrained` and `conditional` on steroids to make your schemas as precise as it's possible using set of flexible and composable predicates  
 
 If you make something new, please feel free to PR to add it here!
 
