@@ -105,7 +105,7 @@
   #+clj
   (safe #(java.util.UUID/fromString ^String %))
   #+cljs
-  #(if (string? %) (cljs.core.UUID. %) %))
+  #(if (string? %) (uuid %) %))
 
 
 (def ^:no-doc +json-coercions+
