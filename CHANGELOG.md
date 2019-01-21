@@ -1,3 +1,6 @@
+## 1.1.10
+ * Fix warnings in newer versions of ClojureScript around `aget`, `aset`, and `uuid`.
+
 ## 1.1.9
  * Fix bug introduced in 1.1.8 ([#402](https://github.com/plumatic/schema/pull/402)).
 
