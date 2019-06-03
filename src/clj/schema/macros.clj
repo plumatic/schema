@@ -28,7 +28,7 @@
     (assert (symbol? sym))
     `(if-cljs
       (try ~@try-body (~'catch js/Object ~sym ~@catch-body))
-      (try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
+      (try ~@try-body (~'catch Exception ~sym ~@catch-body)))))
 
 (defmacro error!
   "Generate a cross-platform exception appropriate to the macroexpansion context"
