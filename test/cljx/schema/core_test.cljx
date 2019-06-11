@@ -288,7 +288,16 @@
       (is (= '(conditional odd? Int)
              (s/explain (s/conditional odd? s/Int))))
       (is (= '(conditional odd? Int weird?)
-             (s/explain (s/conditional odd? s/Int 'weird?)))))))
+             (s/explain (s/conditional odd? s/Int 'weird?))))))
+  (testing "nonfatal exceptions are caught"
+    (let [schema (s/conditional (fn [x] (throw (ex-info "non-fatal error" {})))
+                                s/Int)]
+      (invalid! schema 99)))
+  #+clj
+  (testing "fatal exceptions are not caught"
+    (let [schema (s/conditional (fn [x] (throw (InterruptedException.)))
+                                s/Int)]
+      (is (thrown? InterruptedException (s/validate schema 42))))))
 
 (deftest cond-pre-test
   (let [s (s/cond-pre
