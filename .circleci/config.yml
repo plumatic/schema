@@ -1,0 +1,41 @@
+version: 2.0
+
+jobs:
+  build:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+    working_directory: ~/schema
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          # always restore the latest cache
+          key: v1-jars-
+
+      - run: lein deps
+
+      - save_cache:
+          key: v1-jars-{{ checksum "project.clj" }}
+          paths:
+            - ~/.m2
+
+      - restore_cache:
+          key: node-10-13-0
+
+      - run:
+          name: Install node v10.13.0
+          command: |
+            if [ ! -d "${HOME}/node" ]; then
+                cd ${HOME}
+                wget https://nodejs.org/dist/v10.13.0/node-v10.13.0-linux-x64.tar.xz
+                tar xvf node-v10.13.0-linux-x64.tar.xz
+                mv node-v10.13.0-linux-x64 node
+            fi
+
+      - save_cache:
+          key: node-10-13-0
+          paths:
+            - ~/node
+
+      - run: PATH=${HOME}/node/bin:${PATH} lein with-profile +circleci all test

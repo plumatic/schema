@@ -753,7 +753,7 @@
 
 (clojure.core/defn map-entry-ctor [[k v :as coll]]
   #+clj (clojure.lang.MapEntry. k v)
-  #+cljs (vec coll))
+  #+cljs (cljs.core.MapEntry. k v))
 
 ;; A schema for a single map entry.
 (clojure.core/defrecord MapEntry [key-schema val-schema]

@@ -1,12 +1,12 @@
 (ns schema.coerce-test
   #+clj (:use clojure.test)
   #+cljs (:use-macros
-          [cemerick.cljs.test :only [is deftest]])
+          [cljs.test :only [is deftest]])
   (:require
    [schema.core :as s]
    [schema.utils :as utils]
    [schema.coerce :as coerce]
-   #+cljs cemerick.cljs.test))
+   #+cljs cljs.test))
 
 ;; s/Num s/Int
 
