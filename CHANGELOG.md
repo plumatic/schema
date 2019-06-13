@@ -1,3 +1,9 @@
+## 1.1.11 (`2019-06-12`)
+ * No longer swallows fatal exceptions on the JVM ([#413](https://github.com/plumatic/schema/pull/413))
+ * Wildcard keys in map schemas are internally amended
+   in a way that fixes [a bug in schema-generators](https://github.com/plumatic/schema-generators/issues/16)
+ * Minor fixes for more recent ClojureScript versions
+
 ## 1.1.10
  * Fix warnings in newer versions of ClojureScript around `aget`, `aset`, and `uuid`.
 
