@@ -19,8 +19,10 @@
   (if (cljs-env? &env) then else))
 
 (defmacro try-catchall
-  "A cross-platform variant of try-catch that catches all exceptions.
-   Does not (yet) support finally, and does not need or want an exception class."
+  "A cross-platform variant of try-catch that catches all* exceptions.
+   Does not (yet) support finally, and does not need or want an exception class.
+
+   *On the JVM certain fatal exceptions are not caught."
   [& body]
   (let [try-body (butlast body)
         [catch sym & catch-body :as catch-form] (last body)]
@@ -28,7 +30,15 @@
     (assert (symbol? sym))
     `(if-cljs
       (try ~@try-body (~'catch js/Object ~sym ~@catch-body))
-      (try ~@try-body (~'catch Throwable ~sym ~@catch-body)))))
+      (try
+        ~@try-body
+        ;; this whitelist is shamelessly copied from scala
+        ;; https://github.com/scala/scala/blob/2.13.x/src/library/scala/util/control/NonFatal.scala#L42
+        (~'catch VirtualMachineError  e# (throw e#))
+        (~'catch ThreadDeath          e# (throw e#))
+        (~'catch InterruptedException e# (throw e#))
+        (~'catch LinkageError         e# (throw e#))
+        (~'catch Throwable ~sym ~@catch-body)))))
 
 (defmacro error!
   "Generate a cross-platform exception appropriate to the macroexpansion context"
