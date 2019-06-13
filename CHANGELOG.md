@@ -16,7 +16,7 @@
 ## 1.1.7
  * Remove unnecessarily relative marker in `::schema.spec.collection/` keywords to fix compatibility with latest Clojure 1.9 alpha.
 
-## 1.1.6 
+## 1.1.6
  * Add exclusions to workaround `->MapEntry` warnings with latest cljs.
 
 ## 1.1.5
@@ -27,10 +27,10 @@
  * Fix an issue with `isa?` and the global hierarchy
  * Fix an issue with coercion and map entries
 
-## 1.1.3 
+## 1.1.3
  * Make fn validation customizable by addition of `fn-validator` function
 
-## 1.1.2 
+## 1.1.2
  * Exclude `clojure.core/Inst` to avoid warnings in Clojure 1.9 alphas
 
 ## 1.1.1
@@ -61,7 +61,7 @@
  * Add `s/atom` schema for atoms
  * Add `coercer!` which throws on error
  * Add leaf generators for UUIDs
- * Make `s/defn` compatible with `with-test` 
+ * Make `s/defn` compatible with `with-test`
  * Add `constrained` schema for postconditions (replaces `(both x (s/pred ...))`)
 
 ## 1.0.1
