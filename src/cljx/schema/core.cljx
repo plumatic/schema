@@ -804,22 +804,26 @@
                               (mapv explain-kspec))]
       (macros/assert! (empty? duplicate-keys)
                       "Schema has multiple variants of the same explicit key: %s" duplicate-keys))
-    (concat
-     (for [[k v] (dissoc this extra-keys-schema)]
-       (let [rk (explicit-schema-key k)
-             required? (required-key? k)]
-         (collection/one-element
-          required? (map-entry (eq rk) v)
-          (clojure.core/fn [item-fn m]
-            (let [e (find m rk)]
-              (cond e (item-fn e)
-                    required? (item-fn (utils/error [rk 'missing-required-key])))
-              (if e
-                (dissoc #+clj (if (instance? clojure.lang.PersistentStructMap m) (into {} m) m) #+cljs m
-                        rk)
-                m))))))
-     (when extra-keys-schema
-       [(collection/all-elements (apply map-entry (find this extra-keys-schema)))]))))
+    (let [without-extra-keys-schema (dissoc this extra-keys-schema)]
+      (concat
+       (for [[k v] without-extra-keys-schema]
+         (let [rk (explicit-schema-key k)
+               required? (required-key? k)]
+           (collection/one-element
+            required? (map-entry (eq rk) v)
+            (clojure.core/fn [item-fn m]
+              (let [e (find m rk)]
+                (cond e (item-fn e)
+                      required? (item-fn (utils/error [rk 'missing-required-key])))
+                (if e
+                  (dissoc #+clj (if (instance? clojure.lang.PersistentStructMap m) (into {} m) m) #+cljs m
+                          rk)
+                  m))))))
+       (when extra-keys-schema
+         (let [specific-keys (set (map explicit-schema-key (keys without-extra-keys-schema)))
+               [ks vs] (find this extra-keys-schema)
+               restricted-ks (constrained ks #(not (contains? specific-keys %)))]
+           [(collection/all-elements (map-entry restricted-ks vs))]))))))
 
 (defn- map-error []
   (clojure.core/fn [_ elts extra]
