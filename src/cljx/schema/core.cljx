@@ -368,7 +368,7 @@
 (def Str
   "Satisfied only by String.
    Is (pred string?) and not js/String in cljs because of keywords."
-  #+clj java.lang.String #+cljs (pred string?))
+  #+clj java.lang.String #+cljs (pred string? 'string?))
 
 (def Bool
   "Boolean true or false"
@@ -380,15 +380,15 @@
 
 (def Int
   "Any integral number"
-  (pred integer?))
+  (pred integer? 'integer?))
 
 (def Keyword
   "A keyword"
-  (pred keyword?))
+  (pred keyword? 'keyword?))
 
 (def Symbol
   "A symbol"
-  (pred symbol?))
+  (pred symbol? 'symbol?))
 
 (def Regex
   "A regular expression"
