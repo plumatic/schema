@@ -63,7 +63,7 @@
   (let [[_ s] (re-matches #"#object\[(.*)\]" (pr-str f))]
     (if (= "Function" s)
       "function"
-      (->> s demunge (re-find #"[^/]+$"))))
+      (->> s demunge (re-find #"[^/]+(?:$|(?=/+$))"))))
   #+clj (let [s (.getName (class f))
               slash (.lastIndexOf s "$")
               raw (unmunge
