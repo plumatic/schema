@@ -4,11 +4,13 @@
             [schema.core-test]
             [schema.experimental.abstract-map-test]
             [schema.other-namespace]
-            [schema.test-test]))
+            [schema.test-test]
+            [schema.utils-test]))
 
 (doo-tests
  'schema.coerce-test
  'schema.core-test
  'schema.experimental.abstract-map-test
  'schema.other-namespace
- 'schema.test-test)
+ 'schema.test-test
+ 'schema.utils-test)
