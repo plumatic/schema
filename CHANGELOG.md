@@ -1,3 +1,10 @@
+## 1.1.12 (`2019-08-10`)
+ * Fixes a "wrong number of arguments" warning in clojurescript (#418)
+ * Fixes an issue with function name inference introduced in the previous
+   release (#416)
+ * Improved the names of built-in predicate schemas in clojurescript production
+   environments (#417)
+
 ## 1.1.11 (`2019-06-12`)
  * No longer swallows fatal exceptions on the JVM ([#413](https://github.com/plumatic/schema/pull/413))
  * Wildcard keys in map schemas are internally amended
