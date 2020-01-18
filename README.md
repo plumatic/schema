@@ -397,6 +397,8 @@ We welcome contributions in the form of bug reports and pull requests; please se
  - https://github.com/outpace/schema-transit couples Schema to Cognitect's Transit library
  - https://github.com/plumatic/schema-generators provides out-of-the box generation and partial datum completion from Schemas.
  - https://github.com/KitApps/schema-refined provides `constrained` and `conditional` on steroids to make your schemas as precise as it's possible using set of flexible and composable predicates
+ - https://github.com/vodori/schema-conformer provides a more advanced coercion matcher with optional transformations like removing extra map keys, initializing default values, and converting between vectors and sets.
+ - https://github.com/vodori/schema-forms provides a converter from Schema to JSON Schema.
 
 If you make something new, please feel free to PR to add it here!
 
