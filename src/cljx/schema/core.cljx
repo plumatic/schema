@@ -1009,7 +1009,7 @@
        (if-let [evf (:extra-validator-fn this)]
          (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
          p))
-     (:constructor (meta this))
+     (:konstructor (meta this))
      (map-elements schema)
      (map-error)))
   (explain [this]
@@ -1018,7 +1018,7 @@
 (clojure.core/defn record* [klass schema map-constructor]
   #+clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass))
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
-  (with-meta (Record. klass schema) {:constructor map-constructor}))
+  (with-meta (Record. klass schema) {:konstructor map-constructor}))
 
 (defmacro record
   "A Record instance of type klass, whose elements match map schema 'schema'.
