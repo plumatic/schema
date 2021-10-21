@@ -2,9 +2,9 @@
   "Protocol and preliminaries for Schema 'specs', which are a common language
    for schemas to use to express their structure."
   (:require
-   #+clj [schema.macros :as macros]
+   #?(:clj [schema.macros :as macros])
    [schema.utils :as utils])
-  #+cljs (:require-macros [schema.macros :as macros]))
+  #?(:cljs (:require-macros [schema.macros :as macros])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Core spec protocol
@@ -70,16 +70,20 @@
    s
    {:subschema-checker f
     :return-walked? return-walked?
-    :cache #+clj (java.util.IdentityHashMap.) #+cljs (atom {})}))
+    :cache #?(:clj (java.util.IdentityHashMap.) :cljs (atom {}))}))
 
 (defn with-cache [cache cache-key wrap-recursive-delay result-fn]
-  (if-let [w #+clj (.get ^java.util.Map cache cache-key) #+cljs (@cache cache-key)]
+  (if-let [w #?(:clj (.get ^java.util.Map cache cache-key)
+                :cljs (@cache cache-key))]
     (if (= ::in-progress w) ;; recursive
-      (wrap-recursive-delay (delay #+clj (.get ^java.util.Map cache cache-key) #+cljs (@cache cache-key)))
+      (wrap-recursive-delay (delay #?(:clj (.get ^java.util.Map cache cache-key)
+                                      :cljs (@cache cache-key))))
       w)
-    (do #+clj (.put ^java.util.Map cache cache-key ::in-progress) #+cljs (swap! cache assoc cache-key ::in-progress)
+    (do #?(:clj (.put ^java.util.Map cache cache-key ::in-progress)
+           :cljs (swap! cache assoc cache-key ::in-progress))
         (let [res (result-fn)]
-          #+clj (.put ^java.util.Map cache cache-key res) #+cljs (swap! cache assoc cache-key res)
+          #?(:clj (.put ^java.util.Map cache cache-key res)
+             :cljs (swap! cache assoc cache-key res))
           res))))
 
 (defn sub-checker
