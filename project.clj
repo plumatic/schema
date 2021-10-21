@@ -29,25 +29,23 @@
 
   :source-paths ["src/clj" "src/cljc"]
 
-  :resource-paths ["src/cljs"]
-
   :test-paths ["test/clj" "test/cljc" "test/cljs"]
 
   :cljsbuild {:builds
               [{:id "dev"
-                :source-paths ["src/clj" "src/cljc" "src/cljs"]
+                :source-paths ["src/clj" "src/cljc"]
                 :compiler {:output-to "target/main.js"
                            :optimizations :whitespace
                            :pretty-print true}}
                {:id "test"
-                :source-paths ["src/clj" "src/cljc" "src/cljs"
+                :source-paths ["src/clj" "src/cljc"
                                "test/clj" "test/cljc" "test/cljs"]
                 :compiler {:output-to "target/unit-test.js"
                            :main schema.test-runner
                            :target :nodejs
                            :pretty-print true}}
                {:id "test-no-assert"
-                :source-paths ["src/clj" "src/cljc" "src/cljs"
+                :source-paths ["src/clj" "src/cljc"
                                "test/clj" "test/cljc" "test/cljs"]
                 :assert false
                 :compiler {:output-to "target/unit-test.js"
