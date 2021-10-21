@@ -2,7 +2,8 @@
   "Schemas representing abstract classes and subclasses"
   (:require
    [clojure.string :as str]
-   [schema.core :as s :include-macros true]
+   #?(:clj [schema.core :as s]
+      :cljs [schema.core :as s :include-macros true])
    [schema.spec.core :as spec]
    [schema.spec.variant :as variant]))
 
