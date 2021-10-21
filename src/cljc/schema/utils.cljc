@@ -46,15 +46,17 @@
       value
       (symbol (str "a-" #?(:clj (.getName ^Class t) :cljs t))))))
 
+#?(:clj
 (defmacro char-map []
-  clojure.lang.Compiler/CHAR_MAP)
+  clojure.lang.Compiler/CHAR_MAP))
 
+#?(:clj
 (defn unmunge
   "TODO: eventually use built in demunge in latest cljs."
   [s]
   (->> (char-map)
        (sort-by #(- (count (second %))))
-       (reduce (fn [^String s [to from]] (string/replace s from (str to))) s)))
+       (reduce (fn [^String s [to from]] (string/replace s from (str to))) s))))
 
 (defn fn-name
   "A meaningful name for a function that looks like its symbol, if applicable."
