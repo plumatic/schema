@@ -404,7 +404,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on 1.6 through 1.8 and the latest version of ClojureScript.
+Schema is currently supported on 1.7 through 1.10 and the latest version of ClojureScript.
 
 ## License
 
