@@ -121,7 +121,7 @@
 ;; Schemas print as their explains
 #?(:clj
 (do (clojure.core/defmethod print-method schema.core.Schema [s writer]
-     (print-method (explain s) writer))
+      (print-method (explain s) writer))
     (clojure.core/defmethod pprint/simple-dispatch schema.core.Schema [s]
       (pprint/write-out (explain s)))
     (doseq [m [print-method pprint/simple-dispatch]]
@@ -1019,7 +1019,8 @@
      (map-error)))
   (explain [this]
     (list 'record #?(:clj (symbol (.getName ^Class klass))
-                     :cljs (symbol (pr-str klass)) (explain schema)))))
+                     :cljs (symbol (pr-str klass)))
+          (explain schema))))
 
 (clojure.core/defn record* [klass schema map-constructor]
   #?(:clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass)))
