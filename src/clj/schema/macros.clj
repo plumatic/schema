@@ -53,8 +53,8 @@
          (throw (clojure.lang.ExceptionInfo. ~(with-meta s `{:tag java.lang.String}) ~m))))))
 
 (defmacro safe-get
-  "Like get but throw an exception if not found. A macro for historical reasons (work around cljx function
-   placement restrictions)."
+  "Like get but throw an exception if not found. A macro for historical reasons (to
+   work around cljx function placement restrictions)."
   [m k]
   `(let [m# ~m k# ~k]
      (if-let [pair# (find m# k#)]
