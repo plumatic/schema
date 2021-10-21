@@ -25,9 +25,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ~/.m2/repository
-          key: ${{ env.ACTION_CACHE_VERSION }}-${{ runner.os }}-maven-${{ hashFiles('**/project.clj') }}
+          key: ${{ env.ACTION_CACHE_VERSION }}-${{ runner.os }}-maven-${{ hashFiles('**/project.clj') }}-${{ matrix.java }}
           restore-keys: |
-            ${{ env.ACTION_CACHE_VERSION }}-${{ runner.os }}-maven-
+            ${{ env.ACTION_CACHE_VERSION }}-${{ runner.os }}-maven-${{ hashFiles('**/project.clj') }}-
       - name: Prepare java
         uses: actions/setup-java@v2
         with:
