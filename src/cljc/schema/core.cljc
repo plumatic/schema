@@ -646,21 +646,24 @@
 
 (clojure.core/defn var-name [v]
   (let [{:keys [ns name]} (meta v)]
-    (symbol (str #?(:clj (ns-name ns) :cljs ns "/" name)))))
+    (symbol (str #?(:clj (ns-name ns)
+                    :cljs ns)
+                 "/" name))))
 
 (clojure.core/defrecord Recursive [derefable]
   Schema
   (spec [this] (variant/variant-spec spec/+no-precondition+ [{:schema @derefable}]))
   (explain [this]
     (list 'recursive
-          (if #?(:clj (var? derefable) :cljs (instance? Var derefable))
-              (list 'var (var-name derefable))
-              #?(:clj
-                 (format "%s@%x"
-                         (.getName (class derefable))
-                         (System/identityHashCode derefable))
-                 :cljs
-                 '...)))))
+          (if #?(:clj (var? derefable)
+                 :cljs (instance? Var derefable))
+            (list 'var (var-name derefable))
+            #?(:clj
+               (format "%s@%x"
+                       (.getName (class derefable))
+                       (System/identityHashCode derefable))
+               :cljs
+               '...)))))
 
 (clojure.core/defn recursive
   "Support for (mutually) recursive schemas by passing a var that points to a schema,
