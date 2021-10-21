@@ -1,7 +1,7 @@
 (ns schema.test
   "Utilities for testing with schemas"
   (:require [schema.core :as s :include-macros true]
-            #+clj clojure.test))
+            #?(:clj clojure.test)))
 
 (defn validate-schemas
   "A fixture for tests: put
@@ -10,10 +10,10 @@
   [fn-test]
   (s/with-fn-validation (fn-test)))
 
-#+clj
+#?(:clj
 (defmacro deftest
   "A test with schema validation turned on globally during execution of the body."
   [name & body]
   `(clojure.test/deftest ~name
      (s/with-fn-validation
-       ~@body)))
+       ~@body))))
