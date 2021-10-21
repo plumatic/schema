@@ -18,7 +18,6 @@ jobs:
     strategy:
       matrix:
         java: ['8', '11', '17']
-        impl: ['clj', 'cljs']
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
