@@ -401,7 +401,7 @@
 
 (def Inst
   "The local representation of #inst ..."
-  #?(:clj java.util.Date #:cljs js/Date))
+  #?(:clj java.util.Date :cljs js/Date))
 
 (def Uuid
   "The local representation of #uuid ..."

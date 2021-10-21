@@ -46,7 +46,7 @@
    then
    (reverse elts)))
 
-#?(:cljs ;; for performance
+#?(:clj ;; for performance
 (defn- has-error? [^java.util.List l]
   (let [it (.iterator l)]
     (loop []
