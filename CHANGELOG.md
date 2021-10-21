@@ -1,3 +1,6 @@
+## NEXT
+ * **BREAKING** use `cljc` instead of `cljx`, which requires Clojure 1.7 or later.
+
 ## 1.1.12 (`2019-08-10`)
  * Fixes a "wrong number of arguments" warning in clojurescript (#418)
  * Fixes an issue with function name inference introduced in the previous
