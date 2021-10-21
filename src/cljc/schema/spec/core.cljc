@@ -53,10 +53,11 @@
     (when-let [reason (macros/try-catchall (when-not (p x) 'not) (catch e# 'throws?))]
       (macros/validation-error s x (err-f (utils/value-name x)) reason))))
 
+#?(:clj
 (defmacro simple-precondition
   "A simple precondition where f-sym names a predicate (e.g. (simple-precondition s map?))"
   [s f-sym]
-  `(precondition ~s ~f-sym #(list (quote ~f-sym) %)))
+  `(precondition ~s ~f-sym #(list (quote ~f-sym) %))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

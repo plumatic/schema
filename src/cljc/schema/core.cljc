@@ -334,6 +334,7 @@
   (explain [this] (list 'protocol (protocol-name this))))
 
 ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
+#?(:clj
 (defmacro protocol
   "A value that must satsify? protocol p.
 
@@ -345,7 +346,7 @@
   [p]
   `(with-meta (->Protocol ~p)
      {:proto-pred #(satisfies? ~p %)
-      :proto-sym '~p}))
+      :proto-sym '~p})))
 
 
 ;;; regex (validates matching Strings)
@@ -1027,6 +1028,7 @@
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
   (with-meta (Record. klass schema) {:constructor map-constructor}))
 
+#?(:clj
 (defmacro record
   "A Record instance of type klass, whose elements match map schema 'schema'.
 
@@ -1040,7 +1042,7 @@
                   (symbol (str/join "/" (concat (butlast bits) [(str "map->" (last bits))]))))
                #(~(symbol (str (name klass) "/create")) %))))
   ([klass schema map-constructor]
-     `(record* ~klass ~schema #(~map-constructor (into {} %)))))
+     `(record* ~klass ~schema #(~map-constructor (into {} %))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1085,7 +1087,7 @@
   (macros/assert! (apply distinct? (map arity input-schemas)) "Arities must be distinct")
   (FnSchema. output-schema (sort-by arity input-schemas)))
 
-
+#?(:clj
 (defmacro =>*
   "Produce a function schema from an output schema and a list of arity input schema specs,
    each of which is a vector of argument schemas, ending with an optional '& more-schema'
@@ -1094,13 +1096,14 @@
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
   [output-schema & arity-schema-specs]
-  `(make-fn-schema ~output-schema ~(mapv macros/parse-arity-spec arity-schema-specs)))
+  `(make-fn-schema ~output-schema ~(mapv macros/parse-arity-spec arity-schema-specs))))
 
+#?(:clj
 (defmacro =>
   "Convenience macro for defining function schemas with a single arity; like =>*, but
    there is no vector around the argument schemas for this arity."
   [output-schema & arg-schemas]
-  `(=>* ~output-schema ~(vec arg-schemas)))
+  `(=>* ~output-schema ~(vec arg-schemas))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1121,6 +1124,7 @@
   [schema]
   (-> schema meta :ns))
 
+#?(:clj
 (defmacro defschema
   "Convenience macro to make it clear to reader that body is meant to be used as a schema.
    The name of the schema is recorded in the metadata."
@@ -1130,12 +1134,13 @@
      `(def ~name ~docstring
         (vary-meta
          (schema-with-name ~form '~name)
-         assoc :ns '~(ns-name *ns*)))))
+         assoc :ns '~(ns-name *ns*))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord and (de,let)fn macros
 
+#?(:clj
 (defmacro defrecord
   "Define a record with a schema.
 
@@ -1172,7 +1177,7 @@
    record base."
   {:arglists '([name field-schema extra-key-schema? extra-validator-fn? & opts+specs])}
   [name field-schema & more-args]
-  (apply macros/emit-defrecord 'clojure.core/defrecord &env name field-schema more-args))
+  (apply macros/emit-defrecord 'clojure.core/defrecord &env name field-schema more-args)))
 
 #?(:clj
 (defmacro defrecord+
@@ -1183,10 +1188,11 @@
   [name field-schema & more-args]
   (apply macros/emit-defrecord 'potemkin/defrecord+ &env name field-schema more-args)))
 
+#?(:clj
 (defmacro set-compile-fn-validation!
   [on?]
   (macros/set-compile-fn-validation! on?)
-  nil)
+  nil))
 
 (clojure.core/defn fn-validation?
   "Get the current global schema validation setting."
@@ -1200,6 +1206,7 @@
   #?(:clj (.set ^java.util.concurrent.atomic.AtomicReference utils/use-fn-validation on?)
      :cljs (reset! utils/use-fn-validation on?)))
 
+#?(:clj
 (defmacro with-fn-validation
   "Execute body with input and output schema validation turned on for
    all s/defn and s/fn instances globally (across all threads). After
@@ -1211,8 +1218,9 @@
        (body#)
        (do
          (set-fn-validation! true)
-         (try (body#) (finally (set-fn-validation! false)))))))
+         (try (body#) (finally (set-fn-validation! false))))))))
 
+#?(:clj
 (defmacro without-fn-validation
   "Execute body with input and output schema validation turned off for
    all s/defn and s/fn instances globally (across all threads). After
@@ -1224,7 +1232,7 @@
        (do
          (set-fn-validation! false)
          (try (body#) (finally (set-fn-validation! true))))
-       (body#))))
+       (body#)))))
 
 (def fn-validator
   "A var that can be rebound to a function to customize the behavior
@@ -1257,6 +1265,7 @@
 ;; work around bug in extend-protocol (refers to bare 'fn, so we can't exclude it).
 #?(:clj (when-not clj-1195-fixed? (ns-unmap *ns* 'fn)))
 
+#?(:clj
 (defmacro fn
   "s/fn : s/defn :: clojure.core/fn : clojure.core/defn
 
@@ -1280,8 +1289,9 @@
     `(let ~outer-bindings
        (schematize-fn
         ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
-        ~schema-form))))
+        ~schema-form)))))
 
+#?(:clj
 (defmacro defn
   "Like clojure.core/defn, except that schema-style typehints can be given on
    the argument symbols and on the function name (for the return value).
@@ -1356,8 +1366,9 @@
                        :schema schema-form)
                     ~@fn-body)]
          (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form)
-         ret#))))
+         ret#)))))
 
+#?(:clj
 (defmacro defmethod
   "Like clojure.core/defmethod, except that schema-style typehints can be given on
    the argument symbols and after the dispatch-val (for the return value).
@@ -1381,16 +1392,18 @@
     (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
        addMethod
        ~dispatch-val
-       (fn ~(with-meta (gensym (str (name multifn) "__")) (meta multifn)) ~@fn-tail))))
+       (fn ~(with-meta (gensym (str (name multifn) "__")) (meta multifn)) ~@fn-tail)))))
 
+#?(:clj
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
   [fnspecs & body]
   (list `let
         (vec (interleave (map first fnspecs)
                          (map #(cons `fn %) fnspecs)))
-        `(do ~@body)))
+        `(do ~@body))))
 
+#?(:clj
 (defmacro def
   "Like def, but takes a schema on the var name (with the same format
    as the output schema of s/defn), requires an initial value, and
@@ -1413,7 +1426,7 @@
     `(let [output-schema# ~(macros/extract-schema-form name)]
        (def ~name
          ~@(when doc-string? [doc-string?])
-         (validate output-schema# ~init)))))
+         (validate output-schema# ~init))))))
 
 #?(:clj
 (set! *warn-on-reflection* false))

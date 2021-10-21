@@ -672,11 +672,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
 
+#?(:clj
 (defmacro test-normalized-meta [symbol ex-schema desired-meta]
   (let [normalized (macros/normalized-metadata &env symbol ex-schema)]
     `(do (is (= '~symbol '~normalized))
          (is (= ~(select-keys desired-meta [:schema :tag])
-                ~(select-keys (meta normalized) [:schema :tag]))))))
+                ~(select-keys (meta normalized) [:schema :tag])))))))
 
 #?(:clj
 (do
