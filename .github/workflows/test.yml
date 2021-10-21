@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.m2/repository
           key: ${{ env.ACTION_CACHE_VERSION }}-${{ runner.os }}-maven-${{ hashFiles('**/project.clj') }}-${{ matrix.java }}
@@ -37,8 +37,8 @@ jobs:
         with:
           node-version: '10.13.0'
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@3.4
+        uses: DeLaGuardo/setup-clojure@3.5
         with:
-          lein: 2.9.6
+          lein: 2.9.7
       - name: Run tests
         run: lein all test
