@@ -1,1 +1,1 @@
-{:paths ["src/clj" "src/cljc" "src/cljs"]}
+{:paths ["src/clj" "src/cljc"]}
