@@ -4,7 +4,8 @@
    #?(:cljs [cljs.reader :as reader])
    #?(:clj [clojure.edn :as edn])
    #?(:clj [schema.macros :as macros])
-   [schema.core :as s :include-macros true]
+   #?(:clj [schema.core :as s]
+      :cljs [schema.core :as s :include-macros true])
    [schema.spec.core :as spec]
    [schema.utils :as utils]
    [clojure.string :as str])

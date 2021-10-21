@@ -6,7 +6,8 @@
   (:require
    [schema.core :as s]
    [schema.coerce :as coerce]
-   [schema.experimental.abstract-map :as abstract-map :include-macros true]
+   #?(:clj [schema.experimental.abstract-map :as abstract-map]
+      :cljs [schema.experimental.abstract-map :as abstract-map :include-macros true])
    #?(:cljs cljs.test)))
 
 (s/defschema Animal
