@@ -2,10 +2,10 @@
   "A collection spec represents a collection of elements,
    each of which is itself schematized."
   (:require
-   #+clj [schema.macros :as macros]
+   #?(:clj [schema.macros :as macros])
    [schema.utils :as utils]
    [schema.spec.core :as spec])
-  #+cljs (:require-macros [schema.macros :as macros]))
+  #?(:cljs (:require-macros [schema.macros :as macros])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -22,20 +22,20 @@
       ::remaining
       (let [_ (macros/assert! (= 2 (count e)) "remaining can have only one schema.")
             c (spec/sub-checker (second e) params)]
-        #+clj (fn [^java.util.List res x]
-                (doseq [i x]
-                  (.add res (c i)))
-                (then res nil))
-        #+cljs (fn [res x]
-                 (swap! res into (map c x))
-                 (then res nil))))
+        #?(:clj (fn [^java.util.List res x]
+                  (doseq [i x]
+                    (.add res (c i)))
+                  (then res nil))
+           :cljs (fn [res x]
+                   (swap! res into (map c x))
+                   (then res nil)))))
 
     (let [parser (:parser e)
           c (spec/sub-checker e params)]
-      #+clj (fn [^java.util.List res x]
-              (then res (parser (fn [t] (.add res (if (utils/error? t) t (c t)))) x)))
-      #+cljs (fn [res x]
-               (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x))))))
+      #?(:clj (fn [^java.util.List res x]
+                (then res (parser (fn [t] (.add res (if (utils/error? t) t (c t)))) x)))
+         :cljs (fn [res x]
+                 (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x)))))))
 
 (defn- sequence-transformer [elts params then]
   (macros/assert! (not-any? #(and (vector? %) (= (first %) ::remaining)) (butlast elts))
@@ -46,7 +46,7 @@
    then
    (reverse elts)))
 
-#+clj ;; for performance
+#?(:cljs ;; for performance
 (defn- has-error? [^java.util.List l]
   (let [it (.iterator l)]
     (loop []
@@ -56,9 +56,9 @@
           (recur))
         false))))
 
-#+cljs
+:cljs
 (defn- has-error? [l]
-  (some utils/error? l))
+  (some utils/error? l)))
 
 (defn subschemas [elt]
   (if (map? elt)
@@ -75,9 +75,9 @@
           t (sequence-transformer elements params (fn [_ x] x))]
       (fn [x]
         (or (pre x)
-            (let [res #+clj (java.util.ArrayList.) #+cljs (atom [])
+            (let [res #?(:clj (java.util.ArrayList.) :cljs (atom []))
                   remaining (t res x)
-                  res #+clj res #+cljs @res]
+                  res #?(:clj res :cljs @res)]
               (if (or (seq remaining) (has-error? res))
                 (utils/error (on-error x res remaining))
                 (constructor res))))))))
