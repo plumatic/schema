@@ -303,6 +303,8 @@
   (let [s (s/cond-pre
            s/Int
            (s/maybe s/Str)
+           {(s/precondition-key :type) (s/eq "str"), :value s/Str}
+           {(s/precondition-key :type) (s/eq "int"), :value s/Int}
            (s/cond-pre s/Keyword {:x s/Int})
            (s/both [s/Num] (s/pred (fn [xs] (even? (count xs))) 'even-len?))
            [s/Str])]
@@ -311,11 +313,15 @@
     (valid! s nil)
     (valid! s :hello)
     (valid! s {:x 3})
+    (valid! s {:type "str" :value "foo"})
+    (valid! s {:type "int" :value 123})
     (valid! s [1 2])
     (valid! s ["hello"])
     (invalid! s 3.14)
     (invalid! s [1 2 3])
     (invalid! s {:x 3.14})
+    (invalid! s {:type "str" :value 123})
+    (invalid! s {:type "int" :value "foo"})
     (invalid! s [1 2 3])))
 
 (deftest constrained-test
@@ -454,6 +460,27 @@
     (invalid! schema {:bar 1.0 :baz {:b1 3}})
     (invalid! schema {:foo 1 :bar nil :baz {:b1 3}})
     (invalid! schema {:foo 1 :bar "z" :baz {:b1 3}})))
+
+(deftest precondition-key-map-test
+  (let [schema {(s/precondition-key :type) (s/eq "int")
+                :value s/Int}]
+    (valid! schema {:type "int" :value 123})
+    (valid! schema {:type "int" :value 456})
+    (invalid! schema {:type "str" :value "foo"})
+    (invalid! schema {:type "str" :value 123}))
+
+  (let [schema {(s/precondition-key :type) (s/eq "str")
+                :value s/Str}]
+    (valid! schema {:type "str" :value "foo"})
+    (valid! schema {:type "str" :value "bar"})
+    (invalid! schema {:type "int" :value 123})
+    (invalid! schema {:type "int" :value "foo"}))
+
+  (let [schema {(s/precondition-key :type) (s/eq :shape)
+                (s/precondition-key :sub-type) (s/eq :triangle)
+                :perimeter s/Num}]
+    (valid! schema {:type :shape, :sub-type :triangle, :perimeter 40.53})
+    (invalid! schema {:type :shape, :sub-type :square, :perimeter 40.53})))
 
 (deftest throw-on-multiple-key-variants-test
   (is (thrown? Exception (s/checker {:foo s/Str (s/optional-key :foo) s/Str})))

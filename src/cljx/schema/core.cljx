@@ -703,6 +703,7 @@
 ;; Specific keys are mapped to value schemas, and given as either:
 ;;  - (required-key k), a required key (= k)
 ;;  - a keyword, also a required key
+;;  - (precondition-key k), a required key used as a precondition
 ;;  - (optional-key k), an optional key (= k)
 ;; For example, {:a Int (optional-key :b) String} describes a map with key :a mapping to an
 ;; integer, an optional key :b mapping to a String, and no other keys.
@@ -726,6 +727,16 @@
     k
     (RequiredKey. k)))
 
+(clojure.core/defrecord PreconditionKey [k])
+
+(clojure.core/defn precondition-key
+  "A required key in a map used as a precondition"
+  [k]
+  (PreconditionKey. k))
+
+(clojure.core/defn precondition-key? [ks]
+  (instance? PreconditionKey ks))
+
 (clojure.core/defn required-key? [ks]
   (or (keyword? ks)
       (instance? RequiredKey ks)))
@@ -744,11 +755,13 @@
 (clojure.core/defn explicit-schema-key [ks]
   (cond (keyword? ks) ks
         (instance? RequiredKey ks) (.-k ^RequiredKey ks)
+        (instance? PreconditionKey ks) (.-k ^PreconditionKey ks)
         (optional-key? ks) (.-k ^OptionalKey ks)
         :else (macros/error! (utils/format* "Bad explicit key: %s" ks))))
 
 (clojure.core/defn specific-key? [ks]
   (or (required-key? ks)
+      (precondition-key? ks)
       (optional-key? ks)))
 
 (clojure.core/defn map-entry-ctor [[k v :as coll]]
@@ -789,6 +802,7 @@
     (if (keyword? kspec)
       kspec
       (list (cond (required-key? kspec) 'required-key
+                  (precondition-key? kspec) 'precondition-key
                   (optional-key? kspec) 'optional-key)
             (explicit-schema-key kspec)))
     (explain kspec)))
@@ -808,7 +822,8 @@
       (concat
        (for [[k v] without-extra-keys-schema]
          (let [rk (explicit-schema-key k)
-               required? (required-key? k)]
+               required? (or (required-key? k)
+                             (precondition-key? k))]
            (collection/one-element
             required? (map-entry (eq rk) v)
             (clojure.core/fn [item-fn m]
@@ -831,7 +846,15 @@
 
 (defn- map-spec [this]
   (collection/collection-spec
-   (spec/simple-precondition this map?)
+    (apply some-fn
+      (spec/simple-precondition this map?)
+      (for [[k schema] this
+            :when (precondition-key? k)
+            :let [pre (complement (checker schema))]]
+        (spec/precondition
+          this
+          #(pre (get % (.-k ^PreconditionKey k)))
+          #(list 'satisfies-precondition-keys? %))))
    #(into {} %)
    (map-elements this)
    (map-error)))
@@ -847,7 +870,6 @@
   #+cljs cljs.core.PersistentHashMap
   #+cljs (spec [this] (map-spec this))
   #+cljs (explain [this] (map-explain this)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Set schemas
