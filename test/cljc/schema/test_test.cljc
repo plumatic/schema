@@ -1,10 +1,10 @@
 (ns schema.test-test
-  #+clj (:use clojure.test)
+  #?(:clj (:use clojure.test))
   (:require
    [schema.core :as s]
    [schema.test :as st]))
 
-#+clj
+#?(:clj
 (do
   (s/defn test-fn :- s/Str [] 5)
 
@@ -12,4 +12,4 @@
     (is (= 5 (test-fn))))
 
   (st/deftest validation-on-test
-    (is (thrown? Exception (test-fn)))))
+    (is (thrown? Exception (test-fn))))))

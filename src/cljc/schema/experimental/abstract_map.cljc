@@ -2,7 +2,8 @@
   "Schemas representing abstract classes and subclasses"
   (:require
    [clojure.string :as str]
-   [schema.core :as s :include-macros true]
+   #?(:clj [schema.core :as s]
+      :cljs [schema.core :as s :include-macros true])
    [schema.spec.core :as spec]
    [schema.spec.variant :as variant]))
 
@@ -65,10 +66,11 @@
   [dispatch-key :- s/Keyword schema :- (s/pred map?)]
   (AbstractSchema. (atom {}) dispatch-key schema true))
 
+#?(:clj
 (defmacro extend-schema
   [schema-name extensible-schema dispatch-values extension]
   `(def ~schema-name
-     (extend-schema! ~extensible-schema ~extension '~schema-name ~dispatch-values)))
+     (extend-schema! ~extensible-schema ~extension '~schema-name ~dispatch-values))))
 
 (defn sub-schemas [abstract-schema]
   @(.-sub-schemas ^AbstractSchema abstract-schema))

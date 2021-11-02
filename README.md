@@ -211,7 +211,7 @@ Finally, we use validation with coercion for API inputs and outputs.  See the co
 
 ## More examples
 
-The source code in [schema/core.cljx](https://github.com/plumatic/schema/blob/master/src/cljx/schema/core.cljx) provides a wealth of extra tools for defining schemas, which are described in docstrings. The file [schema/core_test.cljx](https://github.com/plumatic/schema/blob/master/test/cljx/schema/core_test.cljx) demonstrates a variety of sample schemas and many examples of passing & failing clojure data.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
+The source code in [schema/core.cljc](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides a wealth of extra tools for defining schemas, which are described in docstrings. The file [schema/core_test.cljc](https://github.com/plumatic/schema/blob/master/test/cljc/schema/core_test.cljc) demonstrates a variety of sample schemas and many examples of passing & failing clojure data.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
 
 ### Map schema details
 
@@ -270,7 +270,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ### Other schema types
 
-[`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljx/schema/core.cljx) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
 
 ```clojure
 ;; anything
@@ -404,7 +404,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on 1.6 through 1.8 and the latest version of ClojureScript.
+Schema is currently supported on 1.7 through 1.10 and the latest version of ClojureScript.
 
 ## License
 
