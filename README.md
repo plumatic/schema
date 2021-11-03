@@ -4,8 +4,6 @@ A Clojure(Script) library for declarative data description and validation.
 
 [![Clojars Project](http://clojars.org/prismatic/schema/latest-version.svg)](http://clojars.org/prismatic/schema)
 
-[![Circle CI](https://circleci.com/gh/plumatic/schema.svg?style=svg)](https://circleci.com/gh/plumatic/schema)
-
 [Latest codox API docs](http://plumatic.github.io/schema).
 
 **NOTE: this README is updated for the recent 1.0.0 release.  Please refer to the git history for previous versions of schema.**
@@ -404,7 +402,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on 1.7 through 1.10 and the latest version of ClojureScript.
+Schema is currently supported on Clojure 1.8 onwards and the latest version of ClojureScript.
 
 ## License
 
