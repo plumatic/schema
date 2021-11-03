@@ -1,4 +1,4 @@
-## NEXT
+## 1.2.0
  * **BREAKING** use `cljc` instead of `cljx`, which requires Clojure 1.7 or later. (#425)
 
 ## 1.1.12 (`2019-08-10`)
