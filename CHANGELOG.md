@@ -1,4 +1,7 @@
-## 1.2.0
+## NEXT
+ * Fix mutually recursive `s/letfn` bindings
+
+## 1.2.0 (`2021-11-03`)
  * **BREAKING** use `cljc` instead of `cljx`, which requires Clojure 1.7 or later. (#425)
 
 ## 1.1.12 (`2019-08-10`)

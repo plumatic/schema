@@ -1195,12 +1195,74 @@
               (y :- s/Str [m :- s/Num] (str m))]
            (y (x))))))
 
+(deftest mutual-letfn-test
+  (is (= [true false]
+         (s/letfn
+           [(even [x] (if (zero? x) true (odd (dec x))))
+            (odd [x] (if (zero? x) false (even (dec x))))]
+           [(even 10)
+            (odd 10)])))
+  (is (= [true false]
+         (s/letfn
+           [(even :- s/Int [x :- s/Int] (if (zero? x) true (odd (dec x))))
+            (odd :- s/Int [x :- s/Int] (if (zero? x) false (even (dec x))))]
+           [(even 10)
+            (odd 10)])))
+  (is (every? s/fn-schema
+              (s/letfn
+                [(even :- s/Int [x :- s/Int] (if (zero? x) true (odd (dec x))))
+                 (odd :- s/Int [x :- s/Int] (if (zero? x) false (even (dec x))))
+                 (getter [] [getter even odd])]
+                (conj (getter) even odd getter)))))
+
 (deftest error-letfn-test
   (s/with-fn-validation
     (s/letfn
         [(x :- s/Num [] "1")
          (y :- s/Str [m :- s/Num] (str m))]
-      (invalid-call! y (x)))))
+      (invalid-call! y (x))))
+  (testing "without-fn-validation"
+    (s/without-fn-validation
+      (s/letfn
+        [(f :- s/Num [] "1")]
+        (is (= "1" (f))))
+      (testing "^:always-validate"
+        (s/letfn
+          [(^:always-validate f :- s/Num [] "1")]
+          (invalid-call! f)))))
+  (testing "with-fn-validation"
+    (testing "^:always-validate"
+      (s/letfn
+        [(^:always-validate f :- s/Num [] "1")]
+        (invalid-call! f)))
+    (testing "^:never-validate"
+      (s/with-fn-validation
+        (s/letfn
+          [(^:never-validate f :- s/Num [] "1")]
+          (is (= "1" (f)))))))
+  (testing "self recursion"
+    (s/with-fn-validation
+      (s/letfn
+        [(f :- s/Num [] "1")]
+        (invalid-call! f))
+      (s/letfn
+        [(f [x :- s/Num])]
+        (invalid-call! f "1"))
+      (s/letfn
+        [(f
+           ([] (f "1"))
+           ([x :- s/Int]))]
+        (invalid-call! f))))
+  (testing "mutual recursion"
+    (s/with-fn-validation
+      (s/letfn
+        [(f [] (g "1"))
+         (g [x :- s/Num])]
+        (invalid-call! f))
+      (s/letfn
+        [(f [] (g "1"))
+         (g :- s/Num [x] x)]
+        (invalid-call! f)))))
 
 ;; Primitive validation testing for JVM
 #?(:clj

@@ -1398,10 +1398,28 @@
 (defmacro letfn
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
   [fnspecs & body]
-  (list `let
-        (vec (interleave (map first fnspecs)
-                         (map #(cons `fn %) fnspecs)))
-        `(do ~@body))))
+  (let [{:keys [outer-bindings
+                fnspecs
+                declare-class-schemas]}
+        (reduce (fn [acc fnspec]
+                  (let [[name more-fn-args] (macros/extract-arrow-schematized-element &env fnspec)
+                        {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
+                    (-> acc
+                        (update :outer-bindings into outer-bindings)
+                        (update :fnspecs conj (cons name fn-body))
+                        (update :declare-class-schemas conj `(utils/declare-class-schema!
+                                                               (utils/fn-schema-bearer ~name)
+                                                               ~schema-form)))))
+                {:outer-bindings []
+                 :fnspecs []
+                 :declare-class-schemas []}
+                fnspecs)]
+    `(let ~outer-bindings
+       (clojure.core/letfn
+         ~fnspecs
+         (do
+           ~@declare-class-schemas
+           ~@body))))))
 
 #?(:clj
 (defmacro def
