@@ -1396,30 +1396,33 @@
 
 #?(:clj
 (defmacro letfn
-  "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn"
+  "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn
+  
+  Gotchas:
+  - s/fn-schema will only work on direct usages of the bindings
+    in the body. It will not work on intermediate calls between bindings."
   [fnspecs & body]
   (let [{:keys [outer-bindings
                 fnspecs
-                declare-class-schemas]}
+                inner-bindings]}
         (reduce (fn [acc fnspec]
                   (let [[name more-fn-args] (macros/extract-arrow-schematized-element &env fnspec)
                         {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
                     (-> acc
                         (update :outer-bindings into outer-bindings)
                         (update :fnspecs conj (cons name fn-body))
-                        (update :declare-class-schemas conj `(utils/declare-class-schema!
-                                                               (utils/fn-schema-bearer ~name)
-                                                               ~schema-form)))))
+                        (update :inner-bindings conj name `(schematize-fn
+                                                             ~name
+                                                             ~schema-form)))))
                 {:outer-bindings []
                  :fnspecs []
-                 :declare-class-schemas []}
+                 :inner-bindings []}
                 fnspecs)]
     `(let ~outer-bindings
        (clojure.core/letfn
          ~fnspecs
-         (do
-           ~@declare-class-schemas
-           ~@body))))))
+         (let ~inner-bindings
+           (do ~@body)))))))
 
 #?(:clj
 (defmacro def

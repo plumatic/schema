@@ -1211,9 +1211,8 @@
   (is (every? s/fn-schema
               (s/letfn
                 [(even :- s/Int [x :- s/Int] (if (zero? x) true (odd (dec x))))
-                 (odd :- s/Int [x :- s/Int] (if (zero? x) false (even (dec x))))
-                 (getter [] [getter even odd])]
-                (conj (getter) even odd getter)))))
+                 (odd :- s/Int [x :- s/Int] (if (zero? x) false (even (dec x))))]
+                [even odd]))))
 
 (deftest error-letfn-test
   (s/with-fn-validation
