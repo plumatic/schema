@@ -1399,8 +1399,8 @@
   "s/letfn : s/fn :: clojure.core/letfn : clojure.core/fn
   
   Gotchas:
-  - s/fn-schema will only work on direct usages of the bindings
-    in the body. It will not work on intermediate calls between bindings."
+  - s/fn-schema will only work on direct references to the bindings
+    inside the body. It will not work on intermediate calls between bindings."
   [fnspecs & body]
   (let [{:keys [outer-bindings
                 fnspecs
