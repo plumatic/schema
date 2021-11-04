@@ -13,10 +13,13 @@
                              [lein-cljsbuild "1.1.7"]
                              [lein-release/lein-release "1.0.4"]
                              [lein-doo "0.1.10"]]}
+             :1.7 {:dependencies [[org.clojure/clojure "1.7.0"] [org.clojure/clojurescript "1.10.520"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
-             :1.10 {:dependencies [[org.clojure/clojure "1.10.0"] [org.clojure/clojurescript "1.10.520"]]}}
+             :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
+             :1.11 {:dependencies [[org.clojure/clojure "1.11.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.10.879"]]
+                    :repositories [["sonatype-oss-public" {:url "https://oss.sonatype.org/content/groups/public"}]]}}
 
-  :aliases {"all" ["with-profile" "dev:dev,1.9:dev,1.10"]
+  :aliases {"all" ["with-profile" "dev:dev,1.7:dev,1.9:dev,1.10:dev,1.11"]
             "deploy" ["do" "clean," "deploy" "clojars"]
             "test" ["do" "clean," "test," "with-profile" "dev" "doo" "node" "test" "once"]}
 
