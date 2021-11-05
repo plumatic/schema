@@ -1276,20 +1276,27 @@
       don't supply a name, schema will gensym one for you and attach
       the schema.
     - Unlike s/defn, the function schema is stored in metadata on the
-      fn.  Clojure's implementation for metadata on fns currently
-      produces a wrapper fn, which will decrease performance and
-      negate the benefits of primitive type hints compared to
-      clojure.core/fn."
+      fn. The implications of this differ per platform:
+      :clj   The resulting function has the same performance characteristics
+             as clojure.core/fn. Additionally, the following invariant
+             holds for all parameters and schema annotations:
+               (let [f (s/fn this ... [...] this)]
+                 (assert (identical? f (f ...))))
+      :cljs  Returns a wrapper function that forwards arguments positionally
+             up to 20 arguments, and then via `apply` beyond 20 arguments.
+             See `cljs.core/with-meta` and `cljs.core.MetaFn`."
   [& fn-args]
   (let [fn-args (if (symbol? (first fn-args))
                   fn-args
                   (cons (gensym "fn") fn-args))
         [name more-fn-args] (macros/extract-arrow-schematized-element &env fn-args)
         {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
-    `(let ~outer-bindings
-       (schematize-fn
-        ~(vary-meta `(clojure.core/fn ~name ~@fn-body) #(merge (meta &form) %))
-        ~schema-form)))))
+    `(let [~@outer-bindings
+           ;; let bind to work around https://clojure.atlassian.net/browse/CLJS-968
+           f# ~(vary-meta `(clojure.core/fn ~name ~@fn-body)
+                          #(assoc (merge (meta &form) %)
+                                  :schema schema-form))]
+       f#))))
 
 #?(:clj
 (defmacro defn
