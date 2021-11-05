@@ -865,6 +865,11 @@
   (let [f (s/fn ^s/Str foo [^OddLong arg0 arg1])]
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
+#?(:clj
+(deftest no-wrapper-fn-test
+  (let [f (s/fn this [] this)]
+    (is (identical? f (f))))))
+
 (deftest no-schema-fn-test
   (let [f (s/fn [arg0 arg1] (+ arg0 arg1))]
     (is (= (s/=> s/Any s/Any s/Any) (s/fn-schema f)))
@@ -873,8 +878,10 @@
     (is (= 4 (f 1 3)))))
 
 (deftest simple-validated-fn-test
-  (let [f (s/fn test-fn :- (s/pred even?)
+  (let [fthiss (atom [])
+        f (s/fn test-fn :- (s/pred even?)
             [^s/Int x y :- {:foo (s/both s/Int (s/pred odd?))}]
+            (swap! fthiss conj test-fn)
             (+ x (:foo y -100)))]
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
@@ -886,18 +893,21 @@
     (is (= 5 (f 1 {:foo 4})))     ;; foo not odd?
     (is (= 4.0 (f 1.0 {:foo 3}))) ;; first arg not long
     (is (= 5 (f 2 {:foo 3})))     ;; return not even?
-    (testing
-        "Tests that the anonymous function schema macro can handle a
-         name, a schema without a name and no return schema."
-      (let [named-square (s/fn square :- s/Int [x :- s/Int]
-                           (* x x))
-            anon-square (s/fn :- s/Int [x :- s/Int]
-                          (* x x))
-            arg-only-square (s/fn [x :- s/Int] (* x x))]
-        (is (= 100
-               (named-square 10)
-               (anon-square 10)
-               (arg-only-square 10)))))))
+    (let [fthiss @fthiss]
+      (is (seq fthiss))
+      #?(:clj (is (every? #(identical? % f) fthiss)))))
+  (testing
+    "Tests that the anonymous function schema macro can handle a
+    name, a schema without a name and no return schema."
+    (let [named-square (s/fn square :- s/Int [x :- s/Int]
+                         (* x x))
+          anon-square (s/fn :- s/Int [x :- s/Int]
+                        (* x x))
+          arg-only-square (s/fn [x :- s/Int] (* x x))]
+      (is (= 100
+             (named-square 10)
+             (anon-square 10)
+             (arg-only-square 10))))))
 
 
 
@@ -996,14 +1006,20 @@
 
 (deftest rest-arg-destructuring-test
   (testing "no schema"
-    (let [f (s/fn foo :- s/Int
-              [^s/Int arg0 & [rest0]] (+ arg0 (or rest0 2)))]
+    (let [fthiss (atom [])
+          f (s/fn foo :- s/Int
+              [^s/Int arg0 & [rest0]]
+              (swap! fthiss conj foo)
+              (+ arg0 (or rest0 2)))]
       (is (= (s/=>* s/Int [s/Int & [(s/optional s/Any 'rest0)]])
              (s/fn-schema f)))
       (s/with-fn-validation
         (is (= 6 (f 4)))
         (is (= 9 (f 4 5)))
-        (invalid-call! f 4 9 2))))
+        (invalid-call! f 4 9 2))
+      (let [fthiss @fthiss]
+        (is (seq fthiss))
+        #?(:clj (is (every? #(identical? % f) fthiss))))))
   (testing "arg schema"
     (let [f (s/fn foo :- s/Int
               [^s/Int arg0 & [rest0 :- s/Int]] (+ arg0 (or rest0 2)))]
@@ -1039,11 +1055,10 @@
       (s/with-fn-validation
         (is (= 120 (f 5 1)))))))
 
-#?(:clj ;; in ClojureScript, metadata on ordinary fn form does not propagate to fn either.
 (deftest fn-metadata-test
   (let [->mkeys #(set (keys (meta %)))]
     (is (= (into (->mkeys (s/fn [])) [:blah])
-           (->mkeys ^:blah (s/fn [])))))))
+           (->mkeys ^:blah (s/fn []))))))
 
 ;;; defn
 

@@ -7,3 +7,4 @@ pom.xml
 *.asc
 /doc/
 .nrepl-port
+.cpcache/
