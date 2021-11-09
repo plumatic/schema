@@ -14,20 +14,18 @@
                              [lein-release/lein-release "1.0.4"]
                              [lein-doo "0.1.10"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
-             :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
-             :1.11 {:dependencies [[org.clojure/clojure "1.11.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.10.879"]]
+             :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.891"]]}
+             :1.11 {:dependencies [[org.clojure/clojure "1.11.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.10.891"]]
                     :repositories [["sonatype-oss-public" {:url "https://oss.sonatype.org/content/groups/public"}]]}}
 
   :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11"]
             "deploy" ["do" "clean," "deploy" "clojars"]
-            "test" ["do" "clean," "test," "doo" "node" "test" "once"]}
+            "test" ["do" "clean," "test," "clean," "doo" "node" "test" "once"]}
 
   :jar-exclusions [#"\.swp|\.swo|\.DS_Store"]
 
   :lein-release {:deploy-via :shell
                  :shell ["lein" "deploy"]}
-
-  :auto-clean false
 
   :source-paths ["src/clj" "src/cljc"]
 

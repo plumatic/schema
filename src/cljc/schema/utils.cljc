@@ -1,6 +1,6 @@
 (ns schema.utils
   "Private utilities used in schema implementation."
-  (:refer-clojure :exclude [record?])
+  (:refer-clojure :exclude [record? simple-symbol?])
   #?(:clj (:require [clojure.string :as string])
      :cljs (:require
              goog.string.format
@@ -78,6 +78,9 @@
   #?(:clj (instance? clojure.lang.IRecord x)
      :cljs (satisfies? IRecord x)))
 
+(defn simple-symbol? [x]
+  (and (symbol? x)
+       (not (namespace x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Error descriptions
