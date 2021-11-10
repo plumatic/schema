@@ -1667,6 +1667,8 @@
 
 #?(:clj
    (deftest clj-protocol-cache-test
+     ;; make test repeatable by clearing impls
+     (alter-var-root #'ProtocolCache assoc :impls {})
      (let [x 1
            ;; use partial to hold onto method reference. this acts differently
            ;; with cc/defprotocol because of CLJ-1796 (cache is never invalidated
