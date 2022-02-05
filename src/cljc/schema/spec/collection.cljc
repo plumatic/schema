@@ -23,11 +23,10 @@
       (let [_ (macros/assert! (= 2 (count e)) "remaining can have only one schema.")
             c (spec/sub-checker (second e) params)]
         #?(:clj (fn [^java.util.List res x]
-                  (doseq [i x]
-                    (.add res (c i)))
+                  (reduce (fn [res i] (doto res (.add (c i)))) res x)
                   (then res nil))
            :cljs (fn [res x]
-                   (swap! res into (map c x))
+                   (reduce (fn [res i] (doto res (.push (c i)))) res x)
                    (then res nil)))))
 
     (let [parser (:parser e)
@@ -35,7 +34,7 @@
       #?(:clj (fn [^java.util.List res x]
                 (then res (parser (fn [t] (.add res (if (utils/error? t) t (c t)))) x)))
          :cljs (fn [res x]
-                 (then res (parser (fn [t] (swap! res conj (if (utils/error? t) t (c t)))) x)))))))
+                 (then res (parser (fn [t] (.push res (if (utils/error? t) t (c t)))) x)))))))
 
 (defn- sequence-transformer [elts params then]
   (macros/assert! (not-any? #(and (vector? %) (= (first %) ::remaining)) (butlast elts))
@@ -58,7 +57,7 @@
 
 :cljs
 (defn- has-error? [l]
-  (some utils/error? l)))
+  (.some l utils/error?)))
 
 (defn subschemas [elt]
   (if (map? elt)
@@ -75,9 +74,8 @@
           t (sequence-transformer elements params (fn [_ x] x))]
       (fn [x]
         (or (pre x)
-            (let [res #?(:clj (java.util.ArrayList.) :cljs (atom []))
-                  remaining (t res x)
-                  res #?(:clj res :cljs @res)]
+            (let [res #?(:clj (java.util.ArrayList.) :cljs #js [])
+                  remaining (t res x)]
               (if (or (seq remaining) (has-error? res))
                 (utils/error (on-error x res remaining))
                 (constructor res))))))))
