@@ -395,12 +395,13 @@
                          ;; preempt future fix for CLJ-1796--have a canonical method
                          ;; representation for the duration of the protocol, matching
                          ;; CLJS semantics.
-                         outer-mth)]
+                         outer-mth)
+        this-nsym (ns-name *ns*)]
     ;; instrument method builder
     (alter-var-root pvar assoc-in [:method-builders method-var] method-builder)
     ;; defeat Compiler.java inlining capabilities so we can always enforce schemas
     (alter-meta! method-var assoc :inline (fn [& args]
-                                            `((do ~(symbol (-> *ns* ns-name name) (str (.sym ^clojure.lang.Var method-var))))
+                                            `((do ~(symbol (name this-nsym) (str (.sym ^clojure.lang.Var method-var))))
                                               ~@args)))
     ;; instrument the actual method
     (alter-var-root method-var (fn [_] outer-mth))))

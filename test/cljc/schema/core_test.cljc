@@ -1549,6 +1549,18 @@
     [this a :- s/Int, b :- s/Any]
     "doc 2"))
 
+(defrecord ImplementsPDefProtocolTest1 []
+  PDefProtocolTest1
+  (defprotocoltest1-method1
+    [this a]
+    :a))
+
+#?(:clj
+   (deftest protocol-in-another-ns
+     (binding [*ns* *ns*]
+       (eval `(ns ~(gensym)))
+       (is (= :a (eval `(defprotocoltest1-method1 (ImplementsPDefProtocolTest1.) 1)))))))
+
 (deftest protocol-assumptions-test
   #?(:clj
      (testing "methods never have :inline meta by default"
