@@ -12,6 +12,7 @@ on:
 env:
   #bump to clear caches
   ACTION_CACHE_VERSION: 'v2'
+  LEIN_VERSION: '2.9.8'
 
 jobs:
   setup:
@@ -33,7 +34,9 @@ jobs:
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@3.5
         with:
-          lein: 2.9.8
+          lein: ${{ env.LEIN_VERSION }}
+      - name: Run trojansourcedetector
+        uses: haveyoudebuggedit/trojansourcedetector@v1
       - name: Warm deps cache
         run: lein all deps
   lint:
@@ -56,7 +59,7 @@ jobs:
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@3.5
         with:
-          lein: 2.9.8
+          lein: ${{ env.LEIN_VERSION }}
       - name: Run Eastwood
         run: lein eastwood
   test:
@@ -81,13 +84,10 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: actions/setup-node@v2
         with:
-          node-version: '10.13.0'
+          node-version: '17.7.2'
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@3.5
         with:
-          lein: 2.9.8
-      # Run trojansourcedetector
-      - name: Trojan Source Detector
-        uses: haveyoudebuggedit/trojansourcedetector@v1
+          lein: ${{ env.LEIN_VERSION }}
       - name: Run tests
         run: lein all test
