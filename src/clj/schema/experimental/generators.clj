@@ -130,7 +130,7 @@
     Object generators/any
     s/Any generators/any
     s/Uuid generators/uuid
-    s/Inst (generators/fmap (fn [ms] (java.util.Date. ms)) generators/int)}
+    s/Inst (generators/fmap (fn [^long ms] (java.util.Date. ms)) generators/int)}
    (into {}
          (for [[f ctor c] [[doubles double-array Double]
                            [floats float-array Float]
@@ -148,7 +148,7 @@
 
 (defn enum-generators [s]
   (when (instance? schema.core.EnumSchema s)
-    (let [vs (vec (.-vs ^schema.core.EqSchema s))]
+    (let [vs (vec (.-vs ^schema.core.EnumSchema s))]
       (generators/fmap #(nth vs %) (generators/choose 0 (dec (count vs)))))))
 
 

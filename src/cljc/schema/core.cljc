@@ -928,11 +928,12 @@
   ([schema name]
      (One. schema true name)))
 
-(clojure.core/defn parse-sequence-schema [s]
+(clojure.core/defn parse-sequence-schema
   "Parses and validates a sequence schema, returning a vector in the form
   [singles multi] where singles is a sequence of 'one' and 'optional' schemas
   and multi is the rest-schema (which may be nil). A valid sequence schema is
   a vector in the form [one* optional* rest-schema?]."
+  [s]
   (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert!
