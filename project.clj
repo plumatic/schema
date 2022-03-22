@@ -7,7 +7,7 @@
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [org.clojure/clojurescript "1.10.520"]
                                   [org.clojure/tools.nrepl "0.2.5"]
-                                  [org.clojure/test.check "0.9.0"]
+                                  [org.clojure/test.check "1.1.1"]
                                   [potemkin "0.4.1"]]
                    :eastwood {:exclude-namespaces []
                               :exclude-linters [:def-in-def :local-shadows-var :constant-test :suspicious-expression :deprecations

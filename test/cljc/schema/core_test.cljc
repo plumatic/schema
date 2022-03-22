@@ -6,6 +6,7 @@
     - (invalid! s x) asserts that (s/check s x) returns a validation failure
       - The optional last argument also checks the printed Clojure representation of the error.
     - (invalid-call! s x) asserts that calling the function throws an error."
+  (:refer-clojure :exclude [parse-long])
   #?(:clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]]))
   #?(:cljs (:use-macros
              [cljs.test :only [is deftest testing are]]
