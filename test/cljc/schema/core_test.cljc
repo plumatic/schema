@@ -6,6 +6,7 @@
     - (invalid! s x) asserts that (s/check s x) returns a validation failure
       - The optional last argument also checks the printed Clojure representation of the error.
     - (invalid-call! s x) asserts that calling the function throws an error."
+  (:refer-clojure :exclude [parse-long])
   #?(:clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]]))
   #?(:cljs (:use-macros
              [cljs.test :only [is deftest testing are]]
@@ -618,10 +619,10 @@
 #?(:clj
 (deftest java-list-test
   (let [schema [s/Str]]
-    (valid! schema (java.util.ArrayList. ["hi" "bye"]))
-    (invalid! schema (java.util.ArrayList. [1 2]))
-    (valid! schema (java.util.LinkedList. ["hi" "bye"]))
-    (invalid! schema (java.util.LinkedList. [1 2]))
+    (valid! schema (java.util.ArrayList. ^java.util.Collection (identity ["hi" "bye"])))
+    (invalid! schema (java.util.ArrayList. ^java.util.Collection (identity [1 2])))
+    (valid! schema (java.util.LinkedList. ^java.util.Collection (identity ["hi" "bye"])))
+    (invalid! schema (java.util.LinkedList. ^java.util.Collection (identity [1 2])))
     (valid! schema java.util.Collections/EMPTY_LIST)
     (invalid! schema java.util.Collections/EMPTY_MAP)
     (invalid! schema #{"hi" "bye"}))))
@@ -888,7 +889,7 @@
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
       ;; Primitive Interface Test
-      #?(:clj (is (thrown? Exception (.invokePrim f 1 {:foo 3})))) ;; primitive type hints don't work on fns
+      #?(:clj (is (thrown? Exception (.invokePrim ^clojure.lang.IFn$LOL f 1 {:foo 3})))) ;; primitive type hints don't work on fns
       (invalid-call! f 1 {:foo 4})  ;; foo not odd?
       (invalid-call! f 2 {:foo 3})) ;; return not even?
 
@@ -1150,7 +1151,7 @@
     (invalid-call! simple-validated-defn "a"))
 
   (is (= "4" (simple-validated-defn 4)))
-  (let [e ^Exception (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
+  (let [^Exception e (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
     (is (.contains (.getMessage e) +bad-input-str+))
     (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
     (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj")))))
@@ -1298,7 +1299,7 @@
     (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
     (s/with-fn-validation
       (is (= 4 (primitive-validated-defn 3)))
-      (is (= 4 (.invokePrim primitive-validated-defn 3)))
+      (is (= 4 (.invokePrim ^clojure.lang.IFn$LL primitive-validated-defn 3)))
       (is (thrown? Exception (primitive-validated-defn 4))))
 
     (is (= 5 (primitive-validated-defn 4))))

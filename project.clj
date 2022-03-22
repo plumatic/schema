@@ -7,18 +7,23 @@
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [org.clojure/clojurescript "1.10.520"]
                                   [org.clojure/tools.nrepl "0.2.5"]
-                                  [org.clojure/test.check "0.9.0"]
+                                  [org.clojure/test.check "1.1.1"]
                                   [potemkin "0.4.1"]]
+                   :eastwood {:exclude-namespaces []
+                              :exclude-linters [:def-in-def :local-shadows-var :constant-test :suspicious-expression :deprecations
+                                                :unused-meta-on-macro :wrong-tag]}
                    :plugins [[codox "0.8.8"]
                              [lein-cljsbuild "1.1.7"]
                              [lein-release/lein-release "1.0.4"]
-                             [lein-doo "0.1.10"]]}
+                             [lein-doo "0.1.10"]
+                             [jonase/eastwood "1.2.3"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
-             :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.891"]]}
-             :1.11 {:dependencies [[org.clojure/clojure "1.11.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.10.891"]]
+             :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
+             :1.11 {:dependencies [[org.clojure/clojure "1.11.0"] [org.clojure/clojurescript "1.11.4"]]}
+             :1.12 {:dependencies [[org.clojure/clojure "1.12.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.11.4"]]
                     :repositories [["sonatype-oss-public" {:url "https://oss.sonatype.org/content/groups/public"}]]}}
 
-  :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11"]
+  :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11:+1.12"]
             "deploy" ["do" "clean," "deploy" "clojars"]
             "test" ["do" "clean," "test," "clean," "doo" "node" "test" "once"]}
 

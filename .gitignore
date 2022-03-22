@@ -8,3 +8,4 @@ pom.xml
 /doc/
 .nrepl-port
 .cpcache/
+.eastwood
