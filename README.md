@@ -6,8 +6,6 @@ A Clojure(Script) library for declarative data description and validation.
 
 [Latest codox API docs](http://plumatic.github.io/schema).
 
-**NOTE: this README is updated for the recent 1.0.0 release.  Please refer to the git history for previous versions of schema.**
-
 --
 
 One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://plumatic.github.io/schema-for-clojurescript-data-shape-declaration-and-validation).)
@@ -16,9 +14,10 @@ Schema is a rich language for describing data shapes, with a variety of features
 
  - Data validation, with descriptive error messages of failures (targeted at programmers)
  - Annotation of function arguments and return values, with optional runtime validation
- - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
- - Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests.  ** As of 1.1.0, this functionality can be found in the separate [`schema-generators`](https://github.com/plumatic/schema-generators) library. **
- - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema.
+ - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below) (https://github.com/plumatic/schema-generators) library. **
+ - Other
+   - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema
+   - Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests as part of the [`schema-generators`](https://github.com/plumatic/schema-generators) library
 
 ## Meet Schema
 
@@ -371,11 +370,6 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
 There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/plumatic/schema/wiki/Writing-Custom-Transformations) to do even more.
 
 For more details, see [this blog post](http://plumatic.github.io//schema-0-2-0-back-with-clojurescript-data-coercion).
-
-## Generation and Completion
-
-** As of 1.1.0, this functionality can be found in the separate [`schema-generators`](https://github.com/plumatic/schema-generators) library. **
-
 
 ## For the Future
 
