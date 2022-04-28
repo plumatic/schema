@@ -787,7 +787,7 @@
 #?(:clj (s/defrecord Nested [^Bar4 b ^LongOrString c p :- (s/protocol PProtocol)]))
 (s/defrecord NestedExplicit [b :- Bar4 c :- LongOrString p :- (s/protocol PProtocol)])
 
-(defn test-fancier-defrecord-schema [klass constructor]
+(defn test-fancier-defrecord-schema [klass konstructor]
   (let [bar1 (Bar. 1 "a")
         bar2 (Bar2. 1 "a")]
     (is (= (utils/class-schema klass)
@@ -796,12 +796,12 @@
             {:b Bar4
              :c LongOrString
              :p (s/protocol PProtocol)}
-            constructor)))
-    (valid! klass (constructor {:b (Bar4. [1] {}) :c 1 :p bar2}))
-    (valid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar2}))
-    (invalid! klass (constructor {:b (Bar4. [1] {}) :c "hi" :p bar1}))
-    (invalid! klass (constructor {:b (Bar4. [1] {:foo :bar}) :c 1 :p bar2}))
-    (invalid! klass (constructor {:b nil :c "hi" :p bar2}))))
+            konstructor)))
+    (valid! klass (konstructor {:b (Bar4. [1] {}) :c 1 :p bar2}))
+    (valid! klass (konstructor {:b (Bar4. [1] {}) :c "hi" :p bar2}))
+    (invalid! klass (konstructor {:b (Bar4. [1] {}) :c "hi" :p bar1}))
+    (invalid! klass (konstructor {:b (Bar4. [1] {:foo :bar}) :c 1 :p bar2}))
+    (invalid! klass (konstructor {:b nil :c "hi" :p bar2}))))
 
 (deftest fancier-defrecord-schema-test
   #?(:clj (test-fancier-defrecord-schema Nested map->Nested))

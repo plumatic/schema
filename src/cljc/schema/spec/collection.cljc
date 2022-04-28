@@ -67,11 +67,11 @@
         (assert (#{::remaining ::optional} (first elt)))
         (mapcat subschemas (next elt)))))
 
-(defrecord CollectionSpec [pre constructor elements on-error]
+(defrecord CollectionSpec [pre konstructor elements on-error]
   spec/CoreSpec
   (subschemas [this] (mapcat subschemas elements))
   (checker [this params]
-    (let [constructor (if (:return-walked? params) constructor (fn [_] nil))
+    (let [konstructor (if (:return-walked? params) konstructor (fn [_] nil))
           t (sequence-transformer elements params (fn [_ x] x))]
       (fn [x]
         (or (pre x)
@@ -80,7 +80,7 @@
                   res #?(:clj res :cljs @res)]
               (if (or (seq remaining) (has-error? res))
                 (utils/error (on-error x res remaining))
-                (constructor res))))))))
+                (konstructor res))))))))
 
 
 (defn collection-spec
@@ -100,7 +100,7 @@
    the user must ensure that the parser enforces the desired semantics, which
    should match the structure of the spec for proper generation."
   [pre ;- spec/Precondition
-   constructor ;- (s/=> s/Any [(s/named s/Any 'checked-value)])
+   konstructor ;- (s/=> s/Any [(s/named s/Any 'checked-value)])
    elements ;- [(s/cond-pre
    ;;            {:schema (s/protocol Schema)
    ;;             :parser (s/=> s/Any (s/=> s/Any s/Any) s/Any) ; takes [item-fn coll], calls item-fn on matching items, returns remaining.
@@ -109,7 +109,7 @@
    ;;          where the last element can optionally be a [::remaining schema]
    on-error ;- (=> s/Any (s/named s/Any 'value) [(s/named s/Any 'checked-element)] [(s/named s/Any 'unmatched-element)])
    ]
-  (->CollectionSpec pre constructor elements on-error))
+  (->CollectionSpec pre konstructor elements on-error))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
