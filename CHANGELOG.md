@@ -1,6 +1,7 @@
 ## NEXT
  * Fix mutually recursive `s/letfn` bindings
  * Fix `s/fn` perf caveats in Clojure by avoiding wrappers
+ * [Fix](https://github.com/plumatic/schema/pull/438) conflict with key named `constructor` in recent ClojureScript versions.
 
 ## 1.2.0 (`2021-11-03`)
  * **BREAKING** use `cljc` instead of `cljx`, which requires Clojure 1.7 or later. (#425)
