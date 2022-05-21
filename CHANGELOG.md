@@ -1,6 +1,8 @@
 ## NEXT
  * Add `s/defprotocol`
 
+ * Add `s/defprotocol`
+
 ## 1.2.1 (`2022-04-28`)
  * Fix mutually recursive `s/letfn` bindings
  * Fix `s/fn` perf caveats in Clojure by avoiding wrappers
