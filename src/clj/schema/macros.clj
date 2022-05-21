@@ -18,6 +18,11 @@
   [then else]
   (if (cljs-env? &env) then else))
 
+(let [bb? (boolean (System/getProperty "babashka.version"))]
+  (defmacro if-bb
+    [then else]
+    (if bb? then else)))
+
 (defmacro try-catchall
   "A cross-platform variant of try-catch that catches all* exceptions.
    Does not (yet) support finally, and does not need or want an exception class.
@@ -70,6 +75,20 @@
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(schema.utils/error
     (utils/make-ValidationError ~schema ~value (delay ~expectation) ~fail-explanation)))
+
+(defmacro defrecord-schema
+  "Like defrecord for schema primitives, and also registers cross-platform print methods."
+  [n & args]
+  `(do (clojure.core/defrecord ~n ~@args)
+       (if-cljs (extend-protocol cljs.core/IPrintWithWriter
+                  ~n
+                  (~'-pr-writer [s# w# _#]
+                    (cljs.core/-write w# (schema.core/explain s#))))
+                ;; bb doesn't support multimethods extended via protocols yet
+                (if-bb (schema.core/register-schema-print-as-explain ~n)
+                       ;; relies on (register-schema-print-as-explain schema.core.Schema)
+                       nil))
+       ~n))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
@@ -201,13 +220,17 @@
      (or (:always-validate fn-meta)
          *assert*))))
 
+(def ^:dynamic *ufv-sym* 'ufv__) ;; dynamic for backwards compat
+
 (defn process-fn-arity
   "Process a single (bind & body) form, producing an output tag, schema-form,
    and arity-form which has asserts for validation purposes added that are
    executed when turned on, and have very low overhead otherwise.
    tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
-   every time we do the validation."
+   every time we do the validation.
+  
+  Bind *ufv-sym* for control over ufv__ name."
   [env fn-name output-schema-sym bind-meta [bind & body]]
   (assert! (vector? bind) "Got non-vector binding form %s" bind)
   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
@@ -218,7 +241,8 @@
         input-schema-sym (gensym "input-schema")
         input-checker-sym (gensym "input-checker")
         output-checker-sym (gensym "output-checker")
-        compile-validation (compile-fn-validation? env fn-name)]
+        compile-validation (compile-fn-validation? env fn-name)
+        ufv-sym *ufv-sym*]
     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
      :more-bindings (when compile-validation
                       [input-checker-sym `(delay (schema.core/checker ~input-schema-sym))
@@ -235,7 +259,8 @@
                         metad-bind-syms)
                       `(let [validate# ~(if (:always-validate (meta fn-name))
                                           `true
-                                          `(if-cljs (deref ~'ufv__) (.get ~'ufv__)))]
+                                          `(if-cljs (deref ~ufv-sym)
+                                                    (if-bb (deref ~ufv-sym) (.get ~ufv-sym))))]
                          (when validate#
                            (let [args# ~(if rest-arg
                                           `(list* ~@bind-syms ~rest-sym)
@@ -278,7 +303,9 @@
                         (when (primitive-sym? t)
                           {:tag t}))
                       {})
-        processed-arities (map (partial process-fn-arity env name output-schema-sym bind-meta)
+        ufv-sym (gensym "ufv")
+        processed-arities (map #(binding [*ufv-sym* ufv-sym]
+                                  (process-fn-arity env name output-schema-sym bind-meta %))
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
@@ -286,7 +313,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
                            (when compile-validation
-                             `[~(with-meta 'ufv__ {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
+                             `[~(with-meta ufv-sym {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))

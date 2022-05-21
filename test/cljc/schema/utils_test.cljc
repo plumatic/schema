@@ -7,6 +7,7 @@
 
 (defn ^:private a-defn-function-with-a-normal-name [a b c d])
 
+#?(:bb nil :default
 (deftest fn-name-test
   (are [in pattern] (re-matches pattern (utils/fn-name in))
 
@@ -26,4 +27,4 @@
 
     #(+ 1 2)
     #?(:clj #"schema\.utils-test.*"
-       :cljs #"function")))
+       :cljs #"function"))))

@@ -1,0 +1,13 @@
+{:paths ["src/clj" "src/cljc" "test/clj" "test/cljc" "test/bb"]
+ ;:deps {org.clojure/test.check {:mvn/version "1.1.1"}}
+ :tasks
+ {:requires ([babashka.fs :as fs]
+             [babashka.process :as p :refer [process]]
+             [babashka.wait :as wait])
+  nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
+              proc (process (str "bb nrepl-server " port) {:inherit true})]
+          (wait/wait-for-port "localhost" port)
+          (spit ".nrepl-port" port)
+          (fs/delete-on-exit ".nrepl-port")
+          (deref proc))
+  test (require 'schema.bb-test-runner)}}

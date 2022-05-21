@@ -11,7 +11,7 @@
                                   [potemkin "0.4.1"]]
                    :eastwood {:exclude-namespaces []
                               :exclude-linters [:def-in-def :local-shadows-var :constant-test :suspicious-expression :deprecations
-                                                :unused-meta-on-macro :wrong-tag]}
+                                                :unused-meta-on-macro :wrong-tag :unused-ret-vals]}
                    :plugins [[codox "0.8.8"]
                              [lein-cljsbuild "1.1.7"]
                              [lein-release/lein-release "1.0.4"]
