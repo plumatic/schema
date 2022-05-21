@@ -53,8 +53,8 @@
    s/Num])
 
 (deftest fancy-seq-smoke-test
-  "Catch issues wit a fancier schema with optional keys and such."
-  (is (= 100 (count (generators/sample 100 FancySeq)))))
+  (testing "Catch issues with a fancier schema with optional keys and such."
+    (is (= 100 (count (generators/sample 100 FancySeq))))))
 
 (check-clojure-test/defspec spec-test
   100

@@ -914,11 +914,12 @@
   ([schema name]
      (One. schema true name)))
 
-(clojure.core/defn parse-sequence-schema [s]
+(clojure.core/defn parse-sequence-schema
   "Parses and validates a sequence schema, returning a vector in the form
   [singles multi] where singles is a sequence of 'one' and 'optional' schemas
   and multi is the rest-schema (which may be nil). A valid sequence schema is
   a vector in the form [one* optional* rest-schema?]."
+  [s]
   (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert!
@@ -1001,7 +1002,7 @@
        (if-let [evf (:extra-validator-fn this)]
          (some-fn p (spec/precondition this evf #(list 'passes-extra-validation? %)))
          p))
-     (:constructor (meta this))
+     (:konstructor (meta this))
      (map-elements schema)
      (map-error)))
   (explain [this]
@@ -1012,7 +1013,7 @@
 (clojure.core/defn record* [klass schema map-constructor]
   #?(:clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass)))
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
-  (with-meta (Record. klass schema) {:constructor map-constructor}))
+  (with-meta (Record. klass schema) {:konstructor map-constructor}))
 
 #?(:clj
 (defmacro record

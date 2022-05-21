@@ -86,10 +86,10 @@
     [(s/one s/Num "Node ID") (s/recursive #'NestedVecs)])
 
   (deftest recursive-coercion-test
-    "Test that recursion (which rebinds subschema-walker) works with coercion."
-    (is (= [1 [2 [3] [4]]]
-           ((coerce/coercer NestedVecs coerce/string-coercion-matcher)
-            ["1" ["2" ["3"] ["4"]]]))))))
+    (testing "Test that recursion (which rebinds subschema-walker) works with coercion."
+      (is (= [1 [2 [3] [4]]]
+             ((coerce/coercer NestedVecs coerce/string-coercion-matcher)
+              ["1" ["2" ["3"] ["4"]]])))))))
 
 (deftest constrained-test
   (is (= 1 ((coerce/coercer! (s/constrained s/Int odd?) coerce/string-coercion-matcher) "1")))
