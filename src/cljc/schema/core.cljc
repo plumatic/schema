@@ -193,10 +193,10 @@
   (if-let [more-schema (utils/class-schema this)]
     (explain more-schema)
     (condp = this
-      #?(:clj java.lang.String :cljs nil) 'Str
+      #?@(:clj [java.lang.String 'Str])
       #?(:clj java.lang.Boolean :cljs js/Boolean) 'Bool
       #?(:clj java.lang.Number :cljs js/Number) 'Num
-      #?(:clj java.util.regex.Pattern :cljs nil) 'Regex
+      #?@(:clj [java.util.regex.Pattern 'Regex])
       #?(:clj java.util.Date :cljs js/Date) 'Inst
       #?(:clj java.util.UUID :cljs cljs.core/UUID) 'Uuid
       #?(:clj (or #?(:bb (when (symbol? this) this))
