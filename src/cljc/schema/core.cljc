@@ -199,7 +199,8 @@
       #?@(:clj [java.util.regex.Pattern 'Regex])
       #?(:clj java.util.Date :cljs js/Date) 'Inst
       #?(:clj java.util.UUID :cljs cljs.core/UUID) 'Uuid
-      #?(:clj (or #?(:bb (when (symbol? this) this))
+      #?(:clj (or #?(:bb (when (instance? sci.lang.Type this)
+                           (symbol (str this))))
                   (symbol (.getName ^Class this)))
          :cljs this))))
 
@@ -208,7 +209,7 @@
      :cljs function)
   (spec [this] (-class-spec this))
   (explain [this] (-class-explain this))
-  #?@(:bb [clojure.lang.Symbol
+  #?@(:bb [sci.lang.Type
            (spec [this] (-class-spec this))
            (explain [this] (-class-explain this))]))
 
@@ -1034,13 +1035,14 @@
      (map-elements schema)
      (map-error)))
   (explain [this]
-    (list 'record #?(:clj (or #?(:bb (when (symbol? klass) klass))
+           (list 'record #?(:clj (or #?(:bb (when (instance? sci.lang.Type klass)
+                                              (symbol (str klass))))
                               (symbol (.getName ^Class klass)))
                      :cljs (symbol (pr-str klass)))
           (explain schema))))
 
 (clojure.core/defn record* [klass schema map-constructor]
-  #?(:bb (macros/assert! (or (class? klass) (symbol? klass)) "Expected record class or symbol, got %s" (utils/type-of klass))
+  #?(:bb (macros/assert! (or (class? klass) (instance? sci.lang.Type klass)) "Expected record class or symbol, got %s" (utils/type-of klass))
      :clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass)))
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
   (with-meta (Record. klass schema) {:konstructor map-constructor}))
