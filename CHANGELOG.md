@@ -1,5 +1,5 @@
-## NEXT
- * Babashka support
+## 1.3.0 (`2022-06-10`)
+ * [Babashka support](https://github.com/plumatic/schema/pull/440)
  * CLJS: Add pretty `pr-str` for schemas
 
 ## 1.2.1 (`2022-04-28`)
