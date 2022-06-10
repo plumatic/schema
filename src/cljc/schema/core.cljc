@@ -1035,8 +1035,8 @@
      (map-elements schema)
      (map-error)))
   (explain [this]
-           (list 'record #?(:clj (or #?(:bb (when (instance? sci.lang.Type klass)
-                                              (symbol (str klass))))
+    (list 'record #?(:clj (or #?(:bb (when (instance? sci.lang.Type klass)
+                                       (symbol (str klass))))
                               (symbol (.getName ^Class klass)))
                      :cljs (symbol (pr-str klass)))
           (explain schema))))
