@@ -14,7 +14,7 @@ Schema is a rich language for describing data shapes, with a variety of features
 
  - Data validation, with descriptive error messages of failures (targeted at programmers)
  - Annotation of function arguments and return values, with optional runtime validation
- - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below) (https://github.com/plumatic/schema-generators) library. **
+ - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
  - Other
    - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema
    - Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests as part of the [`schema-generators`](https://github.com/plumatic/schema-generators) library
