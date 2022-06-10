@@ -1042,8 +1042,7 @@
           (explain schema))))
 
 (clojure.core/defn record* [klass schema map-constructor]
-  #?(:bb (macros/assert! (or (class? klass) (instance? sci.lang.Type klass)) "Expected record class or symbol, got %s" (utils/type-of klass))
-     :clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass)))
+  (macros/assert! (or (class? klass) #?(:bb (instance? sci.lang.Type klass))) "Expected record class, got %s" (utils/type-of klass))
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
   (with-meta (Record. klass schema) {:konstructor map-constructor}))
 
