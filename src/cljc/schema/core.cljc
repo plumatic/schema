@@ -172,7 +172,7 @@
 
 ;; On the JVM, a Class itself is a schema. In JS, we treat functions as prototypes so any
 ;; function prototype checks objects for compatibility. In BB, defrecord classes can also be
-;; symbols.
+;; instances of sci.lang.Type, and the interpreter extends `instance?` to support it as first arg.
 
 (clojure.core/defn instance-precondition [s klass]
   (spec/precondition
