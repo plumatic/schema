@@ -1,4 +1,6 @@
 ## NEXT
+ * Babashka support
+ * CLJS: Add pretty `pr-str` for schemas
 
 ## 1.2.1 (`2022-04-28`)
  * Fix mutually recursive `s/letfn` bindings

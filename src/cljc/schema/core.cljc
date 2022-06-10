@@ -118,16 +118,20 @@
      user> (s/explain {:a s/Keyword :b [s/Int]} )
      {:a Keyword, :b [Int]}"))
 
-;; Schemas print as their explains
 #?(:clj
-(do (clojure.core/defmethod print-method schema.core.Schema [s writer]
-      (print-method (explain s) writer))
-    (clojure.core/defmethod pprint/simple-dispatch schema.core.Schema [s]
-      (pprint/write-out (explain s)))
-    (doseq [m [print-method pprint/simple-dispatch]]
-      (prefer-method m schema.core.Schema clojure.lang.IRecord)
-      (prefer-method m schema.core.Schema java.util.Map)
-      (prefer-method m schema.core.Schema clojure.lang.IPersistentMap))))
+(clojure.core/defn register-schema-print-as-explain [t]
+  (clojure.core/defmethod print-method t [s writer]
+    (print-method (explain s) writer))
+  (clojure.core/defmethod pprint/simple-dispatch t [s]
+    (pprint/write-out (explain s)))))
+
+;; macros/defrecord-schema implements print methods in bb/cljs
+#?(:bb nil
+   :clj (do (register-schema-print-as-explain schema.core.Schema)
+            (doseq [m [print-method pprint/simple-dispatch]]
+              (prefer-method m schema.core.Schema clojure.lang.IRecord)
+              (prefer-method m schema.core.Schema java.util.Map)
+              (prefer-method m schema.core.Schema clojure.lang.IPersistentMap))))
 
 (clojure.core/defn checker
   "Compile an efficient checker for schema, which returns nil for valid values and
@@ -167,7 +171,8 @@
 ;;; Platform-specific leaf Schemas
 
 ;; On the JVM, a Class itself is a schema. In JS, we treat functions as prototypes so any
-;; function prototype checks objects for compatibility.
+;; function prototype checks objects for compatibility. In BB, defrecord classes can also be
+;; instances of sci.lang.Type, and the interpreter extends `instance?` to support it as first arg.
 
 (clojure.core/defn instance-precondition [s klass]
   (spec/precondition
@@ -178,25 +183,35 @@
                       (js* "~{} instanceof ~{}" % klass))))
    #(list 'instance? klass %)))
 
+(defn- -class-spec [this]
+  (let [pre (instance-precondition this this)]
+    (if-let [class-schema (utils/class-schema this)]
+      (variant/variant-spec pre [{:schema class-schema}])
+      (leaf/leaf-spec pre))))
+
+(defn- -class-explain [this]
+  (if-let [more-schema (utils/class-schema this)]
+    (explain more-schema)
+    (condp = this
+      #?@(:clj [java.lang.String 'Str])
+      #?(:clj java.lang.Boolean :cljs js/Boolean) 'Bool
+      #?(:clj java.lang.Number :cljs js/Number) 'Num
+      #?@(:clj [java.util.regex.Pattern 'Regex])
+      #?(:clj java.util.Date :cljs js/Date) 'Inst
+      #?(:clj java.util.UUID :cljs cljs.core/UUID) 'Uuid
+      #?(:clj (or #?(:bb (when (instance? sci.lang.Type this)
+                           (symbol (str this))))
+                  (symbol (.getName ^Class this)))
+         :cljs this))))
+
 (extend-protocol Schema
   #?(:clj Class
      :cljs function)
-  (spec [this]
-    (let [pre (instance-precondition this this)]
-      (if-let [class-schema (utils/class-schema this)]
-        (variant/variant-spec pre [{:schema class-schema}])
-        (leaf/leaf-spec pre))))
-  (explain [this]
-    (if-let [more-schema (utils/class-schema this)]
-      (explain more-schema)
-      (condp = this
-        #?(:clj java.lang.String :cljs nil) 'Str
-        #?(:clj java.lang.Boolean :cljs js/Boolean) 'Bool
-        #?(:clj java.lang.Number :cljs js/Number) 'Num
-        #?(:clj java.util.regex.Pattern :cljs nil) 'Regex
-        #?(:clj java.util.Date :cljs js/Date) 'Inst
-        #?(:clj java.util.UUID :cljs cljs.core/UUID) 'Uuid
-        #?(:clj (symbol (.getName ^Class this)) :cljs this)))))
+  (spec [this] (-class-spec this))
+  (explain [this] (-class-explain this))
+  #?@(:bb [sci.lang.Type
+           (spec [this] (-class-spec this))
+           (explain [this] (-class-explain this))]))
 
 
 ;; On the JVM, the primitive coercion functions (double, long, etc)
@@ -236,7 +251,7 @@
 
 ;;; Any matches anything (including nil)
 
-(clojure.core/defrecord AnythingSchema [_]
+(macros/defrecord-schema AnythingSchema [_]
   ;; _ is to work around bug in Clojure where eval-ing defrecord with no fields
   ;; loses type info, which makes this unusable in schema-fn.
   ;; http://dev.clojure.org/jira/browse/CLJ-1093
@@ -251,7 +266,7 @@
 
 ;;; eq (to a single allowed value)
 
-(clojure.core/defrecord EqSchema [v]
+(macros/defrecord-schema EqSchema [v]
   Schema
   (spec [this] (leaf/leaf-spec (spec/precondition this #(= v %) #(list '= v %))))
   (explain [this] (list 'eq v)))
@@ -264,7 +279,7 @@
 
 ;;; isa (a child of parent)
 
-(clojure.core/defrecord Isa [h parent]
+(macros/defrecord-schema Isa [h parent]
   Schema
   (spec [this] (leaf/leaf-spec (spec/precondition this
                                                   #(if h
@@ -283,7 +298,7 @@
 
 ;;; enum (in a set of allowed values)
 
-(clojure.core/defrecord EnumSchema [vs]
+(macros/defrecord-schema EnumSchema [vs]
   Schema
   (spec [this] (leaf/leaf-spec (spec/precondition this #(contains? vs %) #(list vs %))))
   (explain [this] (cons 'enum vs)))
@@ -296,7 +311,7 @@
 
 ;;; pred (matches all values for which p? returns truthy)
 
-(clojure.core/defrecord Predicate [p? pred-name]
+(macros/defrecord-schema Predicate [p? pred-name]
   Schema
   (spec [this] (leaf/leaf-spec (spec/precondition this p? #(list pred-name %))))
   (explain [this]
@@ -323,22 +338,22 @@
 
 ;; In cljs, satisfies? is a macro so we must precompile (partial satisfies? p)
 ;; and put it in metadata of the record so that equality is preserved, along with the name.
-(clojure.core/defrecord Protocol [p]
+(macros/defrecord-schema Protocol [p]
   Schema
   (spec [this]
     (leaf/leaf-spec
      (spec/precondition
       this
-      #((:proto-pred (meta this)) %)
+      (:proto-pred (meta this))
       #(list 'satisfies? (protocol-name this) %))))
   (explain [this] (list 'protocol (protocol-name this))))
 
 ;; The cljs version is macros/protocol by necessity, since cljs `satisfies?` is a macro.
 #?(:clj
 (defmacro protocol
-  "A value that must satsify? protocol p.
+  "A value that must satisfy? protocol p.
 
-   Internaly, we must make sure not to capture the value of the protocol at
+   Internally, we must make sure not to capture the value of the protocol at
    schema creation time, since that's impossible in cljs and breaks later
    extends in Clojure.
 
@@ -415,7 +430,7 @@
 
 ;;; maybe (nil)
 
-(clojure.core/defrecord Maybe [schema]
+(macros/defrecord-schema Maybe [schema]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -432,7 +447,7 @@
 
 ;;; named (schema elements)
 
-(clojure.core/defrecord NamedSchema [schema name]
+(macros/defrecord-schema NamedSchema [schema name]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -448,7 +463,7 @@
 
 ;;; either (satisfies this schema or that one)
 
-(clojure.core/defrecord Either [schemas]
+(macros/defrecord-schema Either [schemas]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -475,7 +490,7 @@
 
 ;;; conditional (choice of schema, based on predicates on the value)
 
-(clojure.core/defrecord ConditionalSchema [preds-and-schemas error-symbol]
+(macros/defrecord-schema ConditionalSchema [preds-and-schemas error-symbol]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -546,7 +561,7 @@
   (precondition [this]
     (complement (.-pre ^schema.spec.collection.CollectionSpec this))))
 
-(clojure.core/defrecord CondPre [schemas]
+(macros/defrecord-schema CondPre [schemas]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -581,7 +596,7 @@
 
 ;; constrained (post-condition on schema)
 
-(clojure.core/defrecord Constrained [schema postcondition post-name]
+(macros/defrecord-schema Constrained [schema postcondition post-name]
   Schema
   (spec [this]
     (variant/variant-spec
@@ -605,7 +620,7 @@
 
 ;;; both (satisfies this schema and that one)
 
-(clojure.core/defrecord Both [schemas]
+(macros/defrecord-schema Both [schemas]
   Schema
   (spec [this] this)
   (explain [this] (cons 'both (map explain schemas)))
@@ -651,7 +666,7 @@
                     :cljs ns)
                  "/" name))))
 
-(clojure.core/defrecord Recursive [derefable]
+(macros/defrecord-schema Recursive [derefable]
   Schema
   (spec [this] (variant/variant-spec spec/+no-precondition+ [{:schema @derefable}]))
   (explain [this]
@@ -683,7 +698,7 @@
   #?(:clj (instance? clojure.lang.Atom x)
      :cljs (satisfies? IAtom x)))
 
-(clojure.core/defrecord Atomic [schema]
+(macros/defrecord-schema Atomic [schema]
   Schema
   (spec [this]
     (collection/collection-spec
@@ -761,7 +776,7 @@
      :cljs (cljs.core.MapEntry. k v nil)))
 
 ;; A schema for a single map entry.
-(clojure.core/defrecord MapEntry [key-schema val-schema]
+(macros/defrecord-schema MapEntry [key-schema val-schema]
   Schema
   (spec [this]
     (collection/collection-spec
@@ -891,7 +906,7 @@
       :cljs cljs.core/PersistentQueue.EMPTY)
    col))
 
-(clojure.core/defrecord Queue [schema]
+(macros/defrecord-schema Queue [schema]
   Schema
   (spec [this]
     (collection/collection-spec
@@ -1008,7 +1023,7 @@
 ;; also satisfy a map schema.  An optional :extra-validator-fn can also be attached to do
 ;; additional validation.
 
-(clojure.core/defrecord Record [klass schema]
+(macros/defrecord-schema Record [klass schema]
   Schema
   (spec [this]
     (collection/collection-spec
@@ -1020,12 +1035,14 @@
      (map-elements schema)
      (map-error)))
   (explain [this]
-    (list 'record #?(:clj (symbol (.getName ^Class klass))
+    (list 'record #?(:clj (or #?(:bb (when (instance? sci.lang.Type klass)
+                                       (symbol (str klass))))
+                              (symbol (.getName ^Class klass)))
                      :cljs (symbol (pr-str klass)))
           (explain schema))))
 
 (clojure.core/defn record* [klass schema map-constructor]
-  #?(:clj (macros/assert! (class? klass) "Expected record class, got %s" (utils/type-of klass)))
+  #?(:clj (macros/assert! (or (class? klass) #?(:bb (instance? sci.lang.Type klass))) "Expected record class, got %s" (utils/type-of klass)))
   (macros/assert! (map? schema) "Expected map, got %s" (utils/type-of schema))
   (with-meta (Record. klass schema) {:konstructor map-constructor}))
 
@@ -1037,11 +1054,15 @@
    not pass one, an attempt is made to find the corresponding function
    (but this may fail in exotic circumstances)."
   ([klass schema]
+   (let [map-ctor-var (let [bits (str/split (name klass) #"/")]
+                        (symbol (str/join "/" (concat (butlast bits) [(str "map->" (last bits))]))))
+         map-ctor-mth (symbol (str (name klass) "/create"))]
      `(record ~klass ~schema
               (macros/if-cljs
-               ~(let [bits (str/split (name klass) #"/")]
-                  (symbol (str/join "/" (concat (butlast bits) [(str "map->" (last bits))]))))
-               #(~(symbol (str (name klass) "/create")) %))))
+                ~map-ctor-var
+                (macros/if-bb
+                  ~map-ctor-var
+                  #(~map-ctor-mth %))))))
   ([klass schema map-constructor]
      `(record* ~klass ~schema #(~map-constructor (into {} %))))))
 
@@ -1061,7 +1082,7 @@
             (when (seq more)
               ['& (mapv explain more)]))))
 
-(clojure.core/defrecord FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
+(macros/defrecord-schema FnSchema [output-schema input-schemas] ;; input-schemas sorted by arity
   Schema
   (spec [this] (leaf/leaf-spec (spec/simple-precondition this ifn?)))
   (explain [this]
@@ -1198,13 +1219,15 @@
 (clojure.core/defn fn-validation?
   "Get the current global schema validation setting."
   []
-  #?(:clj (.get ^java.util.concurrent.atomic.AtomicReference utils/use-fn-validation)
+  #?(:bb @utils/use-fn-validation
+     :clj (.get ^java.util.concurrent.atomic.AtomicReference utils/use-fn-validation)
      :cljs @utils/use-fn-validation))
 
 (clojure.core/defn set-fn-validation!
   "Globally turn on (or off) schema validation for all s/fn and s/defn instances."
   [on?]
-  #?(:clj (.set ^java.util.concurrent.atomic.AtomicReference utils/use-fn-validation on?)
+  #?(:bb (reset! utils/use-fn-validation on?)
+     :clj (.set ^java.util.concurrent.atomic.AtomicReference utils/use-fn-validation on?)
      :cljs (reset! utils/use-fn-validation on?)))
 
 #?(:clj
@@ -1392,15 +1415,18 @@
 
      (s/defmethod ^:always-validate mymultifun :a-dispatch-value [x y] (* x y))"
   [multifn dispatch-val & fn-tail]
-  `(macros/if-cljs
-    (cljs.core/-add-method
-     ~(with-meta multifn {:tag 'cljs.core/MultiFn})
-     ~dispatch-val
-     (fn ~(with-meta (gensym (str (name multifn) "__")) (meta multifn)) ~@fn-tail))
-    (. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
-       addMethod
-       ~dispatch-val
-       (fn ~(with-meta (gensym (str (name multifn) "__")) (meta multifn)) ~@fn-tail)))))
+  (let [methodfn `(fn ~(with-meta (gensym (str (name multifn) "__")) (meta multifn)) ~@fn-tail)]
+    `(macros/if-cljs
+       (cljs.core/-add-method
+         ~(with-meta multifn {:tag 'cljs.core/MultiFn})
+         ~dispatch-val
+         ~methodfn)
+       ~#?(:bb `(let [methodfn# ~methodfn]
+                  (clojure.core/defmethod ~multifn ~dispatch-val [& args#] (apply methodfn# args#)))
+           :default `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn})
+                        addMethod
+                        ~dispatch-val
+                        ~methodfn))))))
 
 #?(:clj
 (defmacro letfn
