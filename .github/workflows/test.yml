@@ -103,6 +103,6 @@ jobs:
           distribution: 'temurin'
           java-version: 17
       - name: Download babashka
-        run: bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install) --version 0.8.3-SNAPSHOT --dir .
+        run: bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install) --dir .
       - name: Run Babashka tests
         run: ./bb test
