@@ -18,6 +18,11 @@
   [then else]
   (if (cljs-env? &env) then else))
 
+(let [bb? (boolean (System/getProperty "babashka.version"))]
+  (defmacro if-bb
+    [then else]
+    (if bb? then else)))
+
 (defmacro try-catchall
   "A cross-platform variant of try-catch that catches all* exceptions.
    Does not (yet) support finally, and does not need or want an exception class.
@@ -70,6 +75,20 @@
 (defmacro validation-error [schema value expectation & [fail-explanation]]
   `(schema.utils/error
     (utils/make-ValidationError ~schema ~value (delay ~expectation) ~fail-explanation)))
+
+(defmacro defrecord-schema
+  "Like defrecord for schema primitives, and also registers cross-platform print methods."
+  [n & args]
+  `(do (clojure.core/defrecord ~n ~@args)
+       (if-cljs (extend-protocol cljs.core/IPrintWithWriter
+                  ~n
+                  (~'-pr-writer [s# w# _#]
+                    (cljs.core/-write w# (schema.core/explain s#))))
+                ;; bb doesn't support multimethods extended via protocols yet
+                (if-bb (schema.core/register-schema-print-as-explain ~n)
+                       ;; relies on (register-schema-print-as-explain schema.core.Schema)
+                       nil))
+       ~n))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers for processing and normalizing element/argument schemas in s/defrecord and s/(de)fn
@@ -207,66 +226,74 @@
    executed when turned on, and have very low overhead otherwise.
    tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
-   every time we do the validation."
-  [env fn-name output-schema-sym bind-meta [bind & body]]
-  (assert! (vector? bind) "Got non-vector binding form %s" bind)
-  (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
-    (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
-  (let [original-arglist bind
-        bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
-        [regular-args rest-arg] (split-rest-arg env bind)
-        input-schema-sym (gensym "input-schema")
-        input-checker-sym (gensym "input-checker")
-        output-checker-sym (gensym "output-checker")
-        compile-validation (compile-fn-validation? env fn-name)]
-    {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
-     :more-bindings (when compile-validation
-                      [input-checker-sym `(delay (schema.core/checker ~input-schema-sym))
-                       output-checker-sym `(delay (schema.core/checker ~output-schema-sym))])
-     :arglist bind
-     :raw-arglist original-arglist
-     :arity-form (if compile-validation
-                   (let [bind-syms (vec (repeatedly (count regular-args) gensym))
-                         rest-sym (when rest-arg (gensym "rest"))
-                         metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
-                     (list
-                      (if rest-arg
-                        (into metad-bind-syms ['& rest-sym])
-                        metad-bind-syms)
-                      `(let [validate# ~(if (:always-validate (meta fn-name))
-                                          `true
-                                          `(if-cljs (deref ~'ufv__) (.get ~'ufv__)))]
-                         (when validate#
-                           (let [args# ~(if rest-arg
-                                          `(list* ~@bind-syms ~rest-sym)
-                                          bind-syms)]
-                             (if schema.core/fn-validator
-                               (schema.core/fn-validator :input
-                                                         '~fn-name
-                                                         ~input-schema-sym
-                                                         @~input-checker-sym
-                                                         args#)
-                               (when-let [error# (@~input-checker-sym args#)]
-                                 (error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
-                                                        '~fn-name (pr-str error#))
-                                         {:schema ~input-schema-sym :value args# :error error#})))))
-                         (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
-                                               (when rest-arg [rest-arg rest-sym]))
-                                    ~@(apply-prepost-conditions body))]
+   every time we do the validation.
+  
+  :ufv-sym should name a local binding bound to `schema.utils/use-fn-validation`.
+  
+  5-args arity is deprecated."
+  ([env fn-name output-schema-sym bind-meta arity-form]
+   (process-fn-arity {:env env :fn-name fn-name :output-schema-sym output-schema-sym
+                      :bind-meta bind-meta :arity-form arity-form :ufv-sym 'ufv__}))
+  ([{[bind & body] :arity-form :keys [env fn-name output-schema-sym bind-meta ufv-sym]}]
+   (assert! (vector? bind) "Got non-vector binding form %s" bind)
+   (when-let [bad-meta (seq (filter (or (meta bind) {}) [:tag :s? :s :schema]))]
+     (throw (RuntimeException. (str "Meta not supported on bindings, put on fn name" (vec bad-meta)))))
+   (let [original-arglist bind
+         bind (with-meta (process-arrow-schematized-args env bind) bind-meta)
+         [regular-args rest-arg] (split-rest-arg env bind)
+         input-schema-sym (gensym "input-schema")
+         input-checker-sym (gensym "input-checker")
+         output-checker-sym (gensym "output-checker")
+         compile-validation (compile-fn-validation? env fn-name)]
+     {:schema-binding [input-schema-sym (input-schema-form regular-args rest-arg)]
+      :more-bindings (when compile-validation
+                       [input-checker-sym `(delay (schema.core/checker ~input-schema-sym))
+                        output-checker-sym `(delay (schema.core/checker ~output-schema-sym))])
+      :arglist bind
+      :raw-arglist original-arglist
+      :arity-form (if compile-validation
+                    (let [bind-syms (vec (repeatedly (count regular-args) gensym))
+                          rest-sym (when rest-arg (gensym "rest"))
+                          metad-bind-syms (with-meta (mapv #(with-meta %1 (meta %2)) bind-syms bind) bind-meta)]
+                      (list
+                        (if rest-arg
+                          (into metad-bind-syms ['& rest-sym])
+                          metad-bind-syms)
+                        `(let [validate# ~(if (:always-validate (meta fn-name))
+                                            `true
+                                            `(if-cljs (deref ~ufv-sym)
+                                                      (if-bb (deref ~ufv-sym) (.get ~ufv-sym))))]
                            (when validate#
-                             (if schema.core/fn-validator
-                               (schema.core/fn-validator :output
-                                                         '~fn-name
-                                                         ~output-schema-sym
-                                                         @~output-checker-sym
-                                                         o#)
-                               (when-let [error# (@~output-checker-sym o#)]
-                                 (error! (utils/format* "Output of %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
-                                                        '~fn-name (pr-str error#))
-                                         {:schema ~output-schema-sym :value o# :error error#}))))
-                           o#))))
-                   (cons (into regular-args (when rest-arg ['& rest-arg]))
-                         body))}))
+                             (let [args# ~(if rest-arg
+                                            `(list* ~@bind-syms ~rest-sym)
+                                            bind-syms)]
+                               (if schema.core/fn-validator
+                                 (schema.core/fn-validator :input
+                                                           '~fn-name
+                                                           ~input-schema-sym
+                                                           @~input-checker-sym
+                                                           args#)
+                                 (when-let [error# (@~input-checker-sym args#)]
+                                   (error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                                          '~fn-name (pr-str error#))
+                                           {:schema ~input-schema-sym :value args# :error error#})))))
+                           (let [o# (loop ~(into (vec (interleave (map #(with-meta % {}) bind) bind-syms))
+                                                 (when rest-arg [rest-arg rest-sym]))
+                                      ~@(apply-prepost-conditions body))]
+                             (when validate#
+                               (if schema.core/fn-validator
+                                 (schema.core/fn-validator :output
+                                                           '~fn-name
+                                                           ~output-schema-sym
+                                                           @~output-checker-sym
+                                                           o#)
+                                 (when-let [error# (@~output-checker-sym o#)]
+                                   (error! (utils/format* "Output of %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                                          '~fn-name (pr-str error#))
+                                           {:schema ~output-schema-sym :value o# :error error#}))))
+                             o#))))
+                    (cons (into regular-args (when rest-arg ['& rest-arg]))
+                          body))})))
 
 (defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
@@ -278,7 +305,9 @@
                         (when (primitive-sym? t)
                           {:tag t}))
                       {})
-        processed-arities (map (partial process-fn-arity env name output-schema-sym bind-meta)
+        ufv-sym (gensym "ufv")
+        processed-arities (map #(process-fn-arity {:env env :fn-name name :output-schema-sym output-schema-sym
+                                                   :bind-meta bind-meta :arity-form % :ufv-sym ufv-sym})
                                (if (vector? (first fn-body))
                                  [fn-body]
                                  fn-body))
@@ -286,7 +315,7 @@
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
                            (when compile-validation
-                             `[~(with-meta 'ufv__ {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
+                             `[~(with-meta ufv-sym {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
                            (apply concat schema-bindings)
                            (mapcat :more-bindings processed-arities)))

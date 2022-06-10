@@ -14,7 +14,8 @@
   #?(:cljs (:require-macros [schema.macros :as macros]))
   (:require
    [clojure.string :as str]
-   #?(:clj [clojure.pprint :as pprint])
+   [#?(:clj clojure.pprint
+       :cljs cljs.pprint) :as pprint]
    clojure.data
    [schema.utils :as utils]
    [schema.core :as s]
@@ -48,9 +49,11 @@
 
 (deftest fn-name-test
   (is (= "odd?" (utils/fn-name odd?)))
-  (is (= #?(:clj "schema.core-test/foo-bar" :cljs "foo-bar")
-         (utils/fn-name foo-bar)))
-  #?(:clj (is (= "schema.core-test$fn" (subs (utils/fn-name (fn foo [x] (+ x x))) 0 19))))
+  #?(:bb nil
+     :default (is (= #?(:clj "schema.core-test/foo-bar" :cljs "foo-bar")
+                     (utils/fn-name foo-bar))))
+  #?(:bb nil
+     :clj (is (= "schema.core-test$fn" (subs (utils/fn-name (fn foo [x] (+ x x))) 0 19))))
   #?(:cljs (is (= "foo" (utils/fn-name (fn foo [x] (+ x x))))))
   #?(:cljs (is (= "function" (utils/fn-name (fn [x] (+ x x)))))))
 
@@ -82,7 +85,7 @@
 
   (deftest array-test
     (valid! (Class/forName"[Ljava.lang.String;") (into-array String ["a"]))
-    (invalid! (Class/forName "[Ljava.lang.Long;") (into-array String ["a"]))
+    (invalid! (Class/forName #?(:bb "[Ljava.lang.Double;" :default "[Ljava.lang.Long;")) (into-array String ["a"]))
     (valid! (Class/forName "[Ljava.lang.Double;") (into-array Double [1.0]))
     (valid! (Class/forName "[D") (double-array [1.0]))
     (invalid! (Class/forName "[D") (into-array Double [1.0]))
@@ -138,27 +141,51 @@
     (is (= '(pred odd?) (s/explain schema)))
     (invalid! (s/pred odd?) 2 "(not (odd? 2))")))
 
-(defprotocol ATestProtocol)
+(defprotocol ATestMarkerProtocol)
 
-(s/defn ^:always-validate a-test-protocol-fn
+(s/defn ^:always-validate a-test-marker-protocol-fn
+  "Compile the schema before extending, make sure it works as expected"
+  [x :- (s/protocol ATestMarkerProtocol)]
+  x)
+
+(defrecord DirectTestMarkerProtocolSatisfier [] ATestMarkerProtocol)
+(defrecord IndirectTestMarkerProtocolSatisfier []) (extend-type IndirectTestMarkerProtocolSatisfier ATestMarkerProtocol)
+(defrecord NonTestMarkerProtocolSatisfier [])
+
+(deftest marker-protocol-test
+ (let [schema (s/protocol ATestMarkerProtocol)]
+   (valid! schema (DirectTestMarkerProtocolSatisfier.))
+   (valid! schema (IndirectTestMarkerProtocolSatisfier.))
+   (invalid! schema (NonTestMarkerProtocolSatisfier.))
+   (invalid! schema nil)
+   (invalid! schema 117 "(not (satisfies? ATestMarkerProtocol 117))")
+   (is (a-test-marker-protocol-fn (DirectTestMarkerProtocolSatisfier.)))
+   (is (a-test-marker-protocol-fn (IndirectTestMarkerProtocolSatisfier.)))
+   (invalid-call! a-test-marker-protocol-fn (NonTestMarkerProtocolSatisfier.))
+   (is (= '(protocol ATestMarkerProtocol) (s/explain schema)))))
+
+(defprotocol ATestProtocol
+  (not-marker-protocol [this]))
+
+(s/defn ^:always-validate a-test-non-marker-protocol-fn
   "Compile the schema before extending, make sure it works as expected"
   [x :- (s/protocol ATestProtocol)]
   x)
 
-(defrecord DirectTestProtocolSatisfier [] ATestProtocol)
-(defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol)
+(defrecord DirectTestProtocolSatisfier [] ATestProtocol (not-marker-protocol [this]))
+(defrecord IndirectTestProtocolSatisfier []) (extend-type IndirectTestProtocolSatisfier ATestProtocol (not-marker-protocol [this]))
 (defrecord NonTestProtocolSatisfier [])
 
-(deftest protocol-test
+(deftest non-marker-protocol-test
   (let [schema (s/protocol ATestProtocol)]
     (valid! schema (DirectTestProtocolSatisfier.))
     (valid! schema (IndirectTestProtocolSatisfier.))
     (invalid! schema (NonTestProtocolSatisfier.))
     (invalid! schema nil)
     (invalid! schema 117 "(not (satisfies? ATestProtocol 117))")
-    (is (a-test-protocol-fn (DirectTestProtocolSatisfier.)))
-    (is (a-test-protocol-fn (IndirectTestProtocolSatisfier.)))
-    (invalid-call! a-test-protocol-fn (NonTestProtocolSatisfier.))
+    (is (a-test-non-marker-protocol-fn (DirectTestProtocolSatisfier.)))
+    (is (a-test-non-marker-protocol-fn (IndirectTestProtocolSatisfier.)))
+    (invalid-call! a-test-non-marker-protocol-fn (NonTestProtocolSatisfier.))
     (is (= '(protocol ATestProtocol) (s/explain schema)))))
 
 (deftest regex-test
@@ -476,7 +503,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Handle Struct
 
-#?(:clj
+#?(:bb nil
+:clj
 (do (defstruct ts1 :num :str :map :vec)
     (defstruct ts2 :num :str)
 
@@ -619,8 +647,8 @@
   (let [schema [s/Str]]
     (valid! schema (java.util.ArrayList. ^java.util.Collection (identity ["hi" "bye"])))
     (invalid! schema (java.util.ArrayList. ^java.util.Collection (identity [1 2])))
-    (valid! schema (java.util.LinkedList. ^java.util.Collection (identity ["hi" "bye"])))
-    (invalid! schema (java.util.LinkedList. ^java.util.Collection (identity [1 2])))
+    #?(:bb nil :default (valid! schema (java.util.LinkedList. ^java.util.Collection (identity ["hi" "bye"]))))
+    #?(:bb nil :default (invalid! schema (java.util.LinkedList. ^java.util.Collection (identity [1 2]))))
     (valid! schema java.util.Collections/EMPTY_LIST)
     (invalid! schema java.util.Collections/EMPTY_MAP)
     (invalid! schema #{"hi" "bye"}))))
@@ -635,7 +663,7 @@
     (valid! schema (Foo. :foo 1))
     (invalid! schema {:x :foo :y 1})
     (invalid! schema (assoc (Foo. :foo 1) :bar 2))
-    #?(:clj (is (= '(record schema.core_test.Foo {:x Any,  (optional-key :y) Int})
+    #?(:clj (is (= '(record schema.core_test.Foo {:x Any, (optional-key :y) Int})
                    (s/explain schema))))))
 
 (deftest record-with-extra-keys-test
@@ -645,7 +673,6 @@
     (valid! schema (Foo. :foo 1))
     (valid! schema (assoc (Foo. :foo 1) :bar 2))
     (invalid! schema {:x :foo :y 1})))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Function Schemas
@@ -821,8 +848,10 @@
 (do (s/defrecord RecordWithPrimitive [x :- long])
     (deftest record-with-primitive-test
       (valid! RecordWithPrimitive (RecordWithPrimitive. 1))
-      (is (thrown? Exception (RecordWithPrimitive. "a")))
-      (is (thrown? Exception (RecordWithPrimitive. nil))))))
+      #?(:bb (do (is (invalid! RecordWithPrimitive (RecordWithPrimitive. "a")))
+                 (is (invalid! RecordWithPrimitive (RecordWithPrimitive. nil))))
+         :default (do (is (thrown? Exception (RecordWithPrimitive. "a")))
+                      (is (thrown? Exception (RecordWithPrimitive. nil))))))))
 
 (deftest map->record-test
   (let [subset {:foo 1 :bar "a"}
@@ -866,7 +895,7 @@
   (let [f (s/fn ^s/Str foo [^OddLong arg0 arg1])]
     (is (= +test-fn-schema+ (s/fn-schema f)))))
 
-#?(:clj
+#?(:bb nil :clj
 (deftest no-wrapper-fn-test
   (let [f (s/fn this [] this)]
     (is (identical? f (f))))))
@@ -887,7 +916,8 @@
     (s/with-fn-validation
       (is (= 4 (f 1 {:foo 3})))
       ;; Primitive Interface Test
-      #?(:clj (is (thrown? Exception (.invokePrim ^clojure.lang.IFn$LOL f 1 {:foo 3})))) ;; primitive type hints don't work on fns
+      #?(:bb nil
+         :clj (is (thrown? Exception (.invokePrim ^clojure.lang.IFn$LOL f 1 {:foo 3})))) ;; primitive type hints don't work on fns
       (invalid-call! f 1 {:foo 4})  ;; foo not odd?
       (invalid-call! f 2 {:foo 3})) ;; return not even?
 
@@ -896,7 +926,8 @@
     (is (= 5 (f 2 {:foo 3})))     ;; return not even?
     (let [fthiss @fthiss]
       (is (seq fthiss))
-      #?(:clj (is (every? #(identical? % f) fthiss)))))
+      #?(:bb nil
+         :clj (is (every? #(identical? % f) fthiss)))))
   (testing
     "Tests that the anonymous function schema macro can handle a
     name, a schema without a name and no return schema."
@@ -996,7 +1027,7 @@
 (deftest infinite-arity-fn-test
   (let [f (s/fn foo :- s/Int
             ([^s/Int arg0] (inc arg0))
-            ([^s/Int arg0  & strs :- [s/Str]]
+            ([^s/Int arg0 & strs :- [s/Str]]
                (reduce + (foo arg0) (map count strs))))]
     (is (= (s/=>* s/Int [s/Int] [s/Int & [s/Str]])
            (s/fn-schema f)))
@@ -1020,7 +1051,8 @@
         (invalid-call! f 4 9 2))
       (let [fthiss @fthiss]
         (is (seq fthiss))
-        #?(:clj (is (every? #(identical? % f) fthiss))))))
+        #?(:bb nil
+           :clj (is (every? #(identical? % f) fthiss))))))
   (testing "arg schema"
     (let [f (s/fn foo :- s/Int
               [^s/Int arg0 & [rest0 :- s/Int]] (+ arg0 (or rest0 2)))]
@@ -1103,11 +1135,10 @@
     (invalid-call! validated-pre-post-defn 11)
     (invalid-call! validated-pre-post-defn 1)
     (invalid-call! validated-pre-post-defn "a"))
-  (comment ;; Triggers what seems to be a bug in cljs, fixed in latest version.
-    (let [e (try (s/with-fn-validation (simple-validated-defn 2)) nil
-                 (catch js/Error e e))]
-      (when e ;; validation can be disabled at compile time, and exception not thrown
-        (is (>= (.indexOf (str e) +bad-input-str+) 0)))))
+  (let [e (try (s/with-fn-validation (simple-validated-defn 2)) nil
+               (catch js/Error e e))]
+    (when e ;; validation can be disabled at compile time, and exception not thrown
+      (is (>= (.indexOf (str e) +bad-input-str+) 0))))
   (is (= +simple-validated-defn-schema+ (s/fn-schema simple-validated-defn)))))
 
 #?(:clj
@@ -1123,10 +1154,12 @@
 (deftest simple-validated-defn-test
   (is (= "Inputs: [arg0 :- OddLong]\n  Returns: OddLongString\n\n  I am a simple schema fn"
          (:doc (meta #'simple-validated-defn))))
-  (is (= '([arg0]) (:arglists (meta #'simple-validated-defn))))
+  #?(:bb nil
+     :default (is (= '([arg0]) (:arglists (meta #'simple-validated-defn)))))
   (is (= "Inputs: ([arg0 :- OddLong] [arg0 :- OddLong arg1 :- Long])\n  Returns: OddLongString\n\n  I am a multi-arglist schema fn"
          (:doc (meta #'multi-arglist-validated-defn))))
-  (is (= '([arg0] [arg0 arg1]) (:arglists (meta #'multi-arglist-validated-defn))))
+  #?(:bb nil
+     :default (is (= '([arg0] [arg0 arg1]) (:arglists (meta #'multi-arglist-validated-defn)))))
   (s/with-fn-validation
     (testing "pre/post"
       (is (= 7 (validated-pre-post-defn 7)))
@@ -1151,8 +1184,9 @@
   (is (= "4" (simple-validated-defn 4)))
   (let [^Exception e (try (s/with-fn-validation (simple-validated-defn 2)) nil (catch Exception e e))]
     (is (.contains (.getMessage e) +bad-input-str+))
-    (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
-    (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj")))))
+    #?(:bb nil
+       :default (do (is (.contains (.getClassName ^StackTraceElement (first (.getStackTrace e))) "simple_validated_defn"))
+                    (is (.startsWith (.getFileName ^StackTraceElement (first (.getStackTrace e))) "core_test.clj")))))))
 
 (s/defn ^:always-validate always-validated-defn :- (s/pred even?)
   [x :- (s/pred pos?)]
@@ -1294,10 +1328,12 @@
   (deftest simple-primitive-validated-defn-test
     (is (= +primitive-validated-defn-schema+ (s/fn-schema primitive-validated-defn)))
 
-    (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL))
+    #?(:bb nil
+       :default (is ((ancestors (class primitive-validated-defn)) clojure.lang.IFn$LL)))
     (s/with-fn-validation
       (is (= 4 (primitive-validated-defn 3)))
-      (is (= 4 (.invokePrim ^clojure.lang.IFn$LL primitive-validated-defn 3)))
+       #?(:bb nil
+          :default (is (= 4 (.invokePrim ^clojure.lang.IFn$LL primitive-validated-defn 3))))
       (is (thrown? Exception (primitive-validated-defn 4))))
 
     (is (= 5 (primitive-validated-defn 4))))
@@ -1307,7 +1343,8 @@
     1.0)
 
   (deftest another-primitive-fn-test
-    (is ((ancestors (class another-primitive-fn)) clojure.lang.IFn$LD))
+    #?(:bb nil
+       :default (is ((ancestors (class another-primitive-fn)) clojure.lang.IFn$LD)))
     (is (= 1.0 (another-primitive-fn 10))))))
 
 
@@ -1416,13 +1453,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Regression tests
 
+;; map implementation takes precedence in cljs
 #?(:clj
-(deftest pprint-test
-  (is (= "(maybe Int)" (str/trim (with-out-str (pprint/pprint (s/maybe s/Int))))))))
+   (deftest pprint-test
+     (is (= "(maybe Int)" (str/trim (with-out-str (pprint/pprint (s/maybe s/Int))))))))
+
+(deftest print-test
+  (is (= "(maybe Int)" (pr-str (s/maybe s/Int)))))
 
 (defrecord ItemTest [first second])
 
-(defrecord CacheTest [schema]
+(macros/defrecord-schema CacheTest [schema]
   s/Schema
   (spec [this]
     (collection/collection-spec

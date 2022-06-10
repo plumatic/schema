@@ -396,7 +396,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on Clojure 1.8 onwards and the latest version of ClojureScript.
+Schema is currently supported on Clojure 1.8 onwards, [Babashka](https://github.com/babashka/babashka) 0.8.156 onwards, and the latest version of ClojureScript.
 
 ## License
 

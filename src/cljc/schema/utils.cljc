@@ -30,7 +30,8 @@
   "What class can we associate the fn schema with? In Clojure use the class of the fn; in
    cljs just use the fn itself."
   [f]
-  #?(:clj (class f)
+  #?(:bb f
+     :clj (class f)
      :cljs f))
 
 (defn format* [fmt & args]
@@ -150,8 +151,9 @@
    schema only applies to instances of the concrete type passed, i.e.,
    (= (class x) klass), not (instance? klass x)."
     [klass schema]
-    (assert (class? klass)
-            (format* "Cannot declare class schema for non-class %s" (class klass)))
+    #?(:bb nil ;; fn identity is used as klass in bb
+       :default (assert (class? klass)
+                        (format* "Cannot declare class schema for non-class %s" (pr-str (class klass)))))
     (.put +class-schemata+ klass schema))
 
   (defn class-schema
@@ -176,5 +178,6 @@
    s/compile-fn-validation was true -- has no effect for functions compiled
    when it is false."
   ;; specialize in Clojure for performance
-  #?(:clj (java.util.concurrent.atomic.AtomicReference. false)
+  #?(:bb (atom false)
+     :clj (java.util.concurrent.atomic.AtomicReference. false)
      :cljs (atom false)))
