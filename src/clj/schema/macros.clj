@@ -105,7 +105,7 @@
   "Given a Symbol, attempt to return a valid Clojure tag else nil.
 
   Symbols not contained in `primitive-sym?` will be resolved. Symbols
-  resolved to Vars have thier values checked in an attempt to provide
+  resolved to Vars have their values checked in an attempt to provide
   type hints when possible.
 
   A valid tag is a primitive, Class, or Var containing a Class."
