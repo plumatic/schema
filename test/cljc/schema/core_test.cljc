@@ -716,7 +716,8 @@
     (testing "primitive" (test-normalized-meta ^long foo nil {:tag long :schema long}))
     (testing "class" (test-normalized-meta ^String foo nil {:tag String :schema String}))
     (testing "non-tag" (test-normalized-meta ^ASchema foo nil {:schema ASchema}))
-    (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String})))
+    (testing "explicit" (test-normalized-meta ^Object foo String {:tag Object :schema String}))
+    (testing "xplatform" (test-normalized-meta ^s/Str foo nil {:tag String :schema String})))
 
   (defmacro test-meta-extraction [meta-form arrow-form]
     (let [meta-ized (macros/process-arrow-schematized-args {} arrow-form)]
@@ -729,6 +730,7 @@
     (testing "no-tag" (test-meta-extraction [x] [x]))
     (testing "old-tags" (test-meta-extraction [^String x] [^String x]))
     (testing "new-vs-old-tag" (test-meta-extraction [^String x] [x :- String]))
+    (testing "xplatform-new-vs-xplatform-old-tag" (test-meta-extraction [^s/Str x] [x :- s/Str]))
     (testing "multi vars" (test-meta-extraction [x ^String y z] [x y :- String z])))))
 
 (defprotocol PProtocol

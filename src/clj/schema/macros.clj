@@ -101,8 +101,25 @@
 (def primitive-sym? '#{float double boolean byte char short int long
                        floats doubles booleans bytes chars shorts ints longs objects})
 
-(defn valid-tag? [env tag]
-  (and (symbol? tag) (or (primitive-sym? tag) (class? (resolve env tag)))))
+(defn resolve-tag
+  "Given a Symbol, attempt to return a valid Clojure tag else nil.
+
+  Symbols not contained in `primitive-sym?` will be resolved. Symbols
+  resolved to Vars have their values checked in an attempt to provide
+  type hints when possible.
+
+  A valid tag is a primitive, Class, or Var containing a Class."
+  [env tag]
+  (when (symbol? tag)
+    (let [resolved (delay (resolve env tag))]
+      (cond
+        (or (primitive-sym? tag) (class? @resolved))
+        tag
+
+        (var? @resolved)
+        (let [v (var-get @resolved)]
+          (when (class? v)
+            (symbol (.getName ^Class v))))))))
 
 (defn normalized-metadata
   "Take an object with optional metadata, which may include a :tag,
@@ -118,9 +135,7 @@
         (-> (or (meta imeta) {})
             (dissoc :tag)
             (utils/assoc-when :schema schema
-                              :tag (let [t (or tag schema)]
-                                     (when (valid-tag? env t)
-                                       t))))))))
+                              :tag (resolve-tag env (or tag schema))))))))
 
 (defn extract-schema-form
   "Pull out the schema stored on a thing.  Public only because of its use in a public macro."
@@ -227,9 +242,9 @@
    tag? is a prospective tag for the fn symbol based on the output schema.
    schema-bindings are bindings to lift eval outwards, so we don't build the schema
    every time we do the validation.
-  
+
   :ufv-sym should name a local binding bound to `schema.utils/use-fn-validation`.
-  
+
   5-args arity is deprecated."
   ([env fn-name output-schema-sym bind-meta arity-form]
    (process-fn-arity {:env env :fn-name fn-name :output-schema-sym output-schema-sym
