@@ -118,7 +118,7 @@ What about when things go bad?  Schema's `s/check` and `s/validate` provide mean
 
 ```
 
-See the "More Examples" section below for more examples and explanation, or the [custom Schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
+See the [More examples](#more-examples) section below for more examples and explanation, or the [custom Schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
 
 
 ## Beyond type hints
