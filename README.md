@@ -143,7 +143,7 @@ Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help br
   (StampedNames. (str (System/currentTimeMillis)) names))
 
 (s/def example-stamped-names :- StampedNames
-  (stamped-names (map (s/fn [first-name :- s/Str] :- s/Str
+  (stamped-names (map (s/fn :- s/Str [first-name :- s/Str]
                         (str first-name " Smith")
                       ["Bob" "Jane"]))))
 ```
