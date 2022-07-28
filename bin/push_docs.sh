@@ -17,5 +17,5 @@ rm -fr js css doc
 mv target/doc/* .
 git add .
 git commit --allow-empty -am "new documentation push."
-#git push -u origin gh-pages
-git checkout master
+git push -u origin gh-pages
+git checkout -

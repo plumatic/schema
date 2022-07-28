@@ -1,6 +1,7 @@
-## NEXT
+## 1.3.1
  * [#391](https://github.com/plumatic/schema/issues/391): Improve `s/defalias` error message when passed a schema that doesn't support metadata
  * [#442](https://github.com/plumatic/schema/pull/442): Add support for cross-platform JVM type hints (another attempt at fixing [#174](https://github.com/plumatic/schema/issues/174))
+ * [#434](https://github.com/plumatic/schema/pull/434): Fix [API doc generation](http://plumatic.github.io/schema)
 
 ## 1.3.0 (`2022-06-10`)
  * [Babashka support](https://github.com/plumatic/schema/pull/440)
