@@ -273,7 +273,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; anything
 (s/validate [s/Any] ["woohoo!" 'go-nuts 42.0])
 
-;; maybe
+;; maybe (nilable)
 (s/validate (s/maybe s/Keyword) :a)
 (s/validate (s/maybe s/Keyword) nil)
 
