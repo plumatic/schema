@@ -14,7 +14,6 @@
                                                 :unused-meta-on-macro :wrong-tag :unused-ret-vals]}
                    :plugins [[lein-codox "0.10.8"]
                              [lein-cljsbuild "1.1.7"]
-                             [lein-release/lein-release "1.0.4"]
                              [lein-doo "0.1.10"]
                              [lein-pprint "1.3.2"]
                              [lein-shell "0.5.0"]
