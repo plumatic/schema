@@ -1,12 +1,10 @@
 ## 1.3.5 (`2022-07-28`)
- * Fix `view source` in API docs
-
-## 1.3.4 (`2022-07-28`)
  * [#391](https://github.com/plumatic/schema/issues/391): Improve `s/defalias` error message when passed a schema that doesn't support metadata
  * [#442](https://github.com/plumatic/schema/pull/442): Add support for cross-platform JVM type hints (another attempt at fixing [#174](https://github.com/plumatic/schema/issues/174))
  * [#434](https://github.com/plumatic/schema/pull/434): Fix [API doc generation](http://plumatic.github.io/schema)
+ * Fix `view source` in API docs
 
-## 1.3.1 - 1.3.3 (`2022-07-28`)
+## 1.3.1 - 1.3.4 (`2022-07-28`)
  * Prefer 1.3.4 (used to test the release process for schema)
 
 ## 1.3.0 (`2022-06-10`)
