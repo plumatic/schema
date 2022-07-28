@@ -57,7 +57,7 @@
                            :target :nodejs
                            :pretty-print true}}]}
 
-  :codox {:source-uri "https://github.com/foo/bar/blob/{version}/{filepath}#L{line}"}
+  :codox {:source-uri "https://github.com/foo/bar/blob/{git-commit}/{filepath}#L{line}"}
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
