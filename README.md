@@ -288,6 +288,9 @@ You can also write sequence schemas that expect particular values in specific po
 
 ```clojure
 ;; anything
+(s/validate s/Any "woohoo!")
+(s/validate s/Any 'go-nuts)
+(s/validate s/Any 42.0)
 (s/validate [s/Any] ["woohoo!" 'go-nuts 42.0])
 
 ;; maybe (nilable)
