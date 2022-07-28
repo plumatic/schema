@@ -127,6 +127,11 @@ If you've done much Clojure, you've probably seen code with documentation like t
   "names is a list of Strings"
   [names]
   (StampedNames. (str (System/currentTimeMillis)) names))
+
+(def ^StampedNames example-stamped-names
+  (stamped-names (map (fn [first-name]
+                        (str first-name " Smith")
+                      ["Bob" "Jane"]))))
 ```
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
