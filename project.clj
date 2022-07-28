@@ -19,7 +19,7 @@
                              [jonase/eastwood "1.2.3"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
              :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
-             :1.11 {:dependencies [[org.clojure/clojure "1.11.0"] [org.clojure/clojurescript "1.11.4"]]}
+             :1.11 {:dependencies [[org.clojure/clojure "1.11.1"] [org.clojure/clojurescript "1.11.4"]]}
              :1.12 {:dependencies [[org.clojure/clojure "1.12.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.11.4"]]
                     :repositories [["sonatype-oss-public" {:url "https://oss.sonatype.org/content/groups/public"}]]}}
 
