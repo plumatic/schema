@@ -63,12 +63,13 @@
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
-                  ["vcs" "commit"]
-                  ["vcs" "tag"]
-                  ["deploy"]
+                  ;["vcs" "commit"]
+                  ;["vcs" "tag"]
+                  ;["deploy"]
                   ["shell" "./bin/push_docs_for_current_commit.sh"]
                   ["change" "version" "leiningen.release/bump-version"]
-                  ["vcs" "commit"]
-                  ["vcs" "push"]]
+                  ;["vcs" "commit"]
+                  ;["vcs" "push"]
+                  ]
 
   :signing {:gpg-key "66E0BF75"})
