@@ -130,7 +130,7 @@ If you've done much Clojure, you've probably seen code with documentation like t
 
 (def ^StampedNames example-stamped-names
   (stamped-names (map (fn [first-name]
-                        (str first-name " Smith")
+                        (str first-name " Smith"))
                       ["Bob" "Jane"]))))
 ```
 
@@ -149,7 +149,7 @@ Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help br
 
 (s/def example-stamped-names :- StampedNames
   (stamped-names (map (s/fn :- s/Str [first-name :- s/Str]
-                        (str first-name " Smith")
+                        (str first-name " Smith"))
                       ["Bob" "Jane"]))))
 ```
 
