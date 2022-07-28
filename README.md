@@ -352,7 +352,8 @@ You can also write sequence schemas that expect particular values in specific po
 (s/validate Animal {:type :cat :name "melvin" :claws? true})
 (s/validate Animal {:type :dog :name "roofer" :barks? true})
 (s/validate Animal {:type :cat :name "confused kitty" :barks? true})
-;; RuntimeException: Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
+;; RuntimeException: 
+;; Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
 ```
 
 You can also define schemas for [recursive data types](https://github.com/plumatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0).
