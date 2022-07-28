@@ -88,8 +88,8 @@
   #?(:cljs (:require-macros [schema.macros :as macros]
                             schema.core)))
 
-#?(:clj (def clj-1195-fixed?
-          (do (defprotocol CLJ1195Check
+#?(:clj (def ^:no-doc clj-1195-fixed?
+          (do (defprotocol ^:no-doc CLJ1195Check
                 (dummy-method [this]))
               (try
                 (eval '(extend-protocol CLJ1195Check nil
