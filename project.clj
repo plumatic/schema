@@ -16,6 +16,8 @@
                              [lein-cljsbuild "1.1.7"]
                              [lein-release/lein-release "1.0.4"]
                              [lein-doo "0.1.10"]
+                             [lein-pprint "1.3.2"]
+                             [lein-shell "0.5.0"]
                              [jonase/eastwood "1.2.3"]]}
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
              :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
@@ -63,5 +65,15 @@
 
   :codox {:src-dir-uri "http://github.com/plumatic/schema/blob/master/"
           :src-linenum-anchor-prefix "L"}
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version" "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag"]
+                  ["deploy"]
+                  ["shell" "./bin/push_docs_for_current_commit.sh"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ["vcs" "push"]]
 
   :signing {:gpg-key "66E0BF75"})
