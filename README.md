@@ -29,7 +29,7 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
              :include-macros true ;; cljs only
              ]))
 
-(def Data
+(s/defschema Data
   "A schema for a nested data type"
   {:a {:b s/Str
        :c s/Int}
@@ -94,6 +94,14 @@ Since schemas are just data, you can also `def` them and reuse and compose them 
 (def StringList [s/Str])
 (def StringScores {String double})
 (def StringScoreMap {long StringScores})
+```
+
+However, we encourage you to use `s/defschema` for this purpose to improve error messages:
+
+```clojure
+(s/defschema StringList [s/Str])
+(s/defschema StringScores {String double})
+(s/defschema StringScoreMap {long StringScores})
 ```
 
 What about when things go bad?  Schema's `s/check` and `s/validate` provide meaningful errors that look like the bad parts of your data, and are (hopefully) easy to understand.
@@ -225,7 +233,7 @@ The source code in [schema/core.cljc](https://github.com/plumatic/schema/blob/ma
 In addition to uniform maps (like String to double), map schemas can also capture maps with specific key requirements:
 
 ```clojure
-(def FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
+(s/defschema FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
 
 (s/validate FooBar {:foo "f" :bar :b})
 ;; {:foo "f" :bar :b}
@@ -240,7 +248,7 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
 
 ```clojure
 
-(def FancyMap
+(s/defschema FancyMap
   "If foo is present, it must map to a Keyword.  Any number of additional
    String-String mappings are allowed as well."
   {(s/optional-key :foo) s/Keyword
@@ -263,7 +271,7 @@ Unlike most schemas, sequence schemas are implicitly nilable:
 You can also write sequence schemas that expect particular values in specific positions:
 
 ```clojure
-(def FancySeq
+(s/defschema FancySeq
   "A sequence that starts with a String, followed by an optional Keyword,
    followed by any number of Numbers."
   [(s/one s/Str "s")
@@ -305,7 +313,7 @@ You can also write sequence schemas that expect particular values in specific po
 (s/validate (s/pred odd?) 1)
 
 ;; conditional (i.e. variant or option)
-(def StringListOrKeywordMap (s/conditional map? {s/Keyword s/Keyword} :else [String]))
+(s/defschema StringListOrKeywordMap (s/conditional map? {s/Keyword s/Keyword} :else [String]))
 (s/validate StringListOrKeywordMap ["A" "B" "C"])
 ;; => ["A" "B" "C"]
 (s/validate StringListOrKeywordMap {:foo :bar})
@@ -314,21 +322,21 @@ You can also write sequence schemas that expect particular values in specific po
 ;; RuntimeException:  Value does not match schema: [(not (instance? java.lang.String :foo))]
 
 ;; if (shorthand for conditional)
-(def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
+(s/defschema StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
 
 ;; cond-pre (experimental), also shorthand for conditional, allows you to skip the
 ;; predicate when the options are superficially different by doing a greedy match
 ;; on the preconditions of the options.
-(def StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
+(s/defschema StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
 ;; but don't do this -- this will never validate `{:b :x}` because the first schema
 ;; will be chosen based on the `map?` precondition (use `if` or `abstract-map-schema` instead):
-(def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
+(s/defschema BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
 
 ;; conditional can also be used to apply extra validation to a single type,
 ;; but constrained is often more desirable since it applies the validation
 ;; as a *postcondition*, which typically provides better error messages
 ;; and works better with coercion
-(def OddLong (s/constrained long odd?))
+(s/defschema OddLong (s/constrained long odd?))
 (s/validate OddLong 1)
 ;; 1
 (s/validate OddLong 2)
@@ -337,7 +345,7 @@ You can also write sequence schemas that expect particular values in specific po
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
 
 ;; recursive
-(def Tree {:value s/Int :children [(s/recursive #'Tree)]})
+(s/defschema Tree {:value s/Int :children [(s/recursive #'Tree)]})
 (s/validate Tree {:value 0, :children [{:value 1, :children []}]})
 
 ;; abstract-map (experimental) models "abstract classes" and "subclasses" with maps.
@@ -365,7 +373,7 @@ Schema also supports schema-driven data transformations, with *coercion* being t
 An example application of coercion is converting parsed JSON (e.g., from an HTTP post request) to a domain object with a richer set of types (e.g., Keywords).
 
 ```clojure
-(def CommentRequest
+(s/defschema CommentRequest
   {(s/optional-key :parent-comment-id) long
    :text String
    :share-services [(s/enum :twitter :facebook :google)]})
