@@ -57,8 +57,7 @@
                            :target :nodejs
                            :pretty-print true}}]}
 
-  :codox {:src-dir-uri "http://github.com/plumatic/schema/blob/master/"
-          :src-linenum-anchor-prefix "L"}
+  :codox {:source-uri "https://github.com/foo/bar/blob/{version}/{filepath}#L{line}"}
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
