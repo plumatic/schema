@@ -131,7 +131,7 @@ If you've done much Clojure, you've probably seen code with documentation like t
 (def ^StampedNames example-stamped-names
   (stamped-names (map (fn [first-name]
                         (str first-name " Smith"))
-                      ["Bob" "Jane"]))))
+                      ["Bob" "Jane"])))
 ```
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
@@ -150,7 +150,7 @@ Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help br
 (s/def example-stamped-names :- StampedNames
   (stamped-names (map (s/fn :- s/Str [first-name :- s/Str]
                         (str first-name " Smith"))
-                      ["Bob" "Jane"]))))
+                      ["Bob" "Jane"])))
 ```
 
 Here, `x :- y` means that `x` must satisfy schema `y`, replacing and extending the more familiar metadata hints such as `^y x`.
