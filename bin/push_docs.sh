@@ -10,10 +10,12 @@ latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
 git checkout $latestTag
 
 lein doc
-cd ../doc
 git checkout gh-pages # To be sure you're on the right branch
+# gh-pages is currently deployed from root (not `doc` folder)
+rm *.html
+rm -fr js css doc
+mv target/doc/* .
 git add .
-git commit -am "new documentation push."
-git push -u origin gh-pages
-cd ..
-git checkout -
+git commit --allow-empty -am "new documentation push."
+#git push -u origin gh-pages
+git checkout master

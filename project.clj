@@ -12,7 +12,7 @@
                    :eastwood {:exclude-namespaces []
                               :exclude-linters [:def-in-def :local-shadows-var :constant-test :suspicious-expression :deprecations
                                                 :unused-meta-on-macro :wrong-tag :unused-ret-vals]}
-                   :plugins [[codox "0.8.8"]
+                   :plugins [[lein-codox "0.10.8"]
                              [lein-cljsbuild "1.1.7"]
                              [lein-release/lein-release "1.0.4"]
                              [lein-doo "0.1.10"]
@@ -25,7 +25,8 @@
 
   :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11:+1.12"]
             "deploy" ["do" "clean," "deploy" "clojars"]
-            "test" ["do" "clean," "test," "doo" "node" "test" "once"]}
+            "test" ["do" "clean," "test," "doo" "node" "test" "once"]
+            "doc" ["codox"]}
 
   :jar-exclusions [#"\.swp|\.swo|\.DS_Store"]
 
