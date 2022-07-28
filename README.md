@@ -253,7 +253,14 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
 
 ### Sequence schema details
 
-Similarly, you can also write sequence schemas that expect particular values in specific positions:
+Unlike most schemas, sequence schemas are implicitly nilable:
+
+```clojure
+(s/validate [s/Any] nil)
+;=> nil
+```
+
+You can also write sequence schemas that expect particular values in specific positions:
 
 ```clojure
 (def FancySeq
