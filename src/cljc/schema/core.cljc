@@ -685,9 +685,9 @@
   "Support for (mutually) recursive schemas by passing a var that points to a schema,
    e.g (recursive #'ExampleRecursiveSchema)."
   [schema]
-  (when-not #?(:clj (instance? clojure.lang.IDeref schema)
-               :cljs (satisfies? IDeref schema))
-    (macros/error! (utils/format* "Not an IDeref: %s" schema)))
+  (macros/assert! #?(:clj (instance? clojure.lang.IDeref schema)
+                     :cljs (satisfies? IDeref schema))
+                  "Not an IDeref: %s" schema)
   (Recursive. schema))
 
 
@@ -1134,6 +1134,9 @@
 (clojure.core/defn schema-with-name
   "Records name in schema's metadata."
   [schema name]
+  (macros/assert! #?(:clj (instance? clojure.lang.IObj schema)
+                     :cljs (satisfies? IWithMeta schema))
+                  "Named schema (such as the right-most `s/defalias` arg) must support metadata: %s" (utils/type-of schema))
   (vary-meta schema assoc :name name))
 
 (clojure.core/defn schema-name

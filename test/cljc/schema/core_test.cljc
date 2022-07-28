@@ -7,10 +7,10 @@
       - The optional last argument also checks the printed Clojure representation of the error.
     - (invalid-call! s x) asserts that calling the function throws an error."
   (:refer-clojure :exclude [parse-long])
-  #?(:clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call!]]))
+  #?(:clj (:use clojure.test [schema.test-macros :only [valid! invalid! invalid-call! is-assert!]]))
   #?(:cljs (:use-macros
              [cljs.test :only [is deftest testing are]]
-             [schema.test-macros :only [valid! invalid! invalid-call!]]))
+             [schema.test-macros :only [valid! invalid! invalid-call! is-assert!]]))
   #?(:cljs (:require-macros [schema.macros :as macros]))
   (:require
    [clojure.string :as str]
@@ -421,7 +421,8 @@
       #?(:cljs (is (= '(recursive ...) (val explanation))))))
 
   (is (= '{:black {(optional-key :red) (recursive (var schema.core-test/TestBlackNode))}}
-         (s/explain TestBlackNode))))
+         (s/explain TestBlackNode)))
+  (is-assert! (s/recursive nil) #"Not an IDeref: null"))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1517,7 +1518,11 @@
     (valid! schema {:baz 123})
     (invalid! schema {:baz "abc"})
     (is (= 'Baz (s/schema-name schema)))
-    (is (=  nil (s/schema-ns schema)))))
+    (is (= nil (s/schema-ns schema))))
+  #?(:clj (is-assert! (s/schema-with-name s/Str 'Baz)
+                      #"Named schema \(such as the right-most `s/defalias` arg\) must support metadata: class java.lang.Class")
+     :cljs (is-assert! (s/schema-with-name nil 'Baz)
+                       #"Named schema \(such as the right-most `s/defalias` arg\) must support metadata: object")))
 
 (deftest schema-name-test
   (is (= 'TestFoo (s/schema-name TestFoo))))

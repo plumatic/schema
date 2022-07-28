@@ -24,3 +24,11 @@
   [f & args]
   (when (sm/compile-fn-validation? &env f)
     `(~'is (~'thrown? ~'Throwable (~f ~@args)))))
+
+(defmacro is-assert!
+  "Assert that an assert! is thrown with msg"
+  [form expected-msg]
+  `(~'is (~'thrown-with-msg?
+           ~(if (sm/cljs-env? &env) 'js/Error 'java.lang.RuntimeException)
+           ~expected-msg
+           ~form)))
