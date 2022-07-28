@@ -131,7 +131,7 @@ If you've done much Clojure, you've probably seen code with documentation like t
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
 
-Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, by allowing arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
+Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help bridge this gap. These macros are just like their `clojure.core` counterparts, except they support arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
 
 ```clojure
 (s/defrecord StampedNames
@@ -141,6 +141,11 @@ Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, 
 (s/defn stamped-names :- StampedNames
   [names :- [s/Str]]
   (StampedNames. (str (System/currentTimeMillis)) names))
+
+(s/def example-stamped-names :- StampedNames
+  (stamped-names (map (s/fn [first-name :- s/Str] :- s/Str
+                        (str first-name " Smith")
+                      ["Bob" "Jane"]))))
 ```
 
 Here, `x :- y` means that `x` must satisfy schema `y`, replacing and extending the more familiar metadata hints such as `^y x`.
