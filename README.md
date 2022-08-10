@@ -14,7 +14,7 @@ Schema is a rich language for describing data shapes, with a variety of features
 
  - Data validation, with descriptive error messages of failures (targeted at programmers)
  - Annotation of function arguments and return values, with optional runtime validation
- - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below) (https://github.com/plumatic/schema-generators) library. **
+ - Schema-driven data **coercion**, which can automatically, succinctly, and safely convert complex data types (see the Coercion section below)
  - Other
    - Schema is also built into our [`plumbing`](https://github.com/plumatic/plumbing) and [`fnhouse`](https://github.com/plumatic/fnhouse) libraries, which illustrate how we build services and APIs easily and safely with Schema
    - Schema also supports experimental `clojure.test.check` data **generation** from Schemas, as well as **completion** of partial datums, features we've found very useful when writing tests as part of the [`schema-generators`](https://github.com/plumatic/schema-generators) library
@@ -29,7 +29,7 @@ A Schema is a Clojure(Script) data structure describing a data shape, which can 
              :include-macros true ;; cljs only
              ]))
 
-(def Data
+(s/defschema Data
   "A schema for a nested data type"
   {:a {:b s/Str
        :c s/Int}
@@ -96,6 +96,14 @@ Since schemas are just data, you can also `def` them and reuse and compose them 
 (def StringScoreMap {long StringScores})
 ```
 
+However, we encourage you to use `s/defschema` for this purpose to improve error messages:
+
+```clojure
+(s/defschema StringList [s/Str])
+(s/defschema StringScores {String double})
+(s/defschema StringScoreMap {long StringScores})
+```
+
 What about when things go bad?  Schema's `s/check` and `s/validate` provide meaningful errors that look like the bad parts of your data, and are (hopefully) easy to understand.
 
 ```clojure
@@ -110,7 +118,7 @@ What about when things go bad?  Schema's `s/check` and `s/validate` provide mean
 
 ```
 
-See the "More Examples" section below for more examples and explanation, or the [custom Schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
+See the [More examples](#more-examples) section below for more examples and explanation, or the [custom Schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0) page for details on how Schema works under the hood.
 
 
 ## Beyond type hints
@@ -127,11 +135,16 @@ If you've done much Clojure, you've probably seen code with documentation like t
   "names is a list of Strings"
   [names]
   (StampedNames. (str (System/currentTimeMillis)) names))
+
+(def ^StampedNames example-stamped-names
+  (stamped-names (map (fn [first-name]
+                        (str first-name " Smith"))
+                      ["Bob" "Jane"])))
 ```
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
 
-Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, by allowing arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
+Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help bridge this gap. These macros are just like their `clojure.core` counterparts, except they support arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
 
 ```clojure
 (s/defrecord StampedNames
@@ -141,6 +154,11 @@ Schema provides macros `defrecord`, `defn`, and `fn` that help bridge this gap, 
 (s/defn stamped-names :- StampedNames
   [names :- [s/Str]]
   (StampedNames. (str (System/currentTimeMillis)) names))
+
+(s/def example-stamped-names :- StampedNames
+  (stamped-names (map (s/fn :- s/Str [first-name :- s/Str]
+                        (str first-name " Smith"))
+                      ["Bob" "Jane"])))
 ```
 
 Here, `x :- y` means that `x` must satisfy schema `y`, replacing and extending the more familiar metadata hints such as `^y x`.
@@ -215,7 +233,7 @@ The source code in [schema/core.cljc](https://github.com/plumatic/schema/blob/ma
 In addition to uniform maps (like String to double), map schemas can also capture maps with specific key requirements:
 
 ```clojure
-(def FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
+(s/defschema FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
 
 (s/validate FooBar {:foo "f" :bar :b})
 ;; {:foo "f" :bar :b}
@@ -230,7 +248,7 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
 
 ```clojure
 
-(def FancyMap
+(s/defschema FancyMap
   "If foo is present, it must map to a Keyword.  Any number of additional
    String-String mappings are allowed as well."
   {(s/optional-key :foo) s/Keyword
@@ -243,10 +261,17 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
 
 ### Sequence schema details
 
-Similarly, you can also write sequence schemas that expect particular values in specific positions:
+Unlike most schemas, sequence schemas are implicitly nilable:
 
 ```clojure
-(def FancySeq
+(s/validate [s/Any] nil)
+;=> nil
+```
+
+You can also write sequence schemas that expect particular values in specific positions:
+
+```clojure
+(s/defschema FancySeq
   "A sequence that starts with a String, followed by an optional Keyword,
    followed by any number of Numbers."
   [(s/one s/Str "s")
@@ -271,9 +296,12 @@ Similarly, you can also write sequence schemas that expect particular values in 
 
 ```clojure
 ;; anything
+(s/validate s/Any "woohoo!")
+(s/validate s/Any 'go-nuts)
+(s/validate s/Any 42.0)
 (s/validate [s/Any] ["woohoo!" 'go-nuts 42.0])
 
-;; maybe
+;; maybe (nilable)
 (s/validate (s/maybe s/Keyword) :a)
 (s/validate (s/maybe s/Keyword) nil)
 
@@ -285,7 +313,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate (s/pred odd?) 1)
 
 ;; conditional (i.e. variant or option)
-(def StringListOrKeywordMap (s/conditional map? {s/Keyword s/Keyword} :else [String]))
+(s/defschema StringListOrKeywordMap (s/conditional map? {s/Keyword s/Keyword} :else [String]))
 (s/validate StringListOrKeywordMap ["A" "B" "C"])
 ;; => ["A" "B" "C"]
 (s/validate StringListOrKeywordMap {:foo :bar})
@@ -294,21 +322,21 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException:  Value does not match schema: [(not (instance? java.lang.String :foo))]
 
 ;; if (shorthand for conditional)
-(def StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
+(s/defschema StringListOrKeywordMap (s/if map? {s/Keyword s/Keyword} [String]))
 
 ;; cond-pre (experimental), also shorthand for conditional, allows you to skip the
 ;; predicate when the options are superficially different by doing a greedy match
 ;; on the preconditions of the options.
-(def StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
+(s/defschema StringListOrKeywordMap (s/cond-pre {s/Keyword s/Keyword} [String]))
 ;; but don't do this -- this will never validate `{:b :x}` because the first schema
 ;; will be chosen based on the `map?` precondition (use `if` or `abstract-map-schema` instead):
-(def BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
+(s/defschema BadSchema (s/cond-pre {:a s/Keyword} {:b s/Keyword}))
 
 ;; conditional can also be used to apply extra validation to a single type,
 ;; but constrained is often more desirable since it applies the validation
 ;; as a *postcondition*, which typically provides better error messages
 ;; and works better with coercion
-(def OddLong (s/constrained long odd?))
+(s/defschema OddLong (s/constrained long odd?))
 (s/validate OddLong 1)
 ;; 1
 (s/validate OddLong 2)
@@ -317,7 +345,7 @@ Similarly, you can also write sequence schemas that expect particular values in 
 ;; RuntimeException: Value does not match schema: (not (instance? java.lang.Long 3))
 
 ;; recursive
-(def Tree {:value s/Int :children [(s/recursive #'Tree)]})
+(s/defschema Tree {:value s/Int :children [(s/recursive #'Tree)]})
 (s/validate Tree {:value 0, :children [{:value 1, :children []}]})
 
 ;; abstract-map (experimental) models "abstract classes" and "subclasses" with maps.
@@ -332,7 +360,8 @@ Similarly, you can also write sequence schemas that expect particular values in 
 (s/validate Animal {:type :cat :name "melvin" :claws? true})
 (s/validate Animal {:type :dog :name "roofer" :barks? true})
 (s/validate Animal {:type :cat :name "confused kitty" :barks? true})
-;; RuntimeException: Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
+;; RuntimeException: 
+;; Value does not match schema: {:claws? missing-required-key, :barks? disallowed-key}
 ```
 
 You can also define schemas for [recursive data types](https://github.com/plumatic/schema/wiki/Recursive-Schemas), or create [your own custom schemas types](https://github.com/plumatic/schema/wiki/Defining-New-Schema-Types-1.0).
@@ -344,7 +373,7 @@ Schema also supports schema-driven data transformations, with *coercion* being t
 An example application of coercion is converting parsed JSON (e.g., from an HTTP post request) to a domain object with a richer set of types (e.g., Keywords).
 
 ```clojure
-(def CommentRequest
+(s/defschema CommentRequest
   {(s/optional-key :parent-comment-id) long
    :text String
    :share-services [(s/enum :twitter :facebook :google)]})
@@ -396,7 +425,7 @@ If you make something new, please feel free to PR to add it here!
 
 ## Supported Clojure versions
 
-Schema is currently supported on Clojure 1.8 onwards and the latest version of ClojureScript.
+Schema is currently supported on Clojure 1.8 onwards, [Babashka](https://github.com/babashka/babashka) 0.8.156 onwards, and the latest version of ClojureScript.
 
 ## License
 

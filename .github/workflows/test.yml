@@ -32,7 +32,7 @@ jobs:
           distribution: 'temurin'
           java-version: 11
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@3.5
+        uses: DeLaGuardo/setup-clojure@5.1
         with:
           lein: ${{ env.LEIN_VERSION }}
       - name: Run trojansourcedetector
@@ -57,16 +57,16 @@ jobs:
           distribution: 'temurin'
           java-version: 11
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@3.5
+        uses: DeLaGuardo/setup-clojure@5.1
         with:
           lein: ${{ env.LEIN_VERSION }}
       - name: Run Eastwood
         run: lein eastwood
-  test:
+  test-jvm:
     needs: setup
     strategy:
       matrix:
-        java: ['8', '11', '17']
+        java: ['8', '11', '17', '18']
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -86,8 +86,23 @@ jobs:
         with:
           node-version: '17.7.2'
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@3.5
+        uses: DeLaGuardo/setup-clojure@5.1
         with:
           lein: ${{ env.LEIN_VERSION }}
-      - name: Run tests
+      - name: Run JVM tests
         run: lein all test
+  test-bb:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Download babashka
+        run: bash <(curl https://raw.githubusercontent.com/babashka/babashka/master/install) --dir .
+      - name: Run Babashka tests
+        run: ./bb test
