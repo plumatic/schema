@@ -88,20 +88,6 @@
   #?(:cljs (:require-macros [schema.macros :as macros]
                             schema.core)))
 
-#?(:clj (def ^:no-doc clj-1195-fixed?
-          (do (clojure.core/defprotocol ^:no-doc CLJ1195Check
-                (dummy-method [this]))
-              (try
-                (eval '(extend-protocol CLJ1195Check nil
-                         (dummy-method [_])))
-                true
-                (catch RuntimeException _
-                  false)))))
-
-#?(:clj (when-not clj-1195-fixed?
-         ;; don't exclude fn because of bug in extend-protocol
-         (refer-clojure :exclude '[Keyword Symbol Inst atom defrecord defn letfn defmethod])))
-
 #?(:clj (set! *warn-on-reflection* true))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
