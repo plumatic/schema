@@ -1,6 +1,6 @@
 (ns schema.generators.fn-schema
   (:require [clojure.test.check :refer [quick-check]]
-            [clojure.test.check.generators :as gen]
+            [schema-generators.generators :as gen]
             [com.gfredericks.test.chuck.properties :as prop']
             [schema.fn-schema :as =>]
             [schema.core :as s]))
