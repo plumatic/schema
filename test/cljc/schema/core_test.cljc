@@ -697,6 +697,18 @@
     (valid! schema {})
     (is (= '(=>* Keyword [Int] [Int & [Keyword]]) (s/explain schema)))))
 
+(deftest dotted-fn-schema-test
+  (testing "expand dotted template"
+    (let [X [s/Int s/Bool]
+          schema (s/=> s/Keyword s/Int s/Int & [X] :.. X)]
+      (is (= (s/=> s/Keyword s/Int s/Int [s/Int] [s/Bool])
+             schema))))
+  (testing "expand AnyDotted"
+    (let [X (s/->AnyDotted s/Int)
+          schema (s/=> s/Keyword s/Int s/Int & [X] :.. X)]
+      (is (= (s/=> s/Keyword s/Int s/Int & [[s/Int]])
+             schema)))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schematized defrecord
@@ -1575,3 +1587,91 @@
       (catch Exception e
         (is (re-find #"ef408750"
                      (#?(:cljs .-message :clj .getMessage) e)))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Polymorphic schemas
+
+(s/defn :all [x]
+  args-shadow-schema-variables :- x
+  [x :- x]
+  x)
+
+(s/defn :all [T]
+  poly-identity :- T
+  [x :- T]
+  (s/validate T x))
+
+(s/defn :all [T]
+  poly-first :- T
+  [xs :- [T]]
+  (first xs))
+
+#_ ;;TODO
+(s/defn :all [T ;TODO :- [:=> :schema :schema :schema]
+              ]
+  ho-schema-fn :- T
+  [xs :- (T s/Int s/Bool)]
+  (first xs))
+
+(s/defn :all [X Y]
+  poly-map-nodot :- [Y]
+  [f :- (s/=> Y X)
+   xs :- [X]]
+  (map f xs))
+
+(s/defn :all [X Y :.. Z]
+  poly-map-dot :- [Z]
+  [f :- (s/=> Z X & Y :.. Y)
+   xs :- [X]
+   & xss :- [Y] :.. Y]
+  (apply map f xs xss))
+
+(deftest explain-all-test
+  (is (= '(all [x] (s/=> x)) (s/explain (s/all [x] (s/=> x)))))
+  ;;FIXME ideally (all [T] (s/=> T))
+  (is (= '(all [T] (schema.core/->FnSchema T [[(schema.core/one T (quote x))]]))
+         (s/explain (s/fn-schema poly-identity)))))
+
+(deftest inst-test
+  (is (= (@#'s/instantiate (s/all [a] (s/=> a))
+                           s/Int)
+         (s/=> s/Int)))
+  (is (not= (@#'s/instantiate (s/all [a] (s/=> a))
+                              s/Bool)
+            (s/=> s/Int)))
+  (is (= (@#'s/instantiate (s/all [a] (s/=> a a))
+                           s/Int)
+         (s/=> s/Int s/Int)))
+  (is (= (@#'s/instantiate (s/all [a b] (s/=> a b a b))
+                           s/Int s/Bool)
+         (s/=> s/Int s/Bool s/Int s/Bool)))
+  (is (= '(=> Int Int)
+         (s/explain (@#'s/instantiate (s/fn-schema poly-identity) s/Int))))
+  (is (thrown-with-msg? Exception #"Wrong number of arguments"
+                        (@#'s/instantiate (s/fn-schema poly-map-nodot) s/Int))))
+
+(deftest poly-defn-semantics-test
+  (is (= 1 (s/with-fn-validation (args-shadow-schema-variables 1))))
+  (is (= 1 (s/with-fn-validation (poly-identity 1))))
+  (is (= :a (s/with-fn-validation (poly-identity :a))))
+  (s/with-fn-validation (invalid-call! poly-first 1))
+  (is (= 1 (s/with-fn-validation (poly-first [1]))))
+  (is (= 1 (s/with-fn-validation (poly-first [1]))))
+  (is (= [2 3] (s/with-fn-validation (poly-map-nodot inc [1 2]))))
+  (s/with-fn-validation (invalid-call! poly-map-nodot 1 2))
+  (is (= [2 3] (s/with-fn-validation (poly-map-dot inc [1 2]))))
+  (is (= [3 5] (s/with-fn-validation (poly-map-dot + [1 2] [2 3]))))
+  (s/with-fn-validation (invalid-call! poly-map-dot 1 2)))
+
+(deftest inst-most-general-test 
+  (is (= '(=> Any Any)
+         (s/explain (@#'s/inst-most-general (s/fn-schema poly-identity)))))
+  (is (= '(=> Any [Any])
+         (s/explain (@#'s/inst-most-general (s/fn-schema poly-first)))))
+  (is (= '(=> [Any] (=> Any Any) [Any])
+         (s/explain (@#'s/inst-most-general (s/fn-schema poly-map-nodot)))))
+  (is (= '(=> [Any] (=> Any Any & [Any]) [Any] & [Any])
+         (s/explain (@#'s/inst-most-general (s/fn-schema poly-map-dot))))))
+
+;; TODO test s/defn, s/fn, s/letfn

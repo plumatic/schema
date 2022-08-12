@@ -113,7 +113,7 @@
      in a declarative and/or imperative way.  See schema.spec.* for examples.")
   (explain [this]
     "Expand this schema to a human-readable format suitable for pprinting,
-     also expanding class schematas at the leaves.  Example:
+     also expanding class schemas at the leaves.  Example:
 
      user> (s/explain {:a s/Keyword :b [s/Int]} )
      {:a Keyword, :b [Int]}"))
@@ -1066,6 +1066,68 @@
   ([klass schema map-constructor]
      `(record* ~klass ~schema #(~map-constructor (into {} %))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Polymorphic Schemas
+
+
+(clojure.core/defrecord ^:no-doc AnyDotted [schema])
+
+(declare ^:private inst-most-general)
+
+(macros/defrecord-schema PolySchema [decl parsed-decl schema-form inst->schema]
+  Schema
+  (spec [this] (spec (inst-most-general this)))
+  (explain [this] (list 'all decl schema-form)))
+
+(defn- instantiate
+  "Instantiate a polymorphic schema with schemas."
+  [{:keys [inst->schema parsed-decl] :as for-all-schema} & schemas]
+  {:pre [(instance? PolySchema for-all-schema)]}
+  (macros/assert! (= (count schemas) (count parsed-decl))
+                  "Wrong number of arguments to instantiate schema %s: expected %s, actual %s"
+                  (explain for-all-schema)
+                  (count parsed-decl)
+                  (count schemas))
+  (apply inst->schema schemas))
+
+(defn- most-general-insts [=>-schema]
+  {:pre [(instance? PolySchema =>-schema)]}
+  (mapv (clojure.core/fn [[sym {:keys [kind]}]]
+          (case kind
+            :schema Any
+            :.. (->AnyDotted Any)
+            (throw (ex-info (str "Unknown kind: " kind)
+                            {}))))
+        (:parsed-decl =>-schema)))
+
+(defn- inst-most-general [=>-schema]
+  {:pre [(instance? PolySchema =>-schema)]}
+  (apply instantiate =>-schema (most-general-insts =>-schema)))
+ 
+(clojure.core/defn poly-schema? [v]
+  (instance? PolySchema v))
+
+(defmacro all
+  "Create a polymorphic function schema.
+  
+   Binder declaration is a vector of schema variables and its kinds.
+
+   Schema variables have a 'kind' that classify what it represents.
+   :- assigns a kind to a schema variable. By default, schema variables are kind :schema.
+
+   1. [T :- :schema]   represents a Schema, eg., s/Any, s/Int, (s/=> s/Int s/Bool)
+   2. [T :- :..]       represents a vector of schemas of kind KIND.
+
+   [T :..] is sugar for [T :- :..]"
+  [decl schema]
+  {:pre [(vector? decl)]}
+  (let [parsed-decl (macros/parse-poly-binder decl)]
+    `(->PolySchema
+       '~decl
+       '~parsed-decl
+       '~schema
+       (clojure.core/fn ~(mapv first parsed-decl) ~schema))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Function Schemas
@@ -1114,6 +1176,15 @@
   "Produce a function schema from an output schema and a list of arity input schema specs,
    each of which is a vector of argument schemas, ending with an optional '& more-schema'
    specification where more-schema must be a sequence schema.
+
+   Dotted schemas may be used as rest schemas, and will be immediately expanded.
+
+   For example, if `Y :..` is in scope then (s/=> Z X & [Y] :.. Y) represents the following functions:
+    (s/=> Z X)
+    (s/=> Z X [Y0])
+    (s/=> Z X [Y0] [Y1])
+    (s/=> Z X [Y0] [Y1] [Y1])
+    ...etc
 
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
@@ -1240,7 +1311,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(let [body# (fn [] ~@body)]
+  `(let [body# (clojure.core/fn [] ~@body)]
      (if (fn-validation?)
        (body#)
        (do
@@ -1254,7 +1325,7 @@
    all forms have been executed, resets function validation to its
    previously set value. Not concurrency-safe."
   [& body]
-  `(let [body# (fn [] ~@body)]
+  `(let [body# (clojure.core/fn [] ~@body)]
      (if (fn-validation?)
        (do
          (set-fn-validation! false)
@@ -1282,7 +1353,7 @@
   [f schema]
   (vary-meta f assoc :schema schema))
 
-(clojure.core/defn ^FnSchema fn-schema
+(clojure.core/defn fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
   (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
@@ -1313,10 +1384,12 @@
              up to 20 arguments, and then via `apply` beyond 20 arguments.
              See `cljs.core/with-meta` and `cljs.core.MetaFn`."
   [& fn-args]
-  (let [fn-args (if (symbol? (first fn-args))
+  (let [[leading-opts fn-args] (macros/extract-leading-fn-kv-pairs fn-args)
+        fn-args (if (symbol? (first fn-args))
                   fn-args
                   (cons (gensym "fn") fn-args))
         [name more-fn-args] (macros/extract-arrow-schematized-element &env fn-args)
+        name (vary-meta name merge leading-opts)
         {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
     `(let [~@outer-bindings
            ;; let bind to work around https://clojure.atlassian.net/browse/CLJS-968
@@ -1350,6 +1423,47 @@
 
    See (doc schema.core) for details of the :- syntax for arguments and return
    schemas.
+
+   You can use :all to make a polymorphic schema by binding schema variables.
+   See `s/all` for more about schema variables.
+ 
+   The schema variables are scoped inside the function body. Note, they will usually be bound
+   to their most general values (eg., s/Any) at runtime. This strategy also informs how
+   `s/with-fn-validation` treats schema variables. However, the values of schema
+   variables should always be treated as opaque.
+
+   In the body of the function, names provided by argument vectors may shadow schema variables.
+
+   (s/defn :all [T]
+    my-identity :- T
+    [x :- T]
+    ;; from here, (destructured) arguments shadow schema variables
+    ...
+    ;; usually equivalent to (s/validate s/Any x)
+    (s/validate T x))
+
+   (s/fn-schema my-identity)
+   ==> (all [T] (=> T T))
+
+
+   Rest parameter schemas may be expanded via dotted variables by placing :.. after
+   the schema following the '&'. The following example demonstrates most usages of
+   dotted variables:
+
+   (s/defn :all [X Y :.. Z]
+     map :- [Z]
+     [f :- (=> Z X & Y :.. Y)
+      xs :- [X]
+      & xss :- [Y] :.. Y]
+     (apply map f xs xss))
+
+   The schema for the above function encapsulates the following schemas:
+    (all [X          Z] (=> [Z] (=> Z          X) [X]))
+    (all [X Y0       Z] (=> [Z] (=> Z Y0       X) [X] [Y0]))
+    (all [X Y0 Y1    Z] (=> [Z] (=> Z Y0 Y1    X) [X] [Y0] [Y1]))
+    (all [X Y0 Y1 Y2 Z] (=> [Z] (=> Z Y0 Y1 Y2 X) [X] [Y0] [Y1] [Y0]))
+    ...etc
+
 
    The overhead for checking if run-time validation should be used is very
    small -- about 5% of a very small fn call.  On top of that, actual
@@ -1387,7 +1501,7 @@
         {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (macros/process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
        (let [ret# (clojure.core/defn ~(with-meta name {})
-                    ~(assoc (apply dissoc standard-meta (when (macros/primitive-sym? tag) [:tag]))
+                    ~(assoc (apply dissoc standard-meta ::macros/binder (when (macros/primitive-sym? tag) [:tag]))
                        :doc (str
                              (str "Inputs: " (if (= 1 (count raw-arglists))
                                                (first raw-arglists)
@@ -1442,8 +1556,10 @@
   (let [{:keys [outer-bindings
                 fnspecs
                 inner-bindings]}
-        (reduce (fn [acc fnspec]
-                  (let [[name more-fn-args] (macros/extract-arrow-schematized-element &env fnspec)
+        (reduce (clojure.core/fn [acc fnspec]
+                  (let [[leading-opts fnspec] (macros/extract-leading-fn-kv-pairs fnspec)
+                        [name more-fn-args] (macros/extract-arrow-schematized-element &env fnspec)
+                        name (vary-meta name merge leading-opts)
                         {:keys [outer-bindings schema-form fn-body]} (macros/process-fn- &env name more-fn-args)]
                     (-> acc
                         (update :outer-bindings into outer-bindings)

@@ -290,6 +290,41 @@ You can also write sequence schemas that expect particular values in specific po
 ;;   (not (instance? java.lang.Number "4"))]
 ```
 
+### Polymorphic schemas
+
+Macros such as `s/defn` can define functions with polymorphic schemas. At runtime, they will be checked
+by expanding polymorphic variables to their most general values. For example, at runtime `identity-mono`
+and `identity-poly` are instrumented in the same way:
+
+```clojure
+(s/defn identity-mono :- s/Any
+  [x :- s/Any]
+  x)
+
+(s/defn :all [T]
+  identity-poly :- T
+  [x :- T]
+  x)
+```
+
+The actual value chosen as the "most general" depends on the schema variables kind and should not be
+relied on. In the future, schema variables may be instantiated with other values.
+
+Dotted variables have an internal "most general" value which represents a homogeneous sequence of
+generalized templates (ie., generalizing variables to the left of the `:..`).
+The following two functions are instrumented in the same way.
+
+```clojure
+(s/defn :all [T :..]
+  rest-args-poly :- T
+  [& xs :- {:a T} :.. T]
+  x)
+
+(s/defn rest-args-mono :- s/Any
+  [& xs :- [{:a s/Any}]]
+  x)
+```
+
 ### Other schema types
 
 [`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:

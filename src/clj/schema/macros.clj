@@ -147,12 +147,38 @@
 (defn extract-arrow-schematized-element
   "Take a nonempty seq, which may start like [a ...] or [a :- schema ...], and return
    a list of [first-element-with-schema-attached rest-elements]"
-  [env s]
-  (assert (seq s))
-  (let [[f & more] s]
-    (if (= :- (first more))
-      [(normalized-metadata env f (second more)) (drop 2 more)]
-      [(normalized-metadata env f nil) more])))
+  ([env s] (extract-arrow-schematized-element env s false))
+  ([env s rest-arg?]
+   (assert (seq s))
+   (let [[f & more] s
+         [arg more] (if (= :- (first more))
+                      (let [[arg more] [(normalized-metadata env f (second more)) (drop 2 more)]
+                            [arg more] (if (and rest-arg? (= 2 (count more)))
+                                         (if (= :.. (first more))
+                                           (let [dvar (second more)]
+                                             (assert! (and (symbol? dvar)
+                                                           (not (namespace dvar)))
+                                                      (str "Bad '&' binding: dotted variable must be simple symbol: " (pr-str dvar)))
+                                             [(vary-meta arg update :schema
+                                                         (fn [template]
+                                                           `(let [template# (fn [~dvar] ~template)]
+                                                              (cond
+                                                                (instance? schema.core.AnyDotted ~dvar)
+                                                                (template# (:schema ~dvar))
+
+                                                                (vector? ~dvar)
+                                                                [(apply s/cond-pre ~dvar)]
+
+                                                                :else (throw (ex-info (str ~(format "Unknown value for dotted variable %s: " dvar)
+                                                                                           ~dvar)
+                                                                                      {}))))))
+                                              (drop 2 more)]))
+                                         [arg more])]
+                        [arg more])
+                      [(normalized-metadata env f nil) more])]
+     (when rest-arg?
+       (assert! (empty? more) (str "Extra elements after rest argument: " (pr-str more))))
+     [arg more])))
 
 (defn process-arrow-schematized-args
   "Take an arg vector, in which each argument is followed by an optional :- schema,
@@ -161,8 +187,11 @@
   (loop [in args out []]
     (if (empty? in)
       out
-      (let [[arg more] (extract-arrow-schematized-element env in)]
-        (recur more (conj out arg))))))
+      (if (= '& (first in))
+        (let [[arg more] (extract-arrow-schematized-element env (next in) true)]
+          (recur more (conj out (first in) arg)))
+        (let [[arg more] (extract-arrow-schematized-element env in)]
+          (recur more (conj out arg)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -175,7 +204,7 @@
           (assert! (or (symbol? rest-arg)
                        (and (vector? rest-arg)
                             (not-any? #{'&} rest-arg)))
-                   "Bad & binding form: currently only bare symbols and vectors supported" (vec post-&))
+                   "Bad '&' binding form: currently only bare symbols and vectors supported" (vec post-&))
 
           [(vec pre-&)
            (if (vector? rest-arg)
@@ -199,13 +228,14 @@
       (if (vector? arg)
         (simple-arglist-schema-form true arg)
         [`schema.core/Any])
-      (do (assert! (vector? s) "Expected seq schema for rest args, got %s" s)
-          s))))
+      `(let [s# ~s]
+         (assert! (vector? s#) "Expected seq schema for rest args, got %s" s#)
+         s#))))
 
 (defn input-schema-form [regular-args rest-arg]
   (let [base (simple-arglist-schema-form false regular-args)]
     (if rest-arg
-      (vec (concat base (rest-arg-schema-form rest-arg)))
+      `(into ~base ~(rest-arg-schema-form rest-arg))
       base)))
 
 (defn apply-prepost-conditions
@@ -310,12 +340,43 @@
                     (cons (into regular-args (when rest-arg ['& rest-arg]))
                           body))})))
 
+(defn parse-poly-binder [binder]
+  (loop [binder binder
+         out []]
+    (if (empty? binder)
+      out
+      (let [[sym & binder] binder
+            _ (assert (and (symbol? sym)
+                           (not (namespace sym)))
+                      (str "Expected simple symbol in polymorphic binder: " sym))
+            [opts binder] (loop [binder binder
+                                 opts {:kind :schema}]
+                            (if (not (keyword? (first binder)))
+                              [opts binder]
+                              (cond
+                                (= :- (first binder)) (let [[_ kind & binder] binder]
+                                                        (recur binder (assoc opts :kind kind)))
+                                (= :.. (first binder)) (recur (next binder) (assoc opts :kind :..))
+                                :else (throw (ex-info (str "Unknown keyword in polymorphic binder: " (first binder))
+                                                      {})))))]
+        (recur binder (conj out [sym opts]))))))
+
+(defn poly-binder-outer-bindings [binder]
+  (into [] (mapcat (fn [[sym {:keys [kind]}]]
+                     [sym (case kind
+                            :schema `schema.core/Any
+                            :.. `(schema.core/->AnyDotted schema.core/Any)
+                            (throw (ex-info (str "Unknown kind: " kind)
+                                            {})))]))
+        (parse-poly-binder binder)))
+
 (defn process-fn-
   "Process the fn args into a final tag proposal, schema form, schema bindings, and fn form"
   [env name fn-body]
   (let [compile-validation (compile-fn-validation? env name)
         output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
+        poly-binder (-> name meta ::binder)
         bind-meta (or (when-let [t (:tag (meta name))]
                         (when (primitive-sym? t)
                           {:tag t}))
@@ -329,6 +390,7 @@
         schema-bindings (map :schema-binding processed-arities)
         fn-forms (map :arity-form processed-arities)]
     {:outer-bindings (vec (concat
+                           (poly-binder-outer-bindings poly-binder)
                            (when compile-validation
                              `[~(with-meta ufv-sym {:tag 'java.util.concurrent.atomic.AtomicReference}) schema.utils/use-fn-validation])
                            [output-schema-sym output-schema]
@@ -336,9 +398,15 @@
                            (mapcat :more-bindings processed-arities)))
      :arglists (map :arglist processed-arities)
      :raw-arglists (map :raw-arglist processed-arities)
-     :schema-form (if (= 1 (count processed-arities))
-                    `(schema.core/->FnSchema ~output-schema-sym ~[(ffirst schema-bindings)])
-                    `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings)))
+     :schema-form (if poly-binder
+                    ;; can't reuse output-schema-sym or schema-bindings as type variables are instantiated via poly-binder-outer-bindings
+                    `(schema.core/all ~poly-binder
+                                      ~(if (= 1 (count processed-arities))
+                                         `(schema.core/->FnSchema ~output-schema ~[(-> schema-bindings first second)])
+                                         `(schema.core/make-fn-schema ~output-schema ~(mapv second schema-bindings))))
+                    (if (= 1 (count processed-arities))
+                      `(schema.core/->FnSchema ~output-schema-sym ~[(ffirst schema-bindings)])
+                      `(schema.core/make-fn-schema ~output-schema-sym ~(mapv first schema-bindings))))
      :fn-body fn-forms}))
 
 (defn parse-arity-spec
@@ -346,12 +414,34 @@
   [spec]
   (assert! (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
-        fixed (mapv (fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)]
+        fixed (mapv (fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)
+        start-dotted-idx (count fixed)]
     (if (empty? more)
       fixed
-      (do (assert! (and (= (count more) 2) (vector? (second more)))
+      (if (= (count more) 4)
+        (let [[_ template dots dvar] more]
+          (assert! (and (= :.. dots)
+                        (symbol? dvar)
+                        (not (namespace dvar)))
+                   "An arity with & must be followed by a single sequence schema or dotted variable: %s"
+                   (pr-str more))
+            `(into ~fixed (let [dvar# ~dvar
+                                template# (fn [~dvar] ~template)]
+                            (cond
+                              (instance? schema.core.AnyDotted dvar#)
+                              [(template# (:schema dvar#))]
+
+                              (vector? dvar#)
+                              (into [] (map-indexed (fn [i# s#] (schema.core/one
+                                                                  (template# s#)
+                                                                  (symbol (str "arg" (+ i# ~start-dotted-idx))))))
+                                    dvar#)
+                              :else (throw (ex-info (str ~(format "Unknown value for dotted variable %s: " dvar)
+                                                         dvar#)
+                                                    {}))))))
+        (do (assert! (and (= (count more) 2) (vector? (second more)))
                    "An arity with & must be followed by a single sequence schema")
-          (into fixed (second more))))))
+            (into fixed (second more)))))))
 
 (defn emit-defrecord
   [defrecord-constructor-sym env name field-schema & more-args]
@@ -409,6 +499,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: helpers for schematized functions
 
+(defn extract-leading-fn-kv-pairs
+  "Split list into a map of keys allowed at the beginning
+  of a schema fn macro (eg., :all), and the rest."
+  [macro-args]
+  (loop [[k & [v & next-macro-args :as v-provided] :as macro-args] macro-args
+         leading-opts {}]
+    (if (= :all k)
+      (do (assert! v-provided (str "Missing value for key " k))
+          (recur next-macro-args (assoc leading-opts k v)))
+      [leading-opts macro-args])))
+
 (defn normalized-defn-args
   "Helper for defining defn-like macros with schemas.  Env is &env
    from the macro body.  Reads optional docstring, return type and
@@ -416,11 +517,13 @@
    returning the normalized arglist.  Based on
    clojure.tools.macro/name-with-attributes."
   [env macro-args]
-  (let [[name macro-args] (extract-arrow-schematized-element env macro-args)
+  (let [[leading-opts macro-args] (extract-leading-fn-kv-pairs macro-args)
+        [name macro-args] (extract-arrow-schematized-element env macro-args)
         [maybe-docstring macro-args] (maybe-split-first string? macro-args)
         [maybe-attr-map macro-args] (maybe-split-first map? macro-args)]
     (cons (vary-meta name merge
                      (or maybe-attr-map {})
+                     (when (:all leading-opts) {::binder (:all leading-opts)})
                      (when maybe-docstring {:doc maybe-docstring}))
           macro-args)))
 
