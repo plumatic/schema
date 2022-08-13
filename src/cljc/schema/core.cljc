@@ -1507,7 +1507,7 @@
         {:keys [outer-bindings schema-form fn-body arglists raw-arglists]} (macros/process-fn- &env name more-defn-args)]
     `(let ~outer-bindings
        (let [ret# (clojure.core/defn ~(with-meta name {})
-                    ~(assoc (apply dissoc standard-meta ::macros/binder (when (macros/primitive-sym? tag) [:tag]))
+                    ~(assoc (apply dissoc standard-meta ::macros/poly-binder (when (macros/primitive-sym? tag) [:tag]))
                        :doc (str
                              (str "Inputs: " (if (= 1 (count raw-arglists))
                                                (first raw-arglists)
