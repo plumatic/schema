@@ -307,8 +307,8 @@ and `identity-poly` are instrumented in the same way:
   x)
 ```
 
-The actual value chosen as the "most general" depends on the schema variables kind and should not be
-relied on. In the future, schema variables may be instantiated with other values.
+The actual value chosen as the "most general" depends on the polymorphic variables kind and should not be
+relied on. In the future, polymorphic variables may be instantiated with other values.
 
 Dotted variables have an internal "most general" value which represents a homogeneous sequence of
 generalized templates (ie., generalizing variables to the left of the `:..`).

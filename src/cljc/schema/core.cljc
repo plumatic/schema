@@ -1110,10 +1110,10 @@
 (defmacro all
   "Create a polymorphic function schema.
   
-   Binder declaration is a vector of schema variables and its kinds.
+   Binder declaration is a vector of polymorphic variables and its kinds.
 
    Schema variables have a 'kind' that classify what it represents.
-   :- assigns a kind to a schema variable. By default, schema variables are kind :schema.
+   :- assigns a kind to a polymorphic variable. By default, polymorphic variables are kind :schema.
 
    1. [T :- :schema]   represents a Schema, eg., s/Any, s/Int, (s/=> s/Int s/Bool)
    2. [T :- :..]       represents a vector of schemas of kind KIND.
@@ -1424,20 +1424,20 @@
    See (doc schema.core) for details of the :- syntax for arguments and return
    schemas.
 
-   You can use :all to make a polymorphic schema by binding schema variables.
-   See `s/all` for more about schema variables.
+   You can use :all to make a polymorphic schema by binding polymorphic variables.
+   See `s/all` for more about polymorphic variables.
  
-   The schema variables are scoped inside the function body. Note, they will usually be bound
+   The polymorphic variables are scoped inside the function body. Note, they will usually be bound
    to their most general values (eg., s/Any) at runtime. This strategy also informs how
-   `s/with-fn-validation` treats schema variables. However, the values of schema
+   `s/with-fn-validation` treats polymorphic variables. However, the values of schema
    variables should always be treated as opaque.
 
-   In the body of the function, names provided by argument vectors may shadow schema variables.
+   In the body of the function, names provided by argument vectors may shadow polymorphic variables.
 
    (s/defn :all [T]
     my-identity :- T
     [x :- T]
-    ;; from here, (destructured) arguments shadow schema variables
+    ;; from here, (destructured) arguments shadow polymorphic variables
     ...
     ;; usually equivalent to (s/validate s/Any x)
     (s/validate T x))
