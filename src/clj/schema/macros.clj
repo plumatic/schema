@@ -376,7 +376,7 @@
   (let [compile-validation (compile-fn-validation? env name)
         output-schema (extract-schema-form name)
         output-schema-sym (gensym "output-schema")
-        poly-binder (-> name meta ::binder)
+        poly-binder (-> name meta ::poly-binder)
         bind-meta (or (when-let [t (:tag (meta name))]
                         (when (primitive-sym? t)
                           {:tag t}))
@@ -514,7 +514,7 @@
          leading-opts {}]
     (if (= :all k)
       (do (assert! v-provided (str "Missing value for key " k))
-          (recur next-macro-args (assoc leading-opts k v)))
+          (recur next-macro-args (assoc leading-opts ::poly-binder v)))
       [leading-opts macro-args])))
 
 (defn normalized-defn-args
@@ -530,7 +530,7 @@
         [maybe-attr-map macro-args] (maybe-split-first map? macro-args)]
     (cons (vary-meta name merge
                      (or maybe-attr-map {})
-                     (when (:all leading-opts) {::binder (:all leading-opts)})
+                     leading-opts
                      (when maybe-docstring {:doc maybe-docstring}))
           macro-args)))
 

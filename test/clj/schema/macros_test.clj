@@ -10,16 +10,16 @@
   (is (= (macros/extract-leading-fn-kv-pairs ['name :- 'schema])
          [{} ['name :- 'schema]]))
   (is (= (macros/extract-leading-fn-kv-pairs [:all '[x] 'name :- 'schema])
-         [{:all '[x]} ['name :- 'schema]]))
+         [{::macros/poly-binder '[x]} ['name :- 'schema]]))
   (is (= (macros/extract-leading-fn-kv-pairs [:- '[s/Any] :- 'schema])
          [{} [:- '[s/Any] :- 'schema]]))
   (is (= (macros/extract-leading-fn-kv-pairs [:all '[x] :- '[s/Any] :- 'schema])
-         [{:all '[x]} [:- '[s/Any] :- 'schema]])))
+         [{::macros/poly-binder '[x]} [:- '[s/Any] :- 'schema]])))
 
 (deftest normalized-defn-args-test
   (doseq [explicit-meta [{} {:a -1 :c 3}]
           [leading-map leading-forms] {{} []
-                                       '{::macros/binder [x]} '[:all [x]]}
+                                       '{::macros/poly-binder [x]} '[:all [x]]}
           [schema-attrs schema-forms] {{:schema `s/Any} []
                                        {:schema 'Long :tag 'Long} [:- 'Long]}
           [doc-attrs doc-forms] {{} []
