@@ -700,12 +700,12 @@
 (deftest dotted-fn-schema-test
   (testing "expand dotted template"
     (let [X [s/Int s/Bool]
-          schema (s/=> s/Keyword s/Int s/Int & [X] :.. X)]
+          schema (s/=> s/Keyword s/Int s/Int [X] :.. X)]
       (is (= (s/=> s/Keyword s/Int s/Int [s/Int] [s/Bool])
              schema))))
   (testing "expand AnyDotted"
     (let [X (s/->AnyDotted s/Int)
-          schema (s/=> s/Keyword s/Int s/Int & [X] :.. X)]
+          schema (s/=> s/Keyword s/Int s/Int [X] :.. X)]
       (is (= (s/=> s/Keyword s/Int s/Int & [[s/Int]])
              schema)))))
 
@@ -1622,7 +1622,7 @@
 
 (s/defn :all [X Y :.. Z]
   poly-map-dot :- [Z]
-  [f :- (s/=> Z X & Y :.. Y)
+  [f :- (s/=> Z X Y :.. Y)
    xs :- [X]
    & xss :- [Y] :.. Y]
   (apply map f xs xss))

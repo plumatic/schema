@@ -414,34 +414,41 @@
   [spec]
   (assert! (vector? spec) "An arity spec must be a vector")
   (let [[init more] ((juxt take-while drop-while) #(not= '& %) spec)
+        init (vec init)
+        rest-schema? (= '& (first more))
+        dotted-schema? (and (<= 3 (count init))
+                            (= :.. (-> init pop peek)))
+        _ (assert! (not (and rest-schema? dotted-schema?))
+                   "Cannot provide both & and :.. to =>.")
+        [init template dvar] (if dotted-schema?
+                               [(-> init pop pop pop) (-> init pop pop peek) (-> init peek)]
+                               [init])
+        _ (when dotted-schema?
+            (assert! (and (symbol? dvar)
+                          (not (namespace dvar)))
+                     "Dotted variable after :.. must be a simple symbol: %s"
+                     (pr-str dvar)))
         fixed (mapv (fn [i s] `(schema.core/one ~s '~(symbol (str "arg" i)))) (range) init)
         start-dotted-idx (count fixed)]
-    (if (empty? more)
-      fixed
-      (if (= (count more) 4)
-        (let [[_ template dots dvar] more]
-          (assert! (and (= :.. dots)
-                        (symbol? dvar)
-                        (not (namespace dvar)))
-                   "An arity with & must be followed by a single sequence schema or dotted variable: %s"
-                   (pr-str more))
-            `(into ~fixed (let [dvar# ~dvar
-                                template# (fn [~dvar] ~template)]
-                            (cond
-                              (instance? schema.core.AnyDotted dvar#)
-                              [(template# (:schema dvar#))]
+    (cond
+      rest-schema? (do (assert! (and (= (count more) 2) (vector? (second more)))
+                                "An arity with & must be followed by a single sequence schema")
+                       (into fixed (second more)))
+      dotted-schema? `(into ~fixed (let [dvar# ~dvar
+                                         template# (fn [~dvar] ~template)]
+                                     (cond
+                                       (instance? schema.core.AnyDotted dvar#)
+                                       [(template# (:schema dvar#))]
 
-                              (vector? dvar#)
-                              (into [] (map-indexed (fn [i# s#] (schema.core/one
-                                                                  (template# s#)
-                                                                  (symbol (str "arg" (+ i# ~start-dotted-idx))))))
-                                    dvar#)
-                              :else (throw (ex-info (str ~(format "Unknown value for dotted variable %s: " dvar)
-                                                         dvar#)
-                                                    {}))))))
-        (do (assert! (and (= (count more) 2) (vector? (second more)))
-                   "An arity with & must be followed by a single sequence schema")
-            (into fixed (second more)))))))
+                                       (vector? dvar#)
+                                       (into [] (map-indexed (fn [i# s#] (schema.core/one
+                                                                           (template# s#)
+                                                                           (symbol (str "arg" (+ i# ~start-dotted-idx))))))
+                                             dvar#)
+                                       :else (throw (ex-info (str ~(format "Unknown value for dotted variable %s: " dvar)
+                                                                  dvar#)
+                                                             {})))))
+      :else fixed)))
 
 (defn emit-defrecord
   [defrecord-constructor-sym env name field-schema & more-args]

@@ -315,13 +315,13 @@ generalized templates (ie., generalizing variables to the left of the `:..`).
 The following two functions are instrumented in the same way.
 
 ```clojure
-(s/defn :all [T :..]
-  rest-args-poly :- T
-  [& xs :- {:a T} :.. T]
+(s/defn :all [S T :..]
+  rest-args-poly :- S
+  [& xs :- {:a S :b T} :.. T]
   x)
 
 (s/defn rest-args-mono :- s/Any
-  [& xs :- [{:a s/Any}]]
+  [& xs :- [{:a s/Any :b s/Any}]]
   x)
 ```
 

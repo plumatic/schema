@@ -1179,7 +1179,7 @@
 
    Dotted schemas may be used as rest schemas, and will be immediately expanded.
 
-   For example, if `Y :..` is in scope then (s/=> Z X & [Y] :.. Y) represents the following functions:
+   For example, if `Y :..` is in scope then (s/=> Z X [Y] :.. Y) represents the following functions:
     (s/=> Z X)
     (s/=> Z X [Y0])
     (s/=> Z X [Y0] [Y1])
@@ -1452,7 +1452,7 @@
 
    (s/defn :all [X Y :.. Z]
      map :- [Z]
-     [f :- (=> Z X & Y :.. Y)
+     [f :- (=> Z X Y :.. Y)
       xs :- [X]
       & xss :- [Y] :.. Y]
      (apply map f xs xss))
