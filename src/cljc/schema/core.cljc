@@ -1187,9 +1187,9 @@
     (=> Z X [Y0] [Y1] [Y1])
     ...etc
 
-   Depending on the instantiation of Y, the schema at runtime will be one of the above or
-   the following schema that encapsulates them all:
-    (=> Z X & [s/Any])
+   Depending on the instantiation of Y, the schema at runtime will be one of the above with
+   concretized Y's or the following schema that encapsulates them all:
+    (=> Z X & [[s/Any]])
 
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
