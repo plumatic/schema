@@ -1610,7 +1610,8 @@
            poly-identity
            poly-first
            poly-map-nodot
-           poly-map-dot]} :- PolySemanticsTestSuite]
+           poly-map-dot
+           poly-map-dot-arities]} :- PolySemanticsTestSuite]
   (is (= 1 (s/with-fn-validation (args-shadow-schema-variables 1))))
   (is (= 1 (s/with-fn-validation (poly-identity 1))))
   (is (= :a (s/with-fn-validation (poly-identity :a))))
