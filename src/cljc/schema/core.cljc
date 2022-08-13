@@ -1116,7 +1116,8 @@
    :- assigns a kind to a polymorphic variable. By default, polymorphic variables are kind :schema.
 
    1. [T :- :schema]   represents a Schema, eg., s/Any, s/Int, (s/=> s/Int s/Bool)
-   2. [T :- :..]       represents a vector of schemas of kind KIND.
+   2. [T :- :..]       represents a vector of schemas, often to represent heterogenous rest arguments
+                       eg., [s/Int s/Bool]
 
    [T :..] is sugar for [T :- :..]"
   [decl schema]
@@ -1179,12 +1180,16 @@
 
    Dotted schemas may be used as rest schemas, and will be immediately expanded.
 
-   For example, if `Y :..` is in scope then (s/=> Z X [Y] :.. Y) represents the following functions:
-    (s/=> Z X)
-    (s/=> Z X [Y0])
-    (s/=> Z X [Y0] [Y1])
-    (s/=> Z X [Y0] [Y1] [Y1])
+   For example, if `Y :..` is in scope then (=> Z X [Y] :.. Y) represents the following functions:
+    (=> Z X)
+    (=> Z X [Y0])
+    (=> Z X [Y0] [Y1])
+    (=> Z X [Y0] [Y1] [Y1])
     ...etc
+
+   Depending on the instantiation of Y, the schema at runtime will be one of the above or
+   the following schema that encapsulates them all:
+    (=> Z X & [s/Any])
 
    Currently function schemas are purely descriptive; there is no validation except for
    functions defined directly by s/fn or s/defn"
