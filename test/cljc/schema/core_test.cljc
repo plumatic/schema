@@ -1634,8 +1634,7 @@
   (s/with-fn-validation (invalid-call! poly-map-dot-arities + [1] 2))
   (s/with-fn-validation (invalid-call! poly-map-dot-arities + [1] [2] 3))
   (s/with-fn-validation (invalid-call! poly-map-dot-arities + [1] [2] [3] 4))
-  (s/with-fn-validation (invalid-call! poly-map-dot-arities + [1] [2] [3] [4] 5))
-)
+  (s/with-fn-validation (invalid-call! poly-map-dot-arities + [1] [2] [3] [4] 5)))
 
 (s/defn :all [x]
   args-shadow-schema-variables :- x
