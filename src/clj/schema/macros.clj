@@ -399,7 +399,7 @@
      :arglists (map :arglist processed-arities)
      :raw-arglists (map :raw-arglist processed-arities)
      :schema-form (if poly-binder
-                    ;; can't reuse output-schema-sym or schema-bindings as type variables are instantiated via poly-binder-outer-bindings
+                    ;; can't reuse output-schema-sym or schema-bindings since its type variables are instantiated via poly-binder-outer-bindings
                     `(schema.core/all ~poly-binder
                                       ~(if (= 1 (count processed-arities))
                                          `(schema.core/->FnSchema ~output-schema ~[(-> schema-bindings first second)])

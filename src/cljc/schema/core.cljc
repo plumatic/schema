@@ -1178,7 +1178,8 @@
    each of which is a vector of argument schemas, ending with an optional '& more-schema'
    specification where more-schema must be a sequence schema.
 
-   Dotted schemas may be used as rest schemas, and will be immediately expanded.
+   Dotted schemas are allowed as the final arguments, and will be expanded into either fixed
+   or rest arguments upon evaluation.
 
    For example, if `Y :..` is in scope then (=> Z X [Y] :.. Y) represents the following functions:
     (=> Z X)
