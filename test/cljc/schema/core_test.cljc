@@ -1592,6 +1592,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Polymorphic schemas
 
+(s/defschema PolySemanticsTestSuite
+  {:args-shadow-schema-variables (s/all [x] (s/=> x x))
+   :poly-identity (s/all [T] (s/=> T T))
+   :poly-first (s/all [T] (s/=> T [T]))
+   :poly-map-nodot (s/all [X Y] (s/=> [Y] (s/=> Y X) [X]))
+   :poly-map-dot (s/all [X Y :.. Z] (s/=> [Z] (s/=> Z X Y :.. Y) [X] [Y] :.. Y))})
+
+(s/defn ^:always-validate poly-semantics-test-suite
+  [{:keys [args-shadow-schema-variables
+           poly-identity
+           poly-first
+           poly-map-nodot
+           poly-map-dot]} :- PolySemanticsTestSuite]
+  (is (= 1 (s/with-fn-validation (args-shadow-schema-variables 1))))
+  (is (= 1 (s/with-fn-validation (poly-identity 1))))
+  (is (= :a (s/with-fn-validation (poly-identity :a))))
+  (s/with-fn-validation (invalid-call! poly-first 1))
+  (is (= 1 (s/with-fn-validation (poly-first [1]))))
+  (is (= 1 (s/with-fn-validation (poly-first [1]))))
+  (is (= [2 3] (s/with-fn-validation (poly-map-nodot inc [1 2]))))
+  (s/with-fn-validation (invalid-call! poly-map-nodot 1 2))
+  (is (= [2 3] (s/with-fn-validation (poly-map-dot inc [1 2]))))
+  (is (= [3 5] (s/with-fn-validation (poly-map-dot + [1 2] [2 3]))))
+  (s/with-fn-validation (invalid-call! poly-map-dot 1 2)))
+
 (s/defn :all [x]
   args-shadow-schema-variables :- x
   [x :- x]
@@ -1662,64 +1687,39 @@
          (s/explain (@#'s/inst-most-general (s/fn-schema poly-map-dot))))))
 
 (deftest poly-defn-semantics-test
-  (is (= 1 (s/with-fn-validation (args-shadow-schema-variables 1))))
-  (is (= 1 (s/with-fn-validation (poly-identity 1))))
-  (is (= :a (s/with-fn-validation (poly-identity :a))))
-  (s/with-fn-validation (invalid-call! poly-first 1))
-  (is (= 1 (s/with-fn-validation (poly-first [1]))))
-  (is (= 1 (s/with-fn-validation (poly-first [1]))))
-  (is (= [2 3] (s/with-fn-validation (poly-map-nodot inc [1 2]))))
-  (s/with-fn-validation (invalid-call! poly-map-nodot 1 2))
-  (is (= [2 3] (s/with-fn-validation (poly-map-dot inc [1 2]))))
-  (is (= [3 5] (s/with-fn-validation (poly-map-dot + [1 2] [2 3]))))
-  (s/with-fn-validation (invalid-call! poly-map-dot 1 2)))
-
-(def sfn-args-shadow-schema-variables
-  (s/fn :all [x]
-    args-shadow-schema-variables :- x
-    [x :- x]
-    x))
-
-(def sfn-poly-identity
-  (s/fn :all [T]
-    poly-identity :- T
-    [x :- T]
-    (s/validate T x)))
-
-(def sfn-poly-first
-  (s/fn :all [T]
-    poly-first :- T
-    [xs :- [T]]
-    (first xs)))
-
-(def sfn-poly-map-nodot
-  (s/fn :all [X Y]
-    poly-map-nodot :- [Y]
-    [f :- (s/=> Y X)
-     xs :- [X]]
-    (map f xs)))
-
-(def sfn-poly-map-dot
-  (s/fn :all [X Y :.. Z]
-    poly-map-dot :- [Z]
-    [f :- (s/=> Z X Y :.. Y)
-     xs :- [X]
-     & xss :- [Y] :.. Y]
-    (apply map f xs xss)))
+  (poly-semantics-test-suite
+    {:args-shadow-schema-variables args-shadow-schema-variables
+     :poly-identity poly-identity
+     :poly-first poly-first
+     :poly-map-nodot poly-map-nodot
+     :poly-map-dot poly-map-dot}))
 
 (deftest poly-fn-semantics-test
   (testing "no name"
-    (is (= 1 ((s/fn :all [T] [x :- T] x) 1))))
-  (is (= 1 (s/with-fn-validation (sfn-args-shadow-schema-variables 1))))
-  (is (= 1 (s/with-fn-validation (sfn-poly-identity 1))))
-  (is (= :a (s/with-fn-validation (sfn-poly-identity :a))))
-  (s/with-fn-validation (invalid-call! sfn-poly-first 1))
-  (is (= 1 (s/with-fn-validation (sfn-poly-first [1]))))
-  (is (= 1 (s/with-fn-validation (sfn-poly-first [1]))))
-  (is (= [2 3] (s/with-fn-validation (sfn-poly-map-nodot inc [1 2]))))
-  (s/with-fn-validation (invalid-call! sfn-poly-map-nodot 1 2))
-  (is (= [2 3] (s/with-fn-validation (sfn-poly-map-dot inc [1 2]))))
-  (is (= [3 5] (s/with-fn-validation (sfn-poly-map-dot + [1 2] [2 3]))))
-  (s/with-fn-validation (invalid-call! sfn-poly-map-dot 1 2)))
+    (is (= 1 ((s/fn :all [T] [x :- T] x) 1)))
+    (poly-semantics-test-suite
+      {:args-shadow-schema-variables (s/fn :all [x] :- x [x :- x] x)
+       :poly-identity (s/fn :all [T] :- T [x :- T] (s/validate T x))
+       :poly-first (s/fn :all [T] :- T [xs :- [T]] (first xs))
+       :poly-map-nodot (s/fn :all [X Y] :- [Y] [f :- (s/=> Y X) xs :- [X]] (map f xs))
+       :poly-map-dot (s/fn :all [X Y :.. Z] :- [Z] [f :- (s/=> Z X Y :.. Y) xs :- [X] & xss :- [Y] :.. Y] (apply map f xs xss))}))
+  (testing "with name"
+    (poly-semantics-test-suite
+      {:args-shadow-schema-variables (s/fn :all [x] args-shadow-schema-variables :- x [x :- x] x)
+       :poly-identity (s/fn :all [T] poly-identity :- T [x :- T] (s/validate T x))
+       :poly-first (s/fn :all [T] poly-first :- T [xs :- [T]] (first xs))
+       :poly-map-nodot (s/fn :all [X Y] poly-map-nodot :- [Y] [f :- (s/=> Y X) xs :- [X]] (map f xs))
+       :poly-map-dot (s/fn :all [X Y :.. Z] poly-map-dot :- [Z] [f :- (s/=> Z X Y :.. Y) xs :- [X] & xss :- [Y] :.. Y] (apply map f xs xss))})))
 
-;; TODO test s/fn, s/letfn
+(deftest poly-letfn-semantics-test
+  (poly-semantics-test-suite
+    {:args-shadow-schema-variables (s/letfn [(:all [x] args-shadow-schema-variables :- x [x :- x] x)]
+                                     args-shadow-schema-variables)
+     :poly-identity (s/letfn [(:all [T] poly-identity :- T [x :- T] (s/validate T x))]
+                      poly-identity)
+     :poly-first (s/letfn [(:all [T] poly-first :- T [xs :- [T]] (first xs))]
+                   poly-first)
+     :poly-map-nodot (s/letfn [(:all [X Y] poly-map-nodot :- [Y] [f :- (s/=> Y X) xs :- [X]] (map f xs))]
+                       poly-map-nodot)
+     :poly-map-dot (s/letfn [(:all [X Y :.. Z] poly-map-dot :- [Z] [f :- (s/=> Z X Y :.. Y) xs :- [X] & xss :- [Y] :.. Y] (apply map f xs xss))]
+                     poly-map-dot)}))
