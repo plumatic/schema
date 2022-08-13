@@ -164,7 +164,7 @@
                                                            `(let [template# (fn [~dvar] ~template)]
                                                               (cond
                                                                 (instance? schema.core.AnyDotted ~dvar)
-                                                                (template# (:schema ~dvar))
+                                                                [(template# (:schema ~dvar))]
 
                                                                 (vector? ~dvar)
                                                                 [(apply s/cond-pre ~dvar)]
