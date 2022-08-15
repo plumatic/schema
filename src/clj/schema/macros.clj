@@ -18,10 +18,11 @@
   [then else]
   (if (cljs-env? &env) then else))
 
-(let [bb? (boolean (System/getProperty "babashka.version"))]
-  (defmacro if-bb
-    [then else]
-    (if bb? then else)))
+(def bb? (boolean (System/getProperty "babashka.version")))
+
+(defmacro if-bb
+  [then else]
+  (if bb? then else))
 
 (defmacro try-catchall
   "A cross-platform variant of try-catch that catches all* exceptions.
@@ -406,6 +407,7 @@
              (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
 
+(if-bb nil
 (defn -instrument-protocol-method
   "Given a protocol Var pvar, its method method-var and instrument-method,
   instrument the protocol method."
@@ -448,7 +450,7 @@
                                             `((do ~(symbol (name this-nsym) (str (.sym ^clojure.lang.Var method-var))))
                                               ~@args)))
     ;; instrument the actual method
-    (alter-var-root method-var (fn [_] outer-mth))))
+    (alter-var-root method-var (fn [_] outer-mth)))))
 
 (defn parse-defprotocol-sig [env pname name+sig+doc]
   (let [[doc name+sig] (let [lst (last name+sig+doc)]
@@ -491,6 +493,8 @@
                                                         (gensym)))
                                                     bind))]
                           (cond
+                            bb?
+
                             cljs?
                             (let [cljs-nsym (-> env :ns :name)
                                   ->arity-sym #(symbol (str cljs-nsym "." method-name ".cljs$core$IFn$_invoke$arity$" %))

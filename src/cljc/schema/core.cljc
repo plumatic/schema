@@ -1493,7 +1493,8 @@
                      ;;         it does not change its class, as the same method builder is used each time.
                      ;;         fn-schema-bearer uses the class in :clj, so we're ok.
                      ;; :cljs -- method identity never changes, and fn-schema-bearer uses function identity in :cljs.
-                     (utils/declare-class-schema! (utils/fn-schema-bearer ~method-name) fn-schema#)
+                     ;; :bb -- methods are multimethods which have defonce semantics are always class MultiFn. Object identity is used.
+                     (utils/declare-class-schema! (macros/if-bb ~method-name (utils/fn-schema-bearer ~method-name)) fn-schema#)
                      ;; also add :schema metadata like s/defn
                      (macros/if-cljs
                        nil
