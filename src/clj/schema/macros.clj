@@ -1,8 +1,14 @@
 (ns schema.macros
   "Macros and macro helpers used in schema.core."
+  (:refer-clojure :exclude [simple-symbol?])
   (:require
    [clojure.string :as str]
    [schema.utils :as utils]))
+
+;; can remove this once we drop Clojure 1.8 support
+(defn- simple-symbol? [x]
+  (and (symbol? x)
+       (not (namespace x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
@@ -462,8 +468,8 @@
                          (if (string? lst)
                            [lst (butlast name+sig+doc)]
                            [nil name+sig+doc]))
-        [method-name sig] (maybe-split-first utils/simple-symbol? name+sig)
-        _ (assert! (utils/simple-symbol? method-name) "Missing method name %s" (pr-str method-name))
+        [method-name sig] (maybe-split-first simple-symbol? name+sig)
+        _ (assert! (simple-symbol? method-name) "Missing method name %s" (pr-str method-name))
         [output-schema sig] (let [fst (first sig)]
                               (if (= :- fst)
                                 (let [nxt (next sig)]
@@ -550,8 +556,8 @@
                                             binds)))))))}))
 
 (defn process-defprotocol [env name+opts+sigs]
-  (let [[pname opts+sigs] (maybe-split-first utils/simple-symbol? name+opts+sigs)
-        _ (assert! (utils/simple-symbol? pname) "Missing protocol name: %s" (pr-str pname))
+  (let [[pname opts+sigs] (maybe-split-first simple-symbol? name+opts+sigs)
+        _ (assert! (simple-symbol? pname) "Missing protocol name: %s" (pr-str pname))
         [doc opts+sigs] (maybe-split-first string? opts+sigs)
         [opts sigs] (loop [preamble []
                            [fst :as opts+sigs] opts+sigs]
