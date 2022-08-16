@@ -422,7 +422,7 @@
         ;; via the __methodImplCache field: https://github.com/clojure/clojure/search?q=methodimplcache&type=.
         ;; this mutable field is used inside each protocol method's implementation via (fn this [..] (.__methodImplCache this))
         ;; and also mutated from the "outside" via (set! .__methodImplCache protocol-method).
-        ;; since we wrap protocol methods, we need to preserve the these two features (settable from outside, readable from inside).
+        ;; since we wrap protocol methods, we need to preserve these two features (settable from outside, readable from inside).
         sync! (fn [^clojure.lang.AFunction outer-mth
                    ^clojure.lang.AFunction inner-mth]
                 (when-not (identical? (.__methodImplCache outer-mth)
