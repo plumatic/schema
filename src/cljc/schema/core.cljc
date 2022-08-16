@@ -1271,7 +1271,8 @@
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
-  (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
+  ;; protocol methods in bb are multimethods
+  (macros/assert! (or (fn? f) #?@(:bb [(instance? clojure.lang.MultiFn f)])) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/fn-schema-bearer f))
       (macros/safe-get (meta f) :schema)))
 
@@ -1466,7 +1467,8 @@
   - :schema metadata on protocol method vars is only supported in Clojure.
   - Clojure will never inline protocol methods, as :inline metadata is added to protocol
     methods designed to defeat potential short-circuiting of schema checks. This also means
-    compile-time errors for arity errors are suppressed (eg., `No single method` errors)."
+    compile-time errors for arity errors are suppressed (eg., `No single method` errors).
+  - Methods cannot be instrumented in babashka due to technical limitations."
   [& name+opts+sigs]
   (let [{:keys [pname doc opts parsed-sigs]} (macros/process-defprotocol &env name+opts+sigs)
         sigs (map :sig parsed-sigs)
@@ -1480,10 +1482,13 @@
          ;; put everything that relies on protocol implementation details here so the user can
          ;; turn it off for whatever reason.
          ~@(when instrument?
-             (map (fn [{:keys [method-name instrument-method]}]
-                    `(when (instrument-defprotocol?)
-                       ~instrument-method))
-                  parsed-sigs))
+             ;; in bb, protocol methods are multimethods. there's no way to be notified when
+             ;; a multimethod is extended so we're stuck.
+             #?(:bb nil
+                :default (map (fn [{:keys [method-name instrument-method]}]
+                                `(when (instrument-defprotocol?)
+                                   ~instrument-method))
+                              parsed-sigs)))
          ;; we always want s/fn-schema to work on protocol methods and have :schema
          ;; metadata on the var in Clojure.
          ~@(map (fn [{:keys [method-name schema-form]}]

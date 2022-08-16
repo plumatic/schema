@@ -493,7 +493,8 @@
                                                         (gensym)))
                                                     bind))]
                           (cond
-                            bb? (assert nil "TODO bb support for s/defprotocol")
+                            ;; instrumentation not possible babashka yet
+                            bb? nil
 
                             cljs?
                             (let [cljs-nsym (-> env :ns :name)

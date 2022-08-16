@@ -1604,7 +1604,8 @@
     [this a]
     :a))
 
-#?(:clj
+#?(:bb nil ;;https://github.com/babashka/babashka/issues/1339
+   :clj
    (deftest protocol-in-another-ns
      (binding [*ns* *ns*]
        (eval `(ns ~(gensym)))
@@ -1629,18 +1630,19 @@
                 (-> (var defprotocoltest1-method1)
                     meta
                     :protocol))))))
-  (testing ":doc meta on method vars"
-    (testing "cc/defprotocol"
-      (is (= "foo"
-             (-> (var prot-assumptions)
-                 meta
-                 :doc))))
-    (testing "cc/defprotocol"
-      (is (str/ends-with?
-            (-> (var defprotocoltest1-method1)
-                meta
-                :doc)
-            "doc 1")))))
+  #?(:bb nil ;;https://github.com/babashka/babashka/issues/1340
+     :default (testing ":doc meta on method vars"
+                (testing "cc/defprotocol"
+                  (is (= "foo"
+                         (-> (var prot-assumptions)
+                             meta
+                             :doc))))
+                (testing "cc/defprotocol"
+                  (is (str/ends-with?
+                        (-> (var defprotocoltest1-method1)
+                            meta
+                            :doc)
+                        "doc 1"))))))
 
 (deftype TDefProtocolTest1 []
   PDefProtocolTest1
@@ -1683,8 +1685,10 @@
     s/without-fn-validation)
   (testing "metadata"
     (is (= "Doc" (-> #'PDefProtocolTest1 meta :doc)))
-    #?(:clj (is (= "doc 1" (-> #'defprotocoltest1-method1 meta :doc))))
-    #?(:clj (is (= "doc 2" (-> #'defprotocoltest1-method2 meta :doc))))
+    #?(:bb nil ;;https://github.com/babashka/babashka/issues/1340
+       :clj (is (= "doc 1" (-> #'defprotocoltest1-method1 meta :doc))))
+    #?(:bb nil ;;https://github.com/babashka/babashka/issues/1340
+       :clj (is (= "doc 2" (-> #'defprotocoltest1-method2 meta :doc))))
     (is (= (s/=>* s/Str [s/Any s/Int] [s/Any s/Int s/Any])
            (s/fn-schema defprotocoltest1-method1)))
     #?(:clj (is (= (s/=>* s/Str [s/Any s/Int] [s/Any s/Int s/Any])
@@ -1694,28 +1698,31 @@
      (is (thrown-with-msg?
            Exception #"No single method"
            (eval `#(defprotocoltest1-method1 (->TDefProtocolTest1))))))
-  (testing "default method errors"
-    (s/with-fn-validation
-      (invalid-call! pdefprotocol-test-default1 :foo nil) ;;input
-      (invalid-call! pdefprotocol-test-default1 :foo nil "a") ;;input
-      (invalid-call! pdefprotocol-test-default1 :foo 1 :a) ;;output
-      (invalid-call! pdefprotocol-test-default1 "str" :foo) ;;input
-      (invalid-call! pdefprotocol-test-default1 "str" :foo :a) ;;input
-      (invalid-call! pdefprotocol-test-default1 "str" 1 :a))) ;;output
+  #?(:bb nil
+     :default (testing "default method errors"
+                (s/with-fn-validation
+                  (invalid-call! pdefprotocol-test-default1 :foo nil) ;;input
+                  (invalid-call! pdefprotocol-test-default1 :foo nil "a") ;;input
+                  (invalid-call! pdefprotocol-test-default1 :foo 1 :a) ;;output
+                  (invalid-call! pdefprotocol-test-default1 "str" :foo) ;;input
+                  (invalid-call! pdefprotocol-test-default1 "str" :foo :a) ;;input
+                  (invalid-call! pdefprotocol-test-default1 "str" 1 :a)))) ;;output
   (testing "inlinable positions"
     (s/with-fn-validation
       (is (= "1" (defprotocoltest1-method1 (->TDefProtocolTest1) 1)))
       (is (= "a" (defprotocoltest1-method1 (->TDefProtocolTest1) 1 "a")))
       (is (= "a" (defprotocoltest1-method2 (->TDefProtocolTest1) 1 "a"))))
-    (s/with-fn-validation
-      (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) :a)
-      (testing "input"
-        (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) ::foo "a"))
-      (testing "output"
-        (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) 1 ::foo))
-      (invalid-call! defprotocoltest1-method2 (->TDefProtocolTest1) 1 ::foo))
+    #?(:bb nil
+       :default (s/with-fn-validation
+                  (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) :a)
+                  (testing "input"
+                    (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) ::foo "a"))
+                  (testing "output"
+                    (invalid-call! defprotocoltest1-method1 (->TDefProtocolTest1) 1 ::foo))
+                  (invalid-call! defprotocoltest1-method2 (->TDefProtocolTest1) 1 ::foo)))
     ;; try a bunch of contexts and nestings to make sure inlining is defeated
-    #?(:clj 
+    #?(:bb nil
+       :clj 
        (do
          (s/with-fn-validation
            (invalid-call! (eval `(defprotocoltest1-method1 (->TDefProtocolTest1) :a))))
