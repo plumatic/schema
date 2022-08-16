@@ -79,6 +79,7 @@
   #?(:clj (instance? clojure.lang.IRecord x)
      :cljs (satisfies? IRecord x)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Error descriptions
 
