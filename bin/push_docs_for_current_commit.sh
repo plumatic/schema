@@ -6,7 +6,7 @@ set -e
 lein doc
 git fetch origin
 git checkout gh-pages # To be sure you're on the right branch
-git reset --hard origin/gh-pages
+git reset --hard gh-pages
 git pull origin gh-pages
 # gh-pages is currently deployed from root (not `doc` folder)
 rm *.html
