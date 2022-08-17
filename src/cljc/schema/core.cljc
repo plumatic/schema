@@ -75,7 +75,7 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol Inst atom defrecord defn letfn defmethod fn MapEntry ->MapEntry])
+  (:refer-clojure :exclude [Keyword Symbol Inst atom defprotocol defrecord defn letfn defmethod fn MapEntry ->MapEntry])
   (:require
    #?(:clj [clojure.pprint :as pprint])
    [clojure.string :as str]
@@ -88,26 +88,12 @@
   #?(:cljs (:require-macros [schema.macros :as macros]
                             schema.core)))
 
-#?(:clj (def ^:no-doc clj-1195-fixed?
-          (do (defprotocol ^:no-doc CLJ1195Check
-                (dummy-method [this]))
-              (try
-                (eval '(extend-protocol CLJ1195Check nil
-                         (dummy-method [_])))
-                true
-                (catch RuntimeException _
-                  false)))))
-
-#?(:clj (when-not clj-1195-fixed?
-         ;; don't exclude fn because of bug in extend-protocol
-         (refer-clojure :exclude '[Keyword Symbol Inst atom defrecord defn letfn defmethod])))
-
 #?(:clj (set! *warn-on-reflection* true))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Schema protocol
 
-(defprotocol Schema
+(clojure.core/defprotocol Schema
   (spec [this]
     "A spec is a record of some type that expresses the structure of this schema
      in a declarative and/or imperative way.  See schema.spec.* for examples.")
@@ -536,7 +522,7 @@
 
 ;; cond-pre (conditional based on surface type)
 
-(defprotocol HasPrecondition
+(clojure.core/defprotocol HasPrecondition
   (precondition [this]
     "Return a predicate representing the Precondition for this schema:
      the predicate returns true if the precondition is satisfied.
@@ -1285,12 +1271,10 @@
 (clojure.core/defn ^FnSchema fn-schema
   "Produce the schema for a function defined with s/fn or s/defn."
   [f]
-  (macros/assert! (fn? f) "Non-function %s" (utils/type-of f))
+  ;; protocol methods in bb are multimethods
+  (macros/assert! (or (fn? f) #?@(:bb [(instance? clojure.lang.MultiFn f)])) "Non-function %s" (utils/type-of f))
   (or (utils/class-schema (utils/fn-schema-bearer f))
       (macros/safe-get (meta f) :schema)))
-
-;; work around bug in extend-protocol (refers to bare 'fn, so we can't exclude it).
-#?(:clj (when-not clj-1195-fixed? (ns-unmap *ns* 'fn)))
 
 #?(:clj
 (defmacro fn
@@ -1430,6 +1414,98 @@
                         addMethod
                         ~dispatch-val
                         ~methodfn))))))
+
+(defonce
+  ^{:doc
+    "If the s/defprotocol instrumentation strategy is problematic
+    for your platform, set atom to true and instrumentation will not
+    be performed.
+
+    Defaults to false."}
+  ^:dynamic *elide-defprotocol-instrumentation* 
+  (clojure.core/atom false))
+
+(clojure.core/defn instrument-defprotocol?
+  "If true, elide s/defprotocol instrumentation.
+
+  Instrumentation is elided for any of the following cases:
+  *   @*elide-defprotocol-instrumentation* is true during s/defprotocol macroexpansion
+  *   @*elide-defprotocol-instrumentation* is true during s/defprotocol evaluation"
+  []
+  (not @*elide-defprotocol-instrumentation*))
+
+#?(:clj
+(defmacro defprotocol
+  "Like clojure.core/defprotocol, except schema-style typehints can be provided for
+  the argument symbols and after method names (for output schemas).
+
+  ^:always-validate and ^:never-validate metadata can be specified for all
+  methods on the protocol name. If specified on the method name, ignores
+  the protocol name metatdata and uses the method name metadata.
+
+  Examples:
+
+    (s/defprotocol MyProtocol
+      \"Docstring\"
+      :extend-via-metadata true
+      (^:always-validate method1 :- s/Int
+        [this a :- s/Bool]
+        [this a :- s/Any, b :- s/Str]
+        \"Method doc2\")
+      (^:never-validate method2 :- s/Int
+        [this]
+        \"Method doc2\"))
+  
+  Gotchas and limitations:
+  - Implementation details are used to instrument protocol methods for schema
+    checking. This is tested against a variety of platforms and versions,
+    however if this is problematic for your environment, use
+    *elide-defprotocol-instrumentation* to disable such instrumentation
+    (either at compile-time or runtime depending on your needs).
+    In ClojureScript, method var metadata will be overwritten unless disabled
+    at compile-time. 
+  - :schema metadata on protocol method vars is only supported in Clojure.
+  - Clojure will never inline protocol methods, as :inline metadata is added to protocol
+    methods designed to defeat potential short-circuiting of schema checks. This also means
+    compile-time errors for arity errors are suppressed (eg., `No single method` errors).
+  - Methods cannot be instrumented in babashka due to technical limitations."
+  [& name+opts+sigs]
+  (let [{:keys [pname doc opts parsed-sigs]} (macros/process-defprotocol &env name+opts+sigs)
+        sigs (map :sig parsed-sigs)
+        defprotocol-form `(clojure.core/defprotocol
+                            ~pname
+                            ~@(when doc [doc])
+                            ~@opts
+                            ~@sigs)
+        instrument? (instrument-defprotocol?)]
+    `(do ~defprotocol-form
+         ;; put everything that relies on protocol implementation details here so the user can
+         ;; turn it off for whatever reason.
+         ~@(when instrument?
+             ;; in bb, protocol methods are multimethods. there's no way to be notified when
+             ;; a multimethod is extended so we're stuck.
+             #?(:bb nil
+                :default (map (fn [{:keys [method-name instrument-method]}]
+                                `(when (instrument-defprotocol?)
+                                   ~instrument-method))
+                              parsed-sigs)))
+         ;; we always want s/fn-schema to work on protocol methods and have :schema
+         ;; metadata on the var in Clojure.
+         ~@(map (fn [{:keys [method-name schema-form]}]
+                  `(let [fn-schema# ~schema-form]
+                     ;; utils/declare-class-schema! works for subtly different reasons for each platform:
+                     ;; :clj -- while CLJ-1796 means a method will change its identity after -reset-methods,
+                     ;;         it does not change its class, as the same method builder is used each time.
+                     ;;         fn-schema-bearer uses the class in :clj, so we're ok.
+                     ;; :cljs -- method identity never changes, and fn-schema-bearer uses function identity in :cljs.
+                     ;; :bb -- methods are multimethods which have defonce semantics are always class MultiFn. Object identity is used.
+                     (utils/declare-class-schema! (macros/if-bb ~method-name (utils/fn-schema-bearer ~method-name)) fn-schema#)
+                     ;; also add :schema metadata like s/defn
+                     (macros/if-cljs
+                       nil
+                       (alter-meta! (var ~method-name) assoc :schema fn-schema#))))
+                parsed-sigs)
+         ~pname))))
 
 #?(:clj
 (defmacro letfn

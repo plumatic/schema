@@ -1,8 +1,14 @@
 (ns schema.macros
   "Macros and macro helpers used in schema.core."
+  (:refer-clojure :exclude [simple-symbol?])
   (:require
    [clojure.string :as str]
    [schema.utils :as utils]))
+
+;; can remove this once we drop Clojure 1.8 support
+(defn- simple-symbol? [x]
+  (and (symbol? x)
+       (not (namespace x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Helpers used in schema.core.
@@ -18,10 +24,11 @@
   [then else]
   (if (cljs-env? &env) then else))
 
-(let [bb? (boolean (System/getProperty "babashka.version"))]
-  (defmacro if-bb
-    [then else]
-    (if bb? then else)))
+(def bb? (boolean (System/getProperty "babashka.version")))
+
+(defmacro if-bb
+  [then else]
+  (if bb? then else))
 
 (defmacro try-catchall
   "A cross-platform variant of try-catch that catches all* exceptions.
@@ -405,6 +412,165 @@
                                       (sort ~(mapv keyword field-schema)) (sort (keys ~map-sym)))))
              (new ~(symbol (str name))
                   ~@(map (fn [s] `(safe-get ~map-sym ~(keyword s))) field-schema)))))))
+
+(if-bb nil
+(defn -instrument-protocol-method
+  "Given a protocol Var pvar, its method method-var and instrument-method,
+  instrument the protocol method."
+  [pvar ;:- Var
+   method-var ;:- (Var InnerMth)
+   instrument-method #_:- #_(s/=>* OuterMth
+                                   [InnerMth
+                                    (named (=> Any OuterMth InnerMth)
+                                           'sync!)])]
+  (let [;; propagate method cache to inner method.
+        ;; explanation: all functions in Clojure have special support for protocol methods
+        ;; via the __methodImplCache field: https://github.com/clojure/clojure/search?q=methodimplcache&type=.
+        ;; this mutable field is used inside each protocol method's implementation via (fn this [..] (.__methodImplCache this))
+        ;; and also mutated from the "outside" via (set! .__methodImplCache protocol-method).
+        ;; since we wrap protocol methods, we need to preserve these two features (settable from outside, readable from inside).
+        sync! (fn [^clojure.lang.AFunction outer-mth
+                   ^clojure.lang.AFunction inner-mth]
+                (when-not (identical? (.__methodImplCache outer-mth)
+                                      (.__methodImplCache inner-mth))
+                  ;; lock to prevent outdated outer caches from overwriting newer inner caches
+                  (locking inner-mth
+                    (set! (.__methodImplCache inner-mth)
+                          ;; vv WARNING: must be calculated within protected area
+                          (.__methodImplCache outer-mth)
+                          ;; ^^ WARNING: must be calculated within protected area
+                          ))))
+        ^clojure.lang.AFunction inner-mth @method-var
+        ^clojure.lang.AFunction outer-mth (instrument-method inner-mth sync!)
+        ;; populate outer cache so we can use outer-mth as the protocol method without needing
+        ;; to call -reset-methods.
+        _ (set! (.__methodImplCache outer-mth)
+                (.__methodImplCache inner-mth))
+        method-builder (fn [cache]
+                         (set! (.__methodImplCache outer-mth) cache)
+                         (sync! outer-mth inner-mth)
+                         ;; preempt future fix for CLJ-1796--have a canonical method
+                         ;; representation for the duration of the protocol, matching
+                         ;; CLJS semantics.
+                         outer-mth)
+        this-nsym (ns-name *ns*)]
+    ;; instrument method builder
+    (alter-var-root pvar assoc-in [:method-builders method-var] method-builder)
+    ;; defeat Compiler.java inlining capabilities so we can always enforce schemas
+    (alter-meta! method-var assoc :inline (fn [& args]
+                                            `((do ~(symbol (name this-nsym) (str (.sym ^clojure.lang.Var method-var))))
+                                              ~@args)))
+    ;; instrument the actual method
+    (alter-var-root method-var (fn [_] outer-mth)))))
+
+(defn parse-defprotocol-sig [env pname name+sig+doc]
+  (let [[doc name+sig] (let [lst (last name+sig+doc)]
+                         (if (string? lst)
+                           [lst (butlast name+sig+doc)]
+                           [nil name+sig+doc]))
+        [method-name sig] (maybe-split-first simple-symbol? name+sig)
+        _ (assert! (simple-symbol? method-name) "Missing method name %s" (pr-str method-name))
+        [output-schema sig] (let [fst (first sig)]
+                              (if (= :- fst)
+                                (let [nxt (next sig)]
+                                  (assert! nxt "Missing schema after :- in %s" method-name)
+                                  [(first nxt) (next nxt)])
+                                [`schema.core/Any sig]))
+        _ (assert (seq sig))
+        binds (mapv #(process-arrow-schematized-args env %)
+                    sig)
+        cljs? (cljs-env? env)]
+    {:sig (->> (concat (cons method-name binds) (when doc [doc]))
+               ;; work around https://clojure.atlassian.net/browse/CLJS-3211
+               (apply list))
+     :method-name method-name
+     :schema-form `(schema.core/=>* ~output-schema ~@(map #(mapv (comp :schema meta) %) binds))
+     :instrument-method (let [outer-mth-meta (-> (or (meta method-name) {})
+                                                 (dissoc :always-validate :never-validate)
+                                                 (into 
+                                                   (cond
+                                                     (-> method-name meta :never-validate) {:never-validate true}
+                                                     (-> method-name meta :always-validate) {:always-validate true}
+                                                     (-> pname meta :never-validate) {:never-validate true}
+                                                     (-> pname meta :always-validate) {:always-validate true}))
+                                                 not-empty)
+                              inner-mth (gensym)
+                              gen-binder (fn [gs bind]
+                                           (vec (mapcat #(list %1 :- (-> %2 meta :schema)) gs bind)))
+                              gen-bind-syms (fn [bind]
+                                              (mapv (fn [s]
+                                                      (if (symbol? s)
+                                                        (gensym (str (name s) "__"))
+                                                        (gensym)))
+                                                    bind))]
+                          (cond
+                            ;; instrumentation not possible babashka yet
+                            bb? nil
+
+                            cljs?
+                            (let [cljs-nsym (-> env :ns :name)
+                                  ->arity-sym #(symbol (str cljs-nsym "." method-name ".cljs$core$IFn$_invoke$arity$" %))
+                                  arities (into {}
+                                                (map (fn [bind]
+                                                       [(count bind) (gensym)])
+                                                     binds))]
+                              `(let ~(vec (mapcat (fn [[i g]]
+                                                    [g (if (= 1 (count arities))
+                                                         ;; just one arity, wrap method-name
+                                                         method-name
+                                                         ;; multiple arites, wrap each arity individually. don't save/call old method-name
+                                                         ;; as it will dispatch right back to the wrapper's arities in an infinite loop.
+                                                         (->arity-sym i))])
+                                                  arities))
+                                 ;; use defn instead of set! to completely hide the $arity$ methods of the underlying protocol
+                                 ;; in case the cljs compiler attempts inlining.
+                                 (schema.core/defn ~(with-meta method-name
+                                                               (assoc outer-mth-meta
+                                                                      :protocol (symbol (name cljs-nsym) (name pname))
+                                                                      :doc doc))
+                                   :- ~output-schema
+                                   ~@(map (fn [bind]
+                                            (let [arity (count bind)
+                                                  gs (gen-bind-syms bind)
+                                                  inner-mth (get arities arity)
+                                                  _ (assert inner-mth)]
+                                              (list (gen-binder gs bind)
+                                                    (cons inner-mth gs))))
+                                          binds))))
+                            :else
+                            (let [outer-mth (gensym (str method-name "__"))
+                                  sync! (gensym)]
+                              `(-instrument-protocol-method
+                                 (var ~pname)
+                                 (var ~method-name)
+                                 ;; a function that wraps a protocol method in a schema check with a
+                                 ;; cache synchronization point
+                                 (fn [~inner-mth ~sync!]
+                                   (schema.core/fn ~(with-meta outer-mth outer-mth-meta)
+                                     :- ~output-schema
+                                     ~@(map (fn [bind]
+                                              (let [gs (gen-bind-syms bind)]
+                                                (list (gen-binder gs bind)
+                                                      (list sync! outer-mth inner-mth)
+                                                      (cons inner-mth gs))))
+                                            binds)))))))}))
+
+(defn process-defprotocol [env name+opts+sigs]
+  (let [[pname opts+sigs] (maybe-split-first simple-symbol? name+opts+sigs)
+        _ (assert! (simple-symbol? pname) "Missing protocol name: %s" (pr-str pname))
+        [doc opts+sigs] (maybe-split-first string? opts+sigs)
+        [opts sigs] (loop [preamble []
+                           [fst :as opts+sigs] opts+sigs]
+                      (if (keyword? fst)
+                        (let [nxt (next opts+sigs)]
+                          (assert! nxt "Uneven args to defprotocol %s" pname)
+                          (recur (conj preamble fst (first nxt))
+                                 (next nxt)))
+                        [preamble opts+sigs]))]
+    {:pname pname
+     :opts opts
+     :doc doc
+     :parsed-sigs (mapv (partial parse-defprotocol-sig env pname) sigs)}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public: helpers for schematized functions
