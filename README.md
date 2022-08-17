@@ -148,7 +148,7 @@ If you've done much Clojure, you've probably seen code with documentation like t
 
 Clojure's type hints make great documentation, but they fall short for complex types, often leading to ad-hoc descriptions of data in comments and doc-strings.  This is better than nothing, but these ad hoc descriptions are often imprecise, hard to read, and prone to bit-rot.
 
-Schema provides macros `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help bridge this gap. These macros are just like their `clojure.core` counterparts, except they support arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
+Schema provides macros `s/defprotocol`, `s/defrecord`, `s/defn`, `s/def`, and `s/fn` that help bridge this gap. These macros are just like their `clojure.core` counterparts, except they support arbitrary schemas as type hints on fields, arguments, and return values.  This is a graceful extension of Clojure's type hinting system, because every type hint is a valid Schema, and Schemas that represent valid type hints are automatically passed through to Clojure.
 
 ```clojure
 (s/defprotocol TimestampOffsetter
