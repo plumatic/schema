@@ -11,7 +11,7 @@
 
 (defprotocol CoreSpec
   "Specs are a common language for Schemas to express their structure.
-   These two use-cases aren't priveledged, just the two that are considered core
+   These two use-cases aren't privileged, just the two that are considered core
    to being a Spec."
   (subschemas [this]
     "List all subschemas")
