@@ -984,17 +984,14 @@
         (reverse singles)))
      (clojure.core/fn [_ elts extra]
        (let [head (mapv utils/error-val elts)]
-         (if (seq extra)
-           (conj head (utils/error-val (macros/validation-error nil extra (list 'has-extra-elts? (count extra)))))
-           head)))))
+         (cond-> head
+           (seq extra) (conj (utils/error-val (macros/validation-error nil extra (list 'has-extra-elts? (count extra))))))))))
   (explain [this]
     (let [[singles multi] (parse-sequence-schema this)]
-      (vec
-       (concat
-        (for [^One s singles]
-          (list (if (.-optional? s) 'optional 'one) (explain (:schema s)) (:name s)))
-        (when multi
-          [(explain multi)]))))))
+      (cond-> (mapv (clojure.core/fn [^One s]
+                      (list (if (.-optional? s) 'optional 'one) (explain (:schema s)) (:name s)))
+                    singles)
+        multi (conj (explain multi))))))
 
 (clojure.core/defn pair
   "A schema for a pair of schemas and their names"
