@@ -1693,7 +1693,7 @@
            (s/fn-schema defprotocoltest1-method1)))
     #?(:clj (is (= (s/=>* s/Str [s/Any s/Int] [s/Any s/Int s/Any])
                    (-> #'defprotocoltest1-method1 meta :schema)))))
-  #_ ;; :inline metatdata on methods we add to prevent inlining thwarts this compile-time error
+  #_ ;; :inline metadata on methods we add to prevent inlining thwarts this compile-time error
   #?(:clj
      (is (thrown-with-msg?
            Exception #"No single method"
