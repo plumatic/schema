@@ -938,7 +938,7 @@
   (let [[required more] (split-with #(and (instance? One %) (not (:optional? %))) s)
         [optional more] (split-with #(and (instance? One %) (:optional? %)) more)]
     (macros/assert!
-     (and (<= (count more) 1) (every? #(not (instance? One %)) more))
+     (and (<= (count more) 1) (not-any? #(instance? One %) more))
      "%s is not a valid sequence schema; %s%s%s" s
      "a valid sequence schema consists of zero or more `one` elements, "
      "followed by zero or more `optional` elements, followed by an optional "
