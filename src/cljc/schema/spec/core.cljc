@@ -47,7 +47,7 @@
    Takes a schema, predicate p, and error function err-f.
    If the datum passes the predicate, returns nil.
    Otherwise, returns a validation error with description (err-f datum-description),
-   where datum-description is a (short) printable standin for the datum."
+   where datum-description is a (short) printable stand-in for the datum."
   [s p err-f]
   (fn [x]
     (when-let [reason (macros/try-catchall (when-not (p x) 'not) (catch e# 'throws?))]
