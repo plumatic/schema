@@ -20,13 +20,11 @@
      (by default, usually just data), or a utils/ErrorContainer containing value that looks
      like the 'bad' parts of data with ValidationErrors at the leaves describing the failures.
 
-     params are: subschema-checker, return-walked?, and cache.
-
      params is a map specifying:
-      - subschema-checker - a function for checking subschemas
-      - returned-walked? - a boolean specifying whether to return a walked version of the data
+      - :subschema-checker - a function for checking subschemas
+      - :returned-walked? - a boolean specifying whether to return a walked version of the data
         (otherwise, nil is returned which increases performance)
-      - cache - a map structure from schema to checker, which speeds up checker creation
+      - :cache - a map structure from schema to checker, which speeds up checker creation
         when the same subschema appears multiple times, and also facilitates handling
         recursive schemas."))
 
