@@ -1418,7 +1418,7 @@
     for your platform, set atom to true and instrumentation will not
     be performed.
 
-    Defaults to false."}
+    Atom defaults to false."}
   ^:dynamic *elide-defprotocol-instrumentation* 
   (clojure.core/atom false))
 
@@ -1438,7 +1438,7 @@
 
   ^:always-validate and ^:never-validate metadata can be specified for all
   methods on the protocol name. If specified on the method name, ignores
-  the protocol name metatdata and uses the method name metadata.
+  the protocol name metadata and uses the method name metadata.
 
   Examples:
 
@@ -1452,6 +1452,10 @@
       (^:never-validate method2 :- s/Int
         [this]
         \"Method doc2\"))
+
+  There is a performance penalty compared to `clojure.core/defprotocol`, even
+  if instrumentation is disabled. It may be useful to set *elide-defprotocol-instrumentation*
+  to `true` in production if you do not plan to check methods.
   
   Gotchas and limitations:
   - Implementation details are used to instrument protocol methods for schema
@@ -1462,9 +1466,12 @@
     In ClojureScript, method var metadata will be overwritten unless disabled
     at compile-time. 
   - :schema metadata on protocol method vars is only supported in Clojure.
-  - Clojure will never inline protocol methods, as :inline metadata is added to protocol
+  - The Clojure compiler normally rewrites protocol method invocations to direct
+    method calls if the target is type hinted as a class that directly extends the protocol's interface.
+    This is disabled in s/defprotocol, as :inline metadata is added to protocol
     methods designed to defeat potential short-circuiting of schema checks. This also means
     compile-time errors for arity errors are suppressed (eg., `No single method` errors).
+    Setting *elide-defprotocol-instrumentation* to true will restore the default behavior.
   - Methods cannot be instrumented in babashka due to technical limitations."
   [& name+opts+sigs]
   (let [{:keys [pname doc opts parsed-sigs]} (macros/process-defprotocol &env name+opts+sigs)
