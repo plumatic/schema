@@ -237,9 +237,9 @@ Finally, we use validation with coercion for API inputs and outputs.  See the co
 
 The source code in [schema/core.cljc](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides a wealth of extra tools for defining schemas, which are described in docstrings. The file [schema/core_test.cljc](https://github.com/plumatic/schema/blob/master/test/cljc/schema/core_test.cljc) demonstrates a variety of sample schemas and many examples of passing & failing clojure data.  We'll just touch on a few more examples here, and refer the reader to the code for more details and examples (for now).
 
-### Map schema details
+### Map schemas
 
-In addition to uniform maps (like String to double), map schemas can also capture maps with specific key requirements:
+In addition to uniform maps (like `String` to `Double`), map schemas can also capture maps with specific key requirements:
 
 ```clojure
 (s/defschema FooBar {(s/required-key :foo) s/Str (s/required-key :bar) s/Keyword})
@@ -268,7 +268,7 @@ For the special case of keywords, you can omit the `required-key`, like `{:foo s
 (s/validate FancyMap {:foo :f "c" "d" "e" "f"})
 ```
 
-### Sequence schema details
+### Sequence schemas
 
 Unlike most schemas, sequence schemas are implicitly nilable:
 
@@ -277,7 +277,10 @@ Unlike most schemas, sequence schemas are implicitly nilable:
 ;=> nil
 ```
 
-You can also write sequence schemas that expect particular values in specific positions:
+You can also write sequence schemas that expect particular values in specific positions
+using some regex-like schemas. `s/one` is a named entry (like a singleton `cat` in clojure.spec),
+`s/optional` is an optional entry (like `?` in regular expressions), and
+a trailing schema describes the rest of the sequence (like `*` in regular expressions).
 
 ```clojure
 (s/defschema FancySeq
@@ -299,9 +302,26 @@ You can also write sequence schemas that expect particular values in specific po
 ;;   (not (instance? java.lang.Number "4"))]
 ```
 
+### Set schemas
+
+A homogeneous set of values is specified by a singleton set. A set of strings is `#{s/Str}`.
+
+Use `s/conditional` to add additional constraints:
+
+```clojure
+(s/defn NonEmptySet [s]
+  (s/conditional
+    (every-pred set? seq) #{s}))
+
+(s/validate (NonEmptySet s/Str) #{})
+;; Fail
+(s/validate (NonEmptySet s/Str) #{"a"})
+;; Ok
+```
+
 ### Other schema types
 
-[`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides many more utilities for building schemas, including `maybe`, `eq`, `enum`, `pred`, `conditional`, `cond-pre`, `constrained`, and more.  Here are a few of our favorites:
+[`schema.core`](https://github.com/plumatic/schema/blob/master/src/cljc/schema/core.cljc) provides many more utilities for building schemas, including `s/maybe`, `s/eq`, `s/enum`, `s/pred`, `s/conditional`, `s/cond-pre`, `s/constrained`, and more.  Here are a few of our favorites:
 
 ```clojure
 ;; anything
