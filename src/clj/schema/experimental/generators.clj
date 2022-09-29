@@ -1,9 +1,12 @@
 (ns schema.experimental.generators
-  "(Very) experimental support for compiling schemas to test.check generators.
+  "Deprecated---please migrate to https://github.com/plumatic/schema-generators
+  
+   (Very) experimental support for compiling schemas to test.check generators.
    To use it, you must provide your own test.check dependency.
 
    TODO: add cljs support."
-  {:deprecated "1.1.0"}
+  {:deprecated "1.1.0"
+   :superceded-by "schema-generators.generators"}
   (:require
    [clojure.test.check.generators :as generators]
    [schema.spec.core :as spec]

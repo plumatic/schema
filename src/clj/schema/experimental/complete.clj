@@ -1,7 +1,10 @@
 (ns schema.experimental.complete
-  "(Extremely) experimental support for 'completing' partial datums to match
+  "Deprecated---please migrate to https://github.com/plumatic/schema-generators
+
+   (Extremely) experimental support for 'completing' partial datums to match
    a schema. To use it, you must provide your own test.check dependency."
-  {:deprecated "1.1.0"}
+  {:deprecated "1.1.0"
+   :superceded-by "schema-generators.complete"}
   (:require
    [clojure.test.check.generators :as check-generators]
    [schema.spec.core :as spec]
