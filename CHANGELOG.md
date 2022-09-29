@@ -1,3 +1,6 @@
+## 1.4.1 (`2022-09-29`)
+ * [#449](https://github.com/plumatic/schema/issues/449): Fix bad jsdoc
+
 ## 1.4.0 (`2022-08-16`)
  * Add `s/defprotocol`
 
