@@ -1426,8 +1426,8 @@
   "If true, elide s/defprotocol instrumentation.
 
   Instrumentation is elided for any of the following cases:
-  *   @*elide-defprotocol-instrumentation* is true during s/defprotocol macroexpansion
-  *   @*elide-defprotocol-instrumentation* is true during s/defprotocol evaluation"
+  *   `@*elide-defprotocol-instrumentation*` is true during s/defprotocol macroexpansion
+  *   `@*elide-defprotocol-instrumentation*` is true during s/defprotocol evaluation"
   []
   (not @*elide-defprotocol-instrumentation*))
 
