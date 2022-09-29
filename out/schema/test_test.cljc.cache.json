@@ -1,0 +1,1 @@
+["^ ","~:rename-macros",["^ "],"~:renames",["^ "],"~:use-macros",["^ "],"~:excludes",["~#set",[]],"~:name","~$schema.test-test","~:imports",null,"~:requires",["^ ","~$s","~$schema.core","^9","^9","~$st","~$schema.test","^;","^;"],"~:cljs.spec/speced-vars",[],"~:uses",null,"~:defs",["^ "],"~:cljs.spec/registry-ref",[],"~:require-macros",["^ ","~$s","^9","^9","^9"],"~:doc",null]

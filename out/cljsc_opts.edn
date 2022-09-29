@@ -1,0 +1,1 @@
+{:output-to "target/unit-test.js", :main "schema.test-runner", :target :nodejs, :pretty-print true}
