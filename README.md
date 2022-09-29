@@ -2,13 +2,13 @@
 
 A Clojure(Script) library for declarative data description and validation.
 
-[![Clojars Project](http://clojars.org/prismatic/schema/latest-version.svg)](http://clojars.org/prismatic/schema)
+[![Clojars Project](https://clojars.org/prismatic/schema/latest-version.svg)](https://clojars.org/prismatic/schema)
 
-[Latest codox API docs](http://plumatic.github.io/schema).
+[API docs](https://plumatic.github.io/schema).
 
 --
 
-One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](http://plumatic.github.io/schema-for-clojurescript-data-shape-declaration-and-validation).)
+One of the difficulties with bringing Clojure into a team is the overhead of understanding the kind of data (e.g., list of strings, nested map from long to string to double) that a function expects and returns.  While a full-blown type system is one solution to this problem, we present a lighter weight solution: schemas.  (For more details on why we built Schema, check out [this post](https://plumatic.github.io/schema-for-clojurescript-data-shape-declaration-and-validation).)
 
 Schema is a rich language for describing data shapes, with a variety of features:
 
@@ -427,7 +427,7 @@ Here, `json-coercion-matcher` provides some useful defaults for coercing from JS
 
 There's nothing special about `json-coercion-matcher` though; it's just as easy to [make your own schema-specific transformations](https://github.com/plumatic/schema/wiki/Writing-Custom-Transformations) to do even more.
 
-For more details, see [this blog post](http://plumatic.github.io//schema-0-2-0-back-with-clojurescript-data-coercion).
+For more details, see [this blog post](https://plumatic.github.io//schema-0-2-0-back-with-clojurescript-data-coercion).
 
 ## For the Future
 
