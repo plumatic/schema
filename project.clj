@@ -32,6 +32,7 @@
   :jar-exclusions [#"\.swp|\.swo|\.DS_Store"]
 
   :source-paths ["src/clj" "src/cljc"]
+  :java-source-paths ["src/java"]
 
   :test-paths ["test/clj" "test/cljc" "test/cljs"]
 

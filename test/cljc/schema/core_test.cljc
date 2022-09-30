@@ -1751,3 +1751,19 @@
          (protocol-cache [_] :long))
        (testing "invalidates .__methodImplCache"
          (is (= :long (protocol-cache x) (call)))))))
+
+(s/defmulti defmulti-no-schema class)
+(defmethod defmulti-no-schema :default [x] x)
+(s/defmulti defmulti-with-schema
+ :=> (:- s/Int [a :- s/Num])
+ class)
+(defmethod defmulti-with-schema :default [x] x)
+
+#?(:clj
+   (deftest defmulti-test
+     (is (= 1 (defmulti-no-schema 1)))
+     (is (= 1 (defmulti-with-schema 1)))
+     (invalid-call! defmulti-with-schema 'a)
+     (invalid-call! defmulti-with-schema 1.1)
+     ;(defmulti-with-schema )
+     ))

@@ -75,8 +75,9 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol Inst atom defprotocol defrecord defn letfn defmethod fn MapEntry ->MapEntry])
+  (:refer-clojure :exclude [Keyword Symbol Inst atom defprotocol defrecord defn letfn defmethod defmulti fn MapEntry ->MapEntry])
   (:require
+   [clojure.core :as c]
    #?(:clj [clojure.pprint :as pprint])
    [clojure.string :as str]
    #?(:clj [schema.macros :as macros])
@@ -85,6 +86,7 @@
    [schema.spec.leaf :as leaf]
    [schema.spec.variant :as variant]
    [schema.spec.collection :as collection])
+  #?@(:bb [] :clj [(:import [schema MultiFnWrapper])])
   #?(:cljs (:require-macros [schema.macros :as macros]
                             schema.core)))
 
@@ -1382,6 +1384,270 @@
                     ~@fn-body)]
          (utils/declare-class-schema! (utils/fn-schema-bearer ~name) ~schema-form)
          ret#)))))
+
+#?(:clj
+   (defn- split-argv [argv]
+     (assert (vector? argv))
+     (assert (every? symbol? argv) "Destructuring in arguments-checker not yet supported.")
+     (let [amp? (= '& (nth argv (- (count argv) 2) nil))
+           add-gensym #(vary-meta % assoc
+                                  ::arg-gensym (gensym %)
+                                  ::schema-gensym (gensym (str % "_schema"))
+                                  ::error-gensym (gensym (str % "_error"))
+                                  ::checker-gensym (gensym (str % "_chk")))
+           to-gensym #(-> % meta ::arg-gensym)
+           to-error #(-> % meta ::error-gensym)
+           to-schema #(-> % meta ::schema-gensym)
+           to-checker #(-> % meta ::checker-gensym)
+           fixed-args (mapv add-gensym
+                            (cond-> argv
+                              amp? (-> pop pop)))
+           rest-arg (when amp? (add-gensym (peek argv)))
+           all-args (cond-> fixed-args rest-arg (conj rest-arg))
+           gfixed-args (mapv to-gensym fixed-args)
+           grest-arg (some-> rest-arg to-gensym)
+           gargv (cond-> gfixed-args
+                   grest-arg (conj '& grest-arg))
+           add-deref (fn [e] `(deref ~e))]
+       (assert (apply distinct? (cond-> fixed-args rest-arg (conj rest-arg))))
+       {:fixed-args fixed-args :rest-arg rest-arg :all-args all-args :gall-args (mapv to-gensym all-args)
+        :gfixed-args gfixed-args :grest-arg grest-arg 
+        :fixed-errors (mapv to-error fixed-args) :rest-error (some-> rest-arg to-error)
+        ;; only use the next 4 for references, as they are bound to (delay ..) and are automatically deref'ed
+        :fixed-schemas (mapv (comp add-deref to-schema) fixed-args) :rest-schema (some-> rest-arg to-schema add-deref)
+        :fixed-checkers (mapv (comp add-deref to-checker) fixed-args) :rest-checker (some-> rest-arg to-checker add-deref)
+        :gargv gargv :to-gensym to-gensym :to-error to-error :to-schema to-schema :to-checker to-checker})))
+
+(defn arguments-checker-error!
+  ([fname errors fixed-args fixed-names fixed-schemas]
+   (let [error (mapv (fn [e n]
+                       (when e (list 'named e n)))
+                     errors
+                     fixed-names)]
+     (macros/error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                   fname (pr-str error))
+                    {:schema (mapv schema.core/one fixed-schemas fixed-names)
+                     :value fixed-args
+                     :error error})))
+  ([fname errors rest-error fixed-args rest-arg fixed-names rest-name fixed-schemas rest-schema]
+   (let [error (mapv (fn [e n]
+                       (when e (list 'named e n)))
+                     errors ;; TODO how are rest errors named usually?
+                     (conj fixed-names rest-name))]
+     (macros/error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                   fname (pr-str error))
+                    {:schema (-> (mapv schema.core/one fixed-schemas fixed-names)
+                                 ;; TODO is this named?
+                                 (conj rest-schema))
+                     :value (into fixed-args rest-arg)
+                     :error error}))))
+
+(defn return-checker-error! [fname error output-schema ret]
+  (macros/error! (utils/format* "Output of %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                fname (pr-str error))
+                 {:schema output-schema :value ret :error error}))
+
+;;TODO unroll
+(defn fixed-arguments-checker
+  [& fixed-errors]
+  (when (some some? fixed-errors)
+    (vec fixed-errors)))
+
+(defn rest-arguments-checker
+  [& fixed-errors-then-rest-error]
+  (when (some some? fixed-errors-then-rest-error)
+    (vec fixed-errors-then-rest-error)))
+
+#?(:clj
+   (defn arguments-checker-bindings*
+     [arg-validators]
+     (into [] (mapcat (c/fn [{:keys [all-args to-gensym to-schema to-checker]}]
+                        (mapcat (c/fn [arg]
+                                  ;; ::keys not supported in Clojure 1.8
+                                  (let [[arg-gensym schema-gensym checker-gensym]
+                                        ((juxt to-gensym to-schema to-checker) arg)]
+                                    ;; the corresponding derefs to these delays are added to fixed-schemas, rest-checker etc. by split-argv.
+                                    [schema-gensym `(delay ~(-> arg meta :schema))
+                                     checker-gensym `(delay (schema.core/checker (deref ~schema-gensym)))]))
+                                all-args)))
+           arg-validators)))
+
+#?(:clj
+   (defn arguments-checker-fn*
+     [fname arg-validators]
+     (assert (symbol? fname))
+     (let [gerror (gensym 'error)]
+       `(c/fn ~@(map (c/fn [{:keys [fixed-args gfixed-args rest-arg grest-arg all-args gargv
+                                    fixed-schemas rest-schema fixed-checkers rest-checker]}]
+                       `(~gargv ~@(when (seq all-args)
+                                    [`(when-some [~gerror (~(if rest-arg `rest-arguments-checker `fixed-arguments-checker)
+                                                                ~@(map list fixed-checkers gfixed-args)
+                                                                ~@(some->> grest-arg (list rest-checker)))]
+                                        ~(if rest-arg
+                                           `(arguments-checker-error!
+                                              '~fname
+                                              ~gerror
+                                              ~gfixed-args
+                                              ~grest-arg
+                                              '~fixed-args
+                                              '~rest-arg
+                                              ~fixed-schemas
+                                              ~rest-schema)
+                                           `(arguments-checker-error!
+                                              '~fname
+                                              ~gerror
+                                              ~gfixed-args
+                                              '~fixed-args
+                                              ~fixed-schemas)))])))
+                     arg-validators)))))
+
+#?(:clj
+   (defn parse-arguments-checker-spec [&env args]
+     (assert (seq args))
+     (->> (sort args)
+          (mapv (comp split-argv
+                      #(macros/process-arrow-schematized-args &env %))))))
+
+#?(:clj
+   (defmacro arguments-checker
+     [fname args]
+     (let [arg-validators (parse-arguments-checker-spec &env args)]
+       `(let ~(arguments-checker-bindings* arg-validators)
+          ~(arguments-checker-fn* fname arg-validators)))))
+
+(comment
+(clojure.pprint/pprint (macroexpand-1 '(arguments-checker my-fn-name ([a :- s/Int] [b :- s/Int, c :- s/Num]))))
+;=>
+(let [a_schema s/Int
+      a_chk (checker a_schema)
+      b_schema s/Int
+      b_chk (checker b_schema)
+      c_schema s/Num
+      c_chk (checker c_schema)
+      input_schema2 [(s/one a_schema 'b)
+                     (s/one a_schema 'c)]]
+  (fn
+    ([a]
+     (let [a_err (a_chk a)]
+       (when (or a_err)
+         (error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                'my-fn-name (pr-str [a_err]))
+                 {:schema [(s/one a_schema 'a)] :value [a] :error [a_err]}))))
+    ([b c]
+     (let [b_err (b_chk b)
+           c_err (c_chk c)]
+       (when (or b_err c_err)
+         (let [error (mapv (fn [[n err]]
+                             (when err
+                               (list 'named ~err ~n)))
+                           [[b b_err] [c c_err]])]
+           (error! (utils/format* "Input to %s does not match schema: \n\n\t \033[0;33m  %s \033[0m \n\n"
+                                  'my-fn-name (pr-str error))
+                   {:schema input-schema2 :value [b c] :error error})))))))
+)
+
+(defn unwrap-defmulti [var]
+  (alter-var-root var
+                  ;; harder to implement equivalent to *elide-defprotocol-instrumentation*.
+                  ;; perhaps wrap in a var that reads a JVM property?
+                  (fn* [mm]
+                       (if (instance? MultiFnWrapper mm)
+                         (.getWrappedMultimethod ^MultiFnWrapper mm)
+                         mm))))
+
+(defn wrap-defmulti [var mm-str wrapper]
+  (alter-var-root var
+                  (fn* [mm]
+                       (if (instance? MultiFnWrapper mm)
+                         mm
+                         ;; TODO equivalent to *elide-defprotocol-instrumentation*
+                         (MultiFnWrapper/schemaWrapperCreator
+                           mm-str
+                           mm
+                           wrapper)))))
+
+;;reminder: close the s/fn optimization issue, the problem is error reporting.
+#?(:clj
+(defmacro defmulti
+  "Like clojure.core/defmulti, except that a schema :=> may be provided
+   after the mm-name to wrap calls to methods. Calls to dispatch-fn will
+   not be wrapped.
+
+   The syntax for :=> is similar to s/defprotocol method specs, but without
+   method names and with rest-arguments allowed.
+
+   Examples:
+
+     (s/defmulti mymultifun
+        :=> (:- s/Int [a :- s/Int] [a :- s/Int, b :- s/Int])
+        \"Doc\"
+        my-dispatch-fn)
+
+     ;; You can also use meta tags like ^:always-validate by placing them
+     ;; before the multifunction name:
+     (s/defmulti ^:always-validate mymultifun :- (s/=> s/Int s/Int)
+        my-dispatch-fn)
+  
+  Caveats:
+  - instrumentation is not yet supported in ClojureScript and Babashka.
+  
+  Future ideas:
+  - attach :schema to var
+  - support :- for fully dynamic schema with less optimized expansion"
+  [mm-name & tail]
+  (let [has-schema? (= :=> (first tail))
+        [schema tail] (if has-schema?
+                        [(second tail) (nnext tail)]
+                        [nil tail])
+        has-ret-schema? (and has-schema? (= :- (first schema)))
+        [ret-schema schema] (if has-ret-schema?
+                              [(second schema) (nnext schema)]
+                              [nil schema])
+        arity-schemas (when has-schema?
+                        (assert (seq schema) "Missing arity schemas")
+                        schema)
+        supported? (and (not (macros/cljs-env? &env))
+                        #?(:bb false :default true))
+        wrapper (when (and supported? has-schema?)
+                  (let [f (gensym 'f)
+                        res (gensym 'res)
+                        gret-schema (gensym 'ret-schema)
+                        ret-checker (gensym 'ret-checker)
+                        input-schema (gensym 'input-schema)
+                        garg-validator (gensym 'args-validator)
+                        arg-validators (parse-arguments-checker-spec &env arity-schemas)]
+                    `(let [~@(arguments-checker-bindings* arg-validators)
+                           ~garg-validator ~(arguments-checker-fn* mm-name arg-validators)
+                           ~@(when has-ret-schema?
+                               `[~gret-schema (delay ~ret-schema)
+                                 ~ret-checker (delay (schema.core/checker @~gret-schema))])]
+                       ;;TODO attach schema to var using above bindings to construct
+                       (c/fn [~f]
+                         (c/fn ~@(map (c/fn [{:keys [gall-args rest-arg gargv]}]
+                                        (assert gargv)
+                                        `(~gargv (let [~res (do (~garg-validator ~@gall-args)
+                                                                (println "about to call")
+                                                                (~@(when rest-arg [`apply]) ~f ~@gall-args))]
+                                                   ~@(when has-ret-schema?
+                                                       [`(println "about to check return" ~res "against" @~gret-schema)
+                                                        `(when-some [err# (@~ret-checker ~res)]
+                                                           (return-checker-error! '~mm-name err# @~gret-schema ~res))])
+                                                   ~res)))
+                                      arg-validators))))))
+        defmulti-expr `(clojure.core/defmulti ~mm-name ~@tail)]
+    (if wrapper
+      `(do ~defmulti-expr
+           (wrap-defmulti (var ~mm-name)
+                          ~(str mm-name)
+                          ~wrapper))
+      defmulti-expr))))
+
+(comment
+(clojure.pprint/pprint (macroexpand-1
+                         '(defmulti defmulti-with-schema
+                           :=> (:- s/Int [a :- s/Num])
+                           class)))
+  )
 
 #?(:clj
 (defmacro defmethod
