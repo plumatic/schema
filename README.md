@@ -449,6 +449,7 @@ We welcome contributions in the form of bug reports and pull requests; please se
  - https://github.com/KitApps/schema-refined provides `constrained` and `conditional` on steroids to make your schemas as precise as it's possible using set of flexible and composable predicates
  - https://github.com/vodori/schema-conformer provides a more advanced coercion matcher with optional transformations like removing extra map keys, initializing default values, and converting between vectors and sets.
  - https://github.com/vodori/schema-forms provides a converter from Schema to JSON Schema.
+ - https://github.com/nomicflux/skeptic provides a lein plugin to statically check Schema annotations.
 
 If you make something new, please feel free to PR to add it here!
 
