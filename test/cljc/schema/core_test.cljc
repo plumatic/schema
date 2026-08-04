@@ -437,6 +437,15 @@
     (invalid! s (atom 1))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Atom schemas
+
+(deftest volatile-test
+  (let [s (s/volatile s/Str)]
+    (is (not (s/check s (volatile! "asdf")))) ;; don't expect identity after walking
+    (invalid! s (delay "asdf") "(not (volatile? a-clojure.lang.Delay))")
+    (invalid! s (volatile! 1))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Map Schemas
 
 (deftest uniform-map-test
