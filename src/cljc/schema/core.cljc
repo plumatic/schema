@@ -75,7 +75,8 @@
    See the docstrings of defrecord, fn, and defn for more details about how
    to use these macros."
   ;; don't exclude def because it's not a var.
-  (:refer-clojure :exclude [Keyword Symbol Inst atom defprotocol defrecord defn letfn defmethod fn MapEntry ->MapEntry])
+  (:refer-clojure :exclude [Keyword Symbol Inst atom defprotocol defrecord defn letfn defmethod fn MapEntry ->MapEntry
+                            volatile volatile? Volatile ->Volatile])
   (:require
    #?(:clj [clojure.pprint :as pprint])
    [clojure.string :as str]
@@ -698,6 +699,28 @@
   "An atom containing a value matching 'schema'."
   [schema]
   (->Atomic schema))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Volatile schema
+
+(defn- volatile? [x]
+  #?(:clj (instance? clojure.lang.Volatile x)
+     :cljs (satisfies? IVolatile x)))
+
+(macros/defrecord-schema Volatile [schema]
+  Schema
+  (spec [this]
+    (collection/collection-spec
+     (spec/simple-precondition this volatile?)
+     clojure.core/volatile!
+     [(collection/one-element true schema (clojure.core/fn [item-fn coll] (item-fn @coll) nil))]
+     (clojure.core/fn [_ xs _] (clojure.core/volatile! (first xs)))))
+  (explain [this] (list 'volatile (explain schema))))
+
+(clojure.core/defn volatile
+  "A volatile containing a value matching 'schema'."
+  [schema]
+  (->Volatile schema))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
