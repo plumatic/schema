@@ -21,10 +21,10 @@
              :1.9 {:dependencies [[org.clojure/clojure "1.9.0"] [org.clojure/clojurescript "1.10.520"]]}
              :1.10 {:dependencies [[org.clojure/clojure "1.10.3"] [org.clojure/clojurescript "1.10.879"]]}
              :1.11 {:dependencies [[org.clojure/clojure "1.11.1"] [org.clojure/clojurescript "1.11.4"]]}
-             :1.12 {:dependencies [[org.clojure/clojure "1.12.0-master-SNAPSHOT"] [org.clojure/clojurescript "1.11.4"]]
-                    :repositories [["sonatype-oss-public" {:url "https://oss.sonatype.org/content/groups/public"}]]}}
+             :latest {:dependencies [[org.clojure/clojure "1.12.5"]
+                                     [org.clojure/clojurescript "1.11.4"]]}}
 
-  :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11:+1.12"]
+  :aliases {"all" ["with-profile" "+dev:+1.9:+1.10:+1.11:+latest"]
             "deploy" ["do" "clean," "deploy" "clojars"]
             "test" ["do" "clean," "test," "doo" "node" "test" "once"]
             "doc" ["codox"]}
