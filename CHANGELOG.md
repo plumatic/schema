@@ -1,3 +1,9 @@
+## 1.4.2 (`2026-08-09`)
+ * [#460](https://github.com/plumatic/schema/pull/460), [#461](https://github.com/plumatic/schema/pull/461): Add `s/volatile` schemas for Clojure and ClojureScript volatiles.
+ * Improve deprecation notices for `schema.experimental.complete` and `schema.experimental.generators`.
+ * [#458](https://github.com/plumatic/schema/pull/458), [#462](https://github.com/plumatic/schema/pull/462): Refresh CI and build compatibility, including testing against Clojure 1.12.5.
+ * [#459](https://github.com/plumatic/schema/pull/459): Add Skeptic to the list of Schema extensions and update documentation links to HTTPS.
+
 ## 1.4.1 (`2022-09-29`)
  * [#449](https://github.com/plumatic/schema/issues/449): Fix bad jsdoc
 
