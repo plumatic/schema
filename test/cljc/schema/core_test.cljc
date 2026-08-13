@@ -437,7 +437,7 @@
     (invalid! s (atom 1))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Volatile schemas
+;;; Atom schemas
 
 (deftest volatile-test
   (let [s (s/volatile s/Str)]
